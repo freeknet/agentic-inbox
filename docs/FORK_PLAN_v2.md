@@ -285,11 +285,22 @@ The upgrades move **before** feature work. The codebase is about 10k LOC; the ag
   - MCP `server.tool` → `registerTool`;
   - `McpAgent` → `createMcpHandler`.
 
-## F. Still unverified after research (covered by the Phase 1 probe)
+## F. Verification status after the Phase 1 probe
 
-- DO CPU budget on Free, and whether each RPC call resets it.
-- Whether Resend keeps a custom `Message-ID`, and how the default looks under its new sending engine ("Forge").
-- Resend `path` fetch behavior with presigned URLs: timing, timeout, required URL lifetime.
-- Whether `scheduled_at` works with attachments.
+Full results: `docs/probe-results.md` (2026-11-18).
+
+**Resolved by the probe**
+- **DO CPU on Free:** a DO request has a real budget (20 MB parse at 550–750 ms CPU, 10 of 10 ok; 25 MB base64 at 1.5 s ok). The stateless Worker is killed under sustained load (`exceededCpu`). **Design A.** Each RPC call is metered separately.
+- **Custom `Message-ID`:** discarded. Recipients see Resend's `…@email.amazonses.com` ID, and it equals `message_id` from `GET /emails/:id`. Store Resend's ID (plan §A3 unchanged).
+- **Presigned R2 URL as `path`:** works for immediate sends, including inline `content_id` images. A 1 h expiry was enough.
+- **SPF/DKIM/DMARC** with the four Resend records: all pass at Gmail.
+- **Access path bypass:** works. It also covers sub-paths of the bypassed path.
+- **`scheduled_at` with `path` attachments:** works (delivered on time with both attachments). This supersedes §A3's "never use `path` together with `scheduled_at`". If combining them, set the URL expiry to at least `scheduled_at` + 1 h, because the fetch time is unknown. `message_id` stays `null` until the send happens.
+
+**Still unverified**
+- Resend `path` fetch timeout and the minimum URL lifetime it needs.
 - Whether a cancelled scheduled email still counts toward quota.
 - Combined To + Cc + Bcc cap (capped at 50 in the UI until known).
+- Whether the observed DO CPU allowance is a stable guarantee (it is not documented). Keep postal-mime limits as a safety net.
+
+**New prerequisite found:** the `midwestfreeks.org` zone has no MX records, so Cloudflare Email Routing must be enabled in Phase 4.
