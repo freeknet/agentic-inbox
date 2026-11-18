@@ -1,0 +1,19 @@
+{
+	// Throwaway Free-tier probe (plan v2, Phase 1). Not part of the app.
+	// Deploy:  npx wrangler deploy -c probe/wrangler.jsonc
+	// Delete:  npx wrangler delete -c probe/wrangler.jsonc
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "agentic-inbox-probe",
+	"main": "./src/index.ts",
+	"compatibility_date": "2026-11-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"observability": { "enabled": true },
+	"routes": [{ "pattern": "probe.midwestfreeks.org", "custom_domain": true }],
+	"vars": {
+		"R2_BUCKET_NAME": "agentic-inbox-probe",
+		"MAIL_DOMAIN": "midwestfreeks.org"
+	},
+	"r2_buckets": [{ "binding": "BUCKET", "bucket_name": "agentic-inbox-probe" }],
+	"durable_objects": { "bindings": [{ "name": "PROBE", "class_name": "ProbeDO" }] },
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["ProbeDO"] }]
+}
