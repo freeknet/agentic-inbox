@@ -269,6 +269,22 @@ The upgrades move **before** feature work. The codebase is about 10k LOC; the ag
 - **Worker bundle:** 1.05 MB gzip, against the Free plan's 3 MB compressed limit.
 - **npm:** npm 10.9's arborist crashes resolving vitest 4's optional peers (`Cannot read properties of null (reading 'edgesOut')`). The lockfile was produced with npm 11. `npm ci` on npm 10 (CI on Node 22) works with it.
 
+### E3. Phase 2 results
+**Done on branch `phase-2-upgrades`; CI green.** Deviations from §C:
+- **Steps 3 and 4 had to merge.** `agents@0.33`'s optional peer `@ai-sdk/provider@^4` conflicts with AI SDK 6's provider 3.x, so agents/ai-chat/MCP SDK and AI SDK 7 moved together.
+- **Extra direct dependencies.** The bundle needs these declared, because they aren't hoisted otherwise:
+  - `@ai-sdk/provider` 4.0.35;
+  - `@modelcontextprotocol/server` and `@modelcontextprotocol/client` 2.4.0, imported by `agents/mcp`.
+- **Lockfile anchoring.** Peer cycles (agents ↔ ai-chat, react-router ↔ vite) block incremental installs. Bumps were done by setting `package.json` and dropping the stale lockfile entries.
+- **Worker bundle grew** from 1.05 MB to **1.88 MB gzip** (agents 0.33 + MCP v2 + AI SDK 7). The Free limit is 3 MB; watch it in later phases.
+- **Recipient order changed.** postal-mime ≥ 3 returns recipients in document order. Upstream routing by first `To:` now drops `To: other, me`. This is captured as a KNOWN BUG test; Phase 4 fixes it.
+- **Local dev needs a token.** `npm run dev` needs `CLOUDFLARE_API_TOKEN` because `send_email`/AI are remote bindings. Phase 3 removes `send_email`.
+- **Test noise.** Tests log "Binding AI needs to be run remotely" from inside Miniflare's remote-proxy stub. App code catches it, and tests pass. A mock AI binding comes with Phase 7.
+- **Deprecated but working, left for Phase 7:**
+  - Kumo `Tooltip asChild` and `Banner text=`;
+  - MCP `server.tool` → `registerTool`;
+  - `McpAgent` → `createMcpHandler`.
+
 ## F. Still unverified after research (covered by the Phase 1 probe)
 
 - DO CPU budget on Free, and whether each RPC call resets it.
