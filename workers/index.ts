@@ -26,9 +26,9 @@ type AppContext = Context<MailboxContext>;
 // -- Request body schemas (kept for validation) ---------------------
 
 const CreateMailboxBody = z.object({
-	email: z.string().email(),
+	email: z.email(),
 	name: z.string().min(1),
-	settings: z.record(z.any()).optional(), // unvalidated — agentSystemPrompt goes straight to AI
+	settings: z.record(z.string(), z.any()).optional(), // unvalidated — agentSystemPrompt goes straight to AI
 });
 
 const DraftBody = z.object({
@@ -82,6 +82,15 @@ app.use("/api/*", cors({
 	},
 }));
 app.use("/api/v1/mailboxes/:mailboxId/*", requireMailbox);
+
+// Invalid request bodies (schema.parse throws ZodError) are client errors, not 500s.
+app.onError((err, c) => {
+	if (err instanceof z.ZodError) {
+		return c.json({ error: "Invalid request", issues: z.treeifyError(err) }, 400);
+	}
+	console.error("Unhandled API error:", err);
+	return c.json({ error: "Internal Server Error" }, 500);
+});
 
 // -- Config ---------------------------------------------------------
 

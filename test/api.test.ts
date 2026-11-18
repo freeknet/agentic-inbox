@@ -57,6 +57,14 @@ describe("REST API", () => {
 		expect(emails[0]).toMatchObject({ subject: "Hi Bob", recipient: "bob@other.test" });
 	});
 
+	it("returns 400 with issues for an invalid body", async () => {
+		const res = await api(`${base}/emails`, json({ to: "not-an-address", from: MAILBOX, subject: "x" }));
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as { error: string; issues: unknown };
+		expect(body.error).toBe("Invalid request");
+		expect(body.issues).toBeTruthy();
+	});
+
 	it("rejects a From address that is not the mailbox", async () => {
 		const res = await api(
 			`${base}/emails`,
