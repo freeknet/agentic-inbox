@@ -158,6 +158,8 @@ Source: [email handler](https://developers.cloudflare.com/email-service/api/rout
 | B11 | **Foreign-key enforcement (`ON DELETE CASCADE`) is undocumented for DO SQLite.** If it's off, deleting emails orphans attachment rows. | `db/schema.ts:17,38` | Phase 0 test asserts the cascade. If FKs are off, delete explicitly (P0) |
 | B12 | **`.parse()` failures become 500s.** | `index.ts:103,170,216` | `safeParse` → 400 with `z.treeifyError` (P2) |
 | B13 | **Settings `PUT` stores any JSON** (v1 had this). | `index.ts:128-131` | Zod schema (P4) |
+| B14 | **Inbound replies never join the root's thread.** The root gets `thread_id` = internal UUID, while a reply gets `thread_id` = the root's Message-ID string (`references[0] \|\| inReplyTo`). | `index.ts:386` | Resolve `thread_id` by looking up `message_id` of `In-Reply-To`/`References` in the DB, then fall back (P4). Covered by a `KNOWN BUG` test. |
+| B15 | **The subject-threading fallback can't attach to a single-message thread.** It filters `thread_id != id`, and its 7-day window has the same ISO-vs-`datetime()` comparison bug as B1. | `durableObject/index.ts:756-760` | Fix with B14 (P4) |
 
 ---
 
@@ -242,12 +244,30 @@ The upgrades move **before** feature work. The codebase is about 10k LOC; the ag
 
 ---
 
-## E. Decisions to make before implementation
+## E. Decisions (resolved 2026-11-18)
 
-1. **Phase order: upgrades before features (recommended).** v1 had upgrades as Phase 5.
-2. **Resend key: sending-only, domain-scoped (recommended).** `message_id` comes from the webhook. A full-access key would also allow `GET /emails/:id` and `/cancel`, which isn't needed.
-3. **Default AI model: `glm-4.7-flash` (recommended).** Auto-draft stays default-off.
-4. **Probe deploys on your Cloudflare and Resend accounts.** I can write the probe code; you run `wrangler deploy` and the test sends, or give the session credentials.
+1. **Phase order:** as in §D (upgrades before features). The owner has no preference.
+2. **Resend key:** sending-only, restricted to the domain with `domain_id`. `message_id` comes from the webhook.
+3. **Default AI model:** `@cf/zai-org/glm-4.7-flash`. Auto-draft defaults to off.
+4. **Domain:** `midwestfreeks.org`, already on the owner's Cloudflare account.
+   - Email Routing MX stays on the apex.
+   - Resend's sending records go on its Return-Path subdomain (default `send.`), exactly as Resend shows them. CNAMEs must be DNS-only (grey cloud).
+   - Resend "Receiving" stays off.
+5. **Repo:** `freeknet/agentic-inbox` is private. `upstream` remote = `cloudflare/agentic-inbox`.
+
+### E1. Free-plan prerequisites and fallbacks (no paid plan required)
+**Prerequisites**
+- R2 must be activated, which usually means adding a payment method; usage stays $0 within the free tier. This is needed for the bucket and for the R2 API token used for presigning.
+- Cloudflare Zero Trust (Access) is free for under 50 users. Signup may ask for a payment method; that wasn't confirmed.
+
+**If the DO CPU budget on Free turns out to be about 10 ms (Phase 1 result)**
+- **Inbound:** use Design B (A2). Optionally parse the raw `.eml` client-side in the browser for rendering; postal-mime runs in browsers.
+- **Outbound attachments without presigned `path`:** the browser base64-encodes each file at upload and stores it as `uploads/…b64`. The Worker builds the Resend JSON request body as a concatenation of R2 streams through a `FixedLengthStream` with a precomputed length. That is I/O, not CPU, so no base64 work or `JSON.stringify` runs on a large string server-side.
+
+### E2. Phase 0 results
+- **B11 resolved:** DO SQLite enforces foreign keys, and `ON DELETE CASCADE` removes attachment rows (`test/storage.test.ts`).
+- **Worker bundle:** 1.05 MB gzip, against the Free plan's 3 MB compressed limit.
+- **npm:** npm 10.9's arborist crashes resolving vitest 4's optional peers (`Cannot read properties of null (reading 'edgesOut')`). The lockfile was produced with npm 11. `npm ci` on npm 10 (CI on Node 22) works with it.
 
 ## F. Still unverified after research (covered by the Phase 1 probe)
 
@@ -256,5 +276,4 @@ The upgrades move **before** feature work. The codebase is about 10k LOC; the ag
 - Resend `path` fetch behavior with presigned URLs: timing, timeout, required URL lifetime.
 - Whether `scheduled_at` works with attachments.
 - Whether a cancelled scheduled email still counts toward quota.
-- FK enforcement in DO SQLite (checked by the Phase 0 test).
 - Combined To + Cc + Bcc cap (capped at 50 in the UI until known).
