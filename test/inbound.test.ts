@@ -74,6 +74,14 @@ describe("inbound email", () => {
 		expect(await inbox()).toHaveLength(1);
 	});
 
+	it.fails("KNOWN BUG: mail delivered when the mailbox is not the first To address", async () => {
+		// With EMAIL_ADDRESSES unset, routing picks the first header To: address.
+		// postal-mime >= 3 returns addresses in document order (2.x reversed them),
+		// so "To: other, me" is now ignored. Fixed in Phase 4 (route by message.to).
+		await deliver(mime({ to: `Other <other@other.test>, ${MAILBOX}` }));
+		expect(await inbox()).toHaveLength(1);
+	});
+
 	it.fails("KNOWN BUG: the Date header is stored as the message date", async () => {
 		// Upstream stores receive time (workers/index.ts:399). Fixed in Phase 4.
 		await deliver(mime({ date: "Tue, 03 Nov 2026 10:00:00 +0000" }));
