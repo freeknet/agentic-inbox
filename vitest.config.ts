@@ -1,10 +1,9 @@
 import { cloudflareTest } from "@cloudflare/vitest-plugin";
-import tsconfigPaths from "vite-tsconfig-paths";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+	resolve: { tsconfigPaths: true },
 	plugins: [
-		tsconfigPaths(),
 		cloudflareTest({
 			wrangler: { configPath: "./wrangler.jsonc" },
 			// workers/app.ts needs the React Router virtual module; see test/worker-entry.ts.
