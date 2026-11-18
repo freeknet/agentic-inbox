@@ -3,13 +3,15 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { AIChatAgent } from "@cloudflare/ai-chat";
+import { createAI } from "agents/models/ai-sdk";
 import {
 	streamText,
 	generateText,
 	convertToModelMessages,
-	stepCountIs,
+	createUIMessageStreamResponse,
+	isStepCount,
+	toUIMessageStream,
 } from "ai";
-import { createWorkersAI } from "workers-ai-provider";
 import { z } from "zod";
 import type { EmailFull, EmailMetadata } from "../lib/schemas";
 import { verifyDraft, isPromptInjection } from "../lib/ai";
@@ -31,6 +33,13 @@ import {
 } from "../lib/tools";
 import { Folders, FOLDER_TOOL_DESCRIPTION, MOVE_FOLDER_TOOL_DESCRIPTION } from "../../shared/folders";
 import type { Env } from "../types";
+
+/**
+ * Chat/auto-draft model. kimi-k2.5 (upstream) was deprecated on 2026-05-30 and
+ * now aliases to kimi-k2.6, which requires a paid billing method. glm-4.7-flash
+ * supports tool calling and costs 5,500 / 36,400 Neurons per M input / output tokens.
+ */
+export const AGENT_MODEL = "@cf/zai-org/glm-4.7-flash";
 
 // AI SDK v6 changed tool() overloads significantly. We define tools as plain
 // objects matching the Tool type to avoid overload resolution issues.
@@ -269,27 +278,26 @@ function createEmailTools(env: Env, mailboxId: string) {
 	};
 }
 
-// Use `any` for the Env generic to avoid type conflicts between the custom
-// SEND_EMAIL binding shape and the AIChatAgent constraint.  The actual env
-// is fully typed inside the tools via the closure.
-export class EmailAgent extends AIChatAgent<any> {
-	async onChatMessage(onFinish: any) {
-		const env = this.env as Env;
+export class EmailAgent extends AIChatAgent<Env> {
+	async onChatMessage(onFinish: Parameters<AIChatAgent<Env>["onChatMessage"]>[0]) {
+		const env = this.env;
 		const mailboxId = this.name;
-		const workersai = createWorkersAI({ binding: env.AI });
+		const ai = createAI({ binding: env.AI });
 		const tools = createEmailTools(env, mailboxId);
 		const systemPrompt = await getSystemPrompt(env, mailboxId);
 
 		const result = streamText({
-			model: workersai("@cf/moonshotai/kimi-k2.5"),
-			system: systemPrompt,
+			model: ai(AGENT_MODEL),
+			instructions: systemPrompt,
 			messages: await convertToModelMessages(this.messages),
 			tools,
-			stopWhen: stepCountIs(5),
-			onFinish,
+			stopWhen: isStepCount(5),
+			onEnd: onFinish,
 		});
 
-		return result.toUIMessageStreamResponse();
+		return createUIMessageStreamResponse({
+			stream: toUIMessageStream({ stream: result.stream, tools }),
+		});
 	}
 
 	/**
@@ -334,7 +342,7 @@ export class EmailAgent extends AIChatAgent<any> {
 		threadId: string;
 	}) {
 		const env = this.env as Env;
-		const workersai = createWorkersAI({ binding: env.AI });
+		const ai = createAI({ binding: env.AI });
 		const tools = createEmailTools(env, emailData.mailboxId);
 		const systemPrompt = await getSystemPrompt(env, emailData.mailboxId);
 
@@ -463,11 +471,11 @@ Based on the email content and thread context above, draft a reply using draft_r
 
 		try {
 			const result = await generateText({
-				model: workersai("@cf/moonshotai/kimi-k2.5"),
-				system: systemPrompt,
+				model: ai(AGENT_MODEL),
+				instructions: systemPrompt,
 				messages: await convertToModelMessages(messages),
 				tools,
-				stopWhen: stepCountIs(5),
+				stopWhen: isStepCount(5),
 			});
 
 			// Check if draft_reply was called (saves to Drafts as side effect).

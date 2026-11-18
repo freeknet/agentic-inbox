@@ -76,9 +76,7 @@ function ToolCallBadge({
 		icon: <WrenchIcon size={14} weight="bold" />,
 	};
 	const isDone =
-		state === "output-available" ||
-		state === "result" ||
-		state === "output-error";
+		state === "output-available" || state === "output-error";
 
 	return (
 		<div className="flex items-center gap-1.5 py-1 px-2 rounded bg-kumo-fill/50 text-xs">
@@ -308,7 +306,7 @@ function AgentChatConnected({
 	const { startCompose } = useUIStore();
 
 	const agent = useAgent({ agent: "EmailAgent", name: mailboxId });
-	const { messages, sendMessage, status, setMessages, stop } =
+	const { messages, sendMessage, status, clearHistory, stop } =
 		useAgentChat({ agent });
 	const isStreaming = status === "streaming" || status === "submitted";
 
@@ -363,7 +361,7 @@ function AgentChatConnected({
 								icon={<TrashIcon size={14} />}
 								onClick={() => {
 									if (window.confirm("Clear chat history?")) {
-										setMessages([]);
+										clearHistory();
 									}
 								}}
 								aria-label="Clear chat"
