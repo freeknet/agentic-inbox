@@ -1,0 +1,13 @@
+{
+	"extends": "../tsconfig.json",
+	"include": ["./**/*.ts", "../worker-configuration.d.ts", "../.react-router/types/+server-build.d.ts"],
+	"compilerOptions": {
+		"strict": true,
+		"noEmit": true,
+		"lib": ["ES2022"],
+		"target": "ES2022",
+		"module": "ES2022",
+		"moduleResolution": "bundler",
+		"types": ["@cloudflare/vitest-plugin/types", "vite/client", "../worker-configuration.d.ts"]
+	}
+}

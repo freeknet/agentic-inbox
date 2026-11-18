@@ -3,9 +3,17 @@
 	"private": true,
 	"license": "Apache-2.0",
 	"type": "module",
+	"engines": {
+		"node": ">=22.12"
+	},
 	"cloudflare": {
 		"label": "Agentic Inbox",
-		"products": ["Workers", "Durable Objects", "R2", "Workers AI"],
+		"products": [
+			"Workers",
+			"Durable Objects",
+			"R2",
+			"Workers AI"
+		],
 		"bindings": {
 			"DOMAINS": {
 				"description": "Your domain with [Email Routing](https://developers.cloudflare.com/email-routing/) enabled (e.g. `example.com`). After deploying, create a catch-all Email Routing rule pointing to this Worker."
@@ -18,11 +26,13 @@
 		"deploy": "npm run build && wrangler deploy",
 		"dev": "react-router dev",
 		"preview": "npm run build && vite preview",
-		"typecheck": "npm run cf-typegen && react-router typegen && tsc -b"
+		"typecheck": "npm run cf-typegen && react-router typegen && tsc -b && tsc -p test/tsconfig.json",
+		"test": "vitest run"
 	},
 	"dependencies": {
 		"@cloudflare/ai-chat": "^0.1.8",
 		"@cloudflare/kumo": "^1.13.0",
+		"@modelcontextprotocol/sdk": "1.26.0",
 		"@phosphor-icons/react": "^2.1.10",
 		"@tanstack/react-query": "^5.99.0",
 		"@tiptap/extension-color": "3.20.2",
@@ -81,11 +91,10 @@
 		"@tiptap/extension-text": "3.20.2"
 	},
 	"devDependencies": {
-		"@cloudflare/vite-plugin": "^1.0.12",
-		"@cloudflare/workers-types": "^4.20251128.0",
+		"@cloudflare/vite-plugin": "1.67.0",
+		"@cloudflare/vitest-plugin": "1.5.1",
 		"@react-router/dev": "^7.5.3",
 		"@tailwindcss/vite": "^4.1.4",
-		"@types/dompurify": "^3.0.5",
 		"@types/node": "^20.19.37",
 		"@types/react": "^19.1.2",
 		"@types/react-dom": "^19.1.2",
@@ -93,6 +102,7 @@
 		"typescript": "^5.8.3",
 		"vite": "^6.3.3",
 		"vite-tsconfig-paths": "^5.1.4",
-		"wrangler": "^4.74.0"
+		"vitest": "4.1.12",
+		"wrangler": "4.157.0"
 	}
 }
