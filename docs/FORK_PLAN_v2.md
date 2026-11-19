@@ -304,3 +304,28 @@ Full results: `docs/probe-results.md` (2026-11-18).
 - Whether the observed DO CPU allowance is a stable guarantee (it is not documented). Keep postal-mime limits as a safety net.
 
 **New prerequisite found:** the `midwestfreeks.org` zone has no MX records, so Cloudflare Email Routing must be enabled in Phase 4.
+
+### E4. Phase 5–8 results (2026-11-19)
+**Done on branches `phase-5-rendering` → `phase-6-features` → `phase-7-agent-ui` → `phase-8-docs`, each stacked on the previous. Deployed to `mail.midwestfreeks.org` and tested live against Gmail.** Deviations and decisions:
+- **Attachments use base64 in the DO alarm, not presigned `path`.** Presigning needs an R2 API token, which costs an extra account credential. Base64 works because Design A gives the DO a real CPU budget. Uploads are a raw `PUT` streamed through `FixedLengthStream` (411 without `Content-Length`). Browsers send `Content-Length` over HTTP/2 in production. The total is capped at 18 MiB, so the message stays under Gmail's 25 MB after encoding.
+- **Inline `cid:` images** are fetched by the parent page and inlined as `data:` URIs. The sandboxed frame has an opaque origin and `img-src data:`, so it can't load the attachment API itself. Gmail marks inline images `Content-Disposition: attachment`, so matching is by Content-ID, not disposition.
+- **The v1 §6 feature table was not available to this phase.** Phase 6 shipped what this document names, plus the closest related features:
+  - FTS5 search: a contentless table maintained by triggers;
+  - auto-reply through the outbox, following RFC 3834;
+  - send later;
+  - signature settings;
+  - storage and quota meters.
+  Forwarding of inbound mail (the `forwarding` setting) is **not** implemented. Email Routing rules can forward directly.
+- **Neuron meter.** Usage is recorded by wrapping the `AI` binding, so every caller is metered. For streams, usage is read from the final SSE event.
+  - The injection scan now uses `@cf/meta/llama-3.1-8b-instruct-fp8-fast`. `llama-3.1-8b-instruct-fast` is not on the pricing page.
+  - Prices, per M input / output tokens:
+
+    | Model | Input | Output |
+    |---|---|---|
+    | llama-3.1-8b-instruct-fp8-fast | 4,119 | 34,868 |
+    | llama-4-scout-17b-16e-instruct | 24,545 | 77,273 |
+- **B5.** Service-token JWTs (`common_name`, no `email`) may reach only `/mcp`. `MCP_SERVICE_TOKEN_IDS` optionally pins client ids. No service token was created on the owner's account.
+- **Not done:**
+  - the 24 h soak on Free (Phase 7 exit test);
+  - a fresh deploy on a clean account following only the README (Phase 8 exit test);
+  - the Kumo deprecation cleanup (`Tooltip asChild`, `Banner text=`, MCP `server.tool`).

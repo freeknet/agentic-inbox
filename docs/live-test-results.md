@@ -19,6 +19,19 @@ Deployed from `phase-5-rendering` to `https://mail.midwestfreeks.org` (Workers F
 | Recipient quota | `send-quota` reported 2 used (the delivered message + the bounce). Failed and cancelled sends were not counted. |
 | Non-retryable error handling | The first two sends got `400 validation_error: API key is invalid` and were marked **Failed** with no retry, as designed (see below). |
 
+## Phase 5–7 live tests (2026-11-19 UTC)
+
+| Test | Result |
+|---|---|
+| Attach two files in compose (upload on pick) | Both PUT uploads succeeded in production, so browsers send `Content-Length`. The message reached Gmail with `notes.txt` and `pixel.png`. |
+| Inbound Gmail message with an inline image + attachment | Stored. Gmail labels the inline part `disposition: attachment` with a Content-ID. It renders inline from a `data:` URI. |
+| Forward with one of two original files removed | Gmail received only the kept file. |
+| Search after deploy | FTS5 migration backfilled existing mail. Body, prefix, `from:` and long queries work. |
+| Send later (UI, custom time +2 min) | Banner "Scheduled to send … / Cancel send" shown. Delivered at exactly the scheduled minute. |
+| Vacation auto-reply | Gmail got `Re: …` 3 s after sending, threaded, with `Auto-Submitted: auto-replied` and dkim/spf/dmarc pass. A second message within 4 days got no reply. Auto-reply was turned off again afterwards. |
+| Agent chat with metered AI binding | Answered with a tool call. The meter recorded 2 glm-4.7-flash calls, about 14 Neurons. |
+| Dark mode, 390 px layout | Kumo tokens switch with `data-mode`. Inbox, message, compose and settings fit at 390 px; the compose fields were widened. |
+
 ## Setup done for production
 
 - **R2 bucket:** `agentic-inbox`.
@@ -47,6 +60,8 @@ Remove-Item Env:RK
 ```
 
 The simpler option is to run `npx wrangler secret put NAME` interactively and paste at the prompt.
+
+- **R2 lifecycle rule** `expire-unsent-uploads`: deletes `uploads/` objects after 1 day.
 
 ## Follow-ups noticed
 
