@@ -10,6 +10,8 @@ import * as schema from "../db/schema";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
 import { applyMigrations, mailboxMigrations } from "./migrations";
+import { Outbox, type OutboxPayload, type WebhookEvent } from "./outbox";
+import { createResendProvider } from "../lib/resend";
 
 /**
  * SQL expression to normalize email subjects by stripping common
@@ -87,6 +89,7 @@ interface EmailData {
 	thread_id?: string | null;
 	message_id?: string | null;
 	raw_headers?: string | null;
+	delivery_status?: string | null;
 }
 
 interface AttachmentData {
@@ -107,7 +110,12 @@ export class MailboxDO extends DurableObject<Env> {
 		super(state, env);
 		this.db = drizzle(this.ctx.storage, { schema });
 		applyMigrations(this.ctx.storage.sql, mailboxMigrations, this.ctx.storage);
+		this.outbox = new Outbox(this.ctx.storage.sql, env.BUCKET, () =>
+			env.RESEND_API_KEY ? createResendProvider(env.RESEND_API_KEY) : null,
+		);
 	}
+
+	outbox: Outbox;
 
 	// ── Email CRUD (Drizzle) ───────────────────────────────────────
 
@@ -160,6 +168,7 @@ export class MailboxDO extends DurableObject<Env> {
 				email_references: schema.emails.email_references,
 				thread_id: schema.emails.thread_id,
 				folder_id: schema.emails.folder_id,
+				delivery_status: schema.emails.delivery_status,
 				snippet: sql<string>`SUBSTR(${schema.emails.body}, 1, 300)`,
 			})
 			.from(schema.emails)
@@ -783,42 +792,134 @@ export class MailboxDO extends DurableObject<Env> {
 		return null;
 	}
 
-	// ── Rate limiting (raw SQL) ────────────────────────────────────
+	// ── Outbox (see ./outbox.ts) ───────────────────────────────────
 
 	/**
-	 * Check if the mailbox has exceeded the send rate limit.
-	 * Limits: 20 emails per hour, 100 per day per mailbox.
-	 * Returns null if under limit, or an error message string if exceeded.
+	 * Queue an outgoing message: write the Sent row and the outbox row in one
+	 * transaction (optionally consuming a draft, B9), then arm the alarm.
+	 * Returns an error string when the recipient limits would be exceeded.
 	 */
-	async checkSendRateLimit(): Promise<string | null> {
-		const hourRow = [...this.ctx.storage.sql.exec(
-			`SELECT COUNT(*) as cnt FROM emails
-			 WHERE folder_id = ?1
-			   AND date >= datetime('now', '-1 hour')`,
-			Folders.SENT,
-		)][0] as { cnt: number } | undefined;
-
-		if ((hourRow?.cnt ?? 0) >= 20) {
-			return "Rate limit exceeded: max 20 emails per hour per mailbox";
+	async enqueueOutgoing(input: {
+		email: EmailData;
+		attachments: AttachmentData[];
+		payload: OutboxPayload;
+		delayMs: number;
+		draftId?: string | null;
+	}): Promise<{ ok: true; id: string; sendAt: number } | { ok: false; error: string; status: 400 | 429 }> {
+		const now = Date.now();
+		const count = input.payload.to.length + (input.payload.cc?.length ?? 0) + (input.payload.bcc?.length ?? 0);
+		const quotaError = this.outbox.checkQuota(count, now);
+		if (quotaError) {
+			return { ok: false, error: quotaError, status: count > 0 && count <= 50 ? 429 : 400 };
 		}
+		const sendAt = now + Math.max(0, input.delayMs);
 
-		const dayRow = [...this.ctx.storage.sql.exec(
-			`SELECT COUNT(*) as cnt FROM emails
-			 WHERE folder_id = ?1
-			   AND date >= datetime('now', '-1 day')`,
-			Folders.SENT,
-		)][0] as { cnt: number } | undefined;
+		this.ctx.storage.transactionSync(() => {
+			if (input.draftId) {
+				this.db.delete(schema.emails)
+					.where(and(eq(schema.emails.id, input.draftId), eq(schema.emails.folder_id, Folders.DRAFT)))
+					.run();
+			}
+			this.insertEmail(Folders.SENT, { ...input.email, delivery_status: "queued" }, input.attachments);
+			this.outbox.insert(input.email.id, input.payload, sendAt, now);
+		});
 
-		if ((dayRow?.cnt ?? 0) >= 100) {
-			return "Rate limit exceeded: max 100 emails per day per mailbox";
+		await this.armAlarm();
+		return { ok: true, id: input.email.id, sendAt };
+	}
+
+	/** Undo send: move a still-queued message back to Drafts. */
+	async cancelOutgoing(id: string): Promise<"cancelled" | "not_found" | "too_late"> {
+		const now = Date.now();
+		const result = this.ctx.storage.transactionSync(() => {
+			const r = this.outbox.cancel(id, now);
+			if (r === "cancelled") {
+				this.db.update(schema.emails)
+					.set({ folder_id: Folders.DRAFT, delivery_status: null })
+					.where(eq(schema.emails.id, id))
+					.run();
+			}
+			return r;
+		});
+		await this.armAlarm();
+		return result;
+	}
+
+	async getOutboxEntry(id: string) {
+		const row = this.outbox.get(id);
+		if (!row) return null;
+		const { payload: _payload, ...rest } = row;
+		return rest;
+	}
+
+	async getSendQuota() {
+		const now = Date.now();
+		const day = new Date(now).toISOString().slice(0, 10);
+		return { day, used: this.outbox.recipientsUsed(day), limit: 100, pausedUntil: this.outbox.pausedUntil() || null };
+	}
+
+	async checkSuppressed(emails: string[]) {
+		return this.outbox.suppressed(emails);
+	}
+
+	/** Apply a verified Resend webhook. Returns "duplicate" for an already-seen svix-id. */
+	async applyWebhook(svixId: string, event: WebhookEvent): Promise<"applied" | "duplicate" | "ignored"> {
+		const now = Date.now();
+		return this.ctx.storage.transactionSync(() => {
+			if (!this.outbox.markWebhookSeen(svixId, now)) return "duplicate";
+			if (event.type.startsWith("suppression.")) {
+				this.outbox.applySuppression(event);
+				return "applied";
+			}
+			const match = this.outbox.resolveEmailEvent(event, (id) => {
+				const row = this.db.select({ s: schema.emails.delivery_status })
+					.from(schema.emails).where(eq(schema.emails.id, id)).get();
+				return row?.s ?? null;
+			});
+			if (!match) return "ignored";
+			const set: { delivery_status?: string; message_id?: string } = {};
+			if (match.status) set.delivery_status = match.status;
+			if (match.messageId) set.message_id = match.messageId;
+			if (Object.keys(set).length > 0) {
+				this.db.update(schema.emails).set(set).where(eq(schema.emails.id, match.id)).run();
+			}
+			return "applied";
+		});
+	}
+
+	private async armAlarm() {
+		const next = this.outbox.nextWakeAt();
+		if (next === null) {
+			await this.ctx.storage.deleteAlarm();
+			return;
 		}
+		const current = await this.ctx.storage.getAlarm();
+		if (current === null || current > next || current < Date.now() - 60_000) {
+			await this.ctx.storage.setAlarm(next);
+		}
+	}
 
-		return null;
+	async alarm() {
+		const now = Date.now();
+		await this.outbox.processDue(now, (id, status) => {
+			this.db.update(schema.emails).set({ delivery_status: status }).where(eq(schema.emails.id, id)).run();
+		});
+		const next = this.outbox.nextWakeAt();
+		if (next !== null) await this.ctx.storage.setAlarm(Math.max(next, Date.now() + 1000));
 	}
 
 	// ── Email creation (Drizzle) ───────────────────────────────────
 
 	async createEmail(
+		folder: string,
+		email: EmailData,
+		attachments: AttachmentData[],
+	) {
+		this.insertEmail(folder, email, attachments);
+	}
+
+	/** Synchronous insert so it can run inside transactionSync. */
+	private insertEmail(
 		folder: string,
 		email: EmailData,
 		attachments: AttachmentData[],
@@ -862,6 +963,7 @@ export class MailboxDO extends DurableObject<Env> {
 				thread_id: email.thread_id ?? null,
 				message_id: email.message_id ?? null,
 				raw_headers: email.raw_headers ?? null,
+				delivery_status: email.delivery_status ?? null,
 			})
 			.run();
 

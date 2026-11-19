@@ -22,12 +22,10 @@ import {
 	buildQuotedReplyBlock,
 	textToHtml,
 	listMailboxes,
-	generateMessageId,
 	buildReferencesChain,
-	buildThreadingHeaders,
 } from "./email-helpers";
 import { verifyDraft } from "./ai";
-import { sendEmail } from "../email-sender";
+import { queueSend } from "./send";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
 
@@ -37,10 +35,6 @@ type MailboxSearchStub = {
 		query: string;
 		folder?: string;
 	}) => Promise<unknown>;
-};
-
-type RateLimitStub = {
-	checkSendRateLimit: () => Promise<string | null>;
 };
 
 // ── list_mailboxes ─────────────────────────────────────────────────
@@ -389,6 +383,8 @@ export async function toolDeleteEmail(
 }
 
 // ── send_reply ─────────────────────────────────────────────────────
+// Agent and MCP sends go through the outbox like interactive sends (B10),
+// with no undo delay. "queued" means accepted; delivery state arrives by webhook.
 
 export async function toolSendReply(
 	env: Env,
@@ -400,16 +396,10 @@ export async function toolSendReply(
 		bodyHtml: string;
 	},
 ): Promise<
-	| { status: "sent"; messageId: string; message: string }
+	| { status: "queued"; messageId: string; message: string }
 	| { error: string }
 > {
 	const stub = getMailboxStub(env, mailboxId);
-
-	// Check send rate limit
-	const rateLimitError = await (stub as unknown as RateLimitStub).checkSendRateLimit();
-	if (rateLimitError) {
-		return { error: rateLimitError };
-	}
 
 	const originalEmail = (await stub.getEmail(params.originalEmailId)) as EmailFull | null;
 	if (!originalEmail) {
@@ -417,9 +407,7 @@ export async function toolSendReply(
 	}
 
 	const { originalMsgId, references, threadId } = buildReferencesChain(originalEmail);
-	const fromDomain = mailboxId.split("@")[1];
-	if (!fromDomain) throw new Error("Invalid mailbox email address");
-	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
+	if (!mailboxId.split("@")[1]) throw new Error("Invalid mailbox email address");
 
 	// Verify and append quoted original message
 	const sanitizedBody = await verifyDraft(env.AI, params.bodyHtml);
@@ -433,38 +421,20 @@ export async function toolSendReply(
 	});
 	const fullBodyHtml = sanitizedBody + quotedBlock;
 
-	try {
-		await sendEmail(env.EMAIL, {
-			to: params.to,
-			from: mailboxId,
-			subject: params.subject,
-			html: fullBodyHtml,
-			headers: buildThreadingHeaders(originalMsgId, references),
-		});
-	} catch (e) {
-		console.error("Email send failed:", (e as Error).message);
-		return { error: `Failed to send reply: ${(e as Error).message}` };
-	}
+	const result = await queueSend(env, stub, {
+		mailboxId,
+		from: mailboxId,
+		to: params.to,
+		subject: params.subject,
+		html: fullBodyHtml,
+		inReplyTo: originalMsgId,
+		references,
+		threadId,
+		delayMs: 0,
+	});
+	if (!result.ok) return { error: `Failed to send reply: ${result.error}` };
 
-	await stub.createEmail(
-		Folders.SENT,
-		{
-			id: messageId,
-			subject: params.subject,
-			sender: mailboxId.toLowerCase(),
-			recipient: params.to.toLowerCase(),
-			date: new Date().toISOString(),
-			body: fullBodyHtml,
-			in_reply_to: originalMsgId,
-			email_references:
-				references.length > 0 ? JSON.stringify(references) : null,
-			thread_id: threadId,
-			message_id: outgoingMessageId,
-		},
-		[],
-	);
-
-	return { status: "sent", messageId, message: `Reply sent to ${params.to}` };
+	return { status: "queued", messageId: result.id, message: `Reply to ${params.to} queued for sending` };
 }
 
 // ── send_email ─────────────────────────────────────────────────────
@@ -478,54 +448,26 @@ export async function toolSendEmail(
 		bodyHtml: string;
 	},
 ): Promise<
-	| { status: "sent"; messageId: string; message: string }
+	| { status: "queued"; messageId: string; message: string }
 	| { error: string }
 > {
 	const stub = getMailboxStub(env, mailboxId);
-
-	// Check send rate limit
-	const rateLimitError = await (stub as unknown as RateLimitStub).checkSendRateLimit();
-	if (rateLimitError) {
-		return { error: rateLimitError };
-	}
-
-	const fromDomain = mailboxId.split("@")[1];
-	if (!fromDomain) throw new Error("Invalid mailbox email address");
-	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
+	if (!mailboxId.split("@")[1]) throw new Error("Invalid mailbox email address");
 
 	const sanitizedBody = await verifyDraft(env.AI, params.bodyHtml);
 	if (!sanitizedBody) {
 		return { error: "Draft verification failed — refusing to send unverified content. Please try again." };
 	}
 
-	try {
-		await sendEmail(env.EMAIL, {
-			to: params.to,
-			from: mailboxId,
-			subject: params.subject,
-			html: sanitizedBody,
-		});
-	} catch (e) {
-		console.error("Email send failed:", (e as Error).message);
-		return { error: `Failed to send email: ${(e as Error).message}` };
-	}
+	const result = await queueSend(env, stub, {
+		mailboxId,
+		from: mailboxId,
+		to: params.to,
+		subject: params.subject,
+		html: sanitizedBody,
+		delayMs: 0,
+	});
+	if (!result.ok) return { error: `Failed to send email: ${result.error}` };
 
-	await stub.createEmail(
-		Folders.SENT,
-		{
-			id: messageId,
-			subject: params.subject,
-			sender: mailboxId.toLowerCase(),
-			recipient: params.to.toLowerCase(),
-			date: new Date().toISOString(),
-			body: sanitizedBody,
-			in_reply_to: null,
-			email_references: null,
-			thread_id: messageId,
-			message_id: outgoingMessageId,
-		},
-		[],
-	);
-
-	return { status: "sent", messageId, message: `Email sent to ${params.to}` };
+	return { status: "queued", messageId: result.id, message: `Email to ${params.to} queued for sending` };
 }

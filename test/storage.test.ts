@@ -33,23 +33,6 @@ describe("MailboxDO storage", () => {
 		);
 		expect(names[0]).toBe("1_initial_setup");
 		expect(names).toContain("8_add_folder_date_indexes");
-	});
-
-	it("blocks sending after 20 sends in the last hour", async () => {
-		const stub = mailboxStub();
-		for (let i = 0; i < 20; i++) await stub.createEmail(Folders.SENT, sentRow(`r${i}`, new Date().toISOString()), []);
-		expect(await stub.checkSendRateLimit()).toMatch(/per hour/);
-	});
-
-	// ISO dates ("…T…Z") are compared as strings against datetime('now') ("… …").
-	// 'T' sorts after ' ', so every send since 00:00 UTC counts as "last hour".
-	// Needs a timestamp >1h ago on the same UTC day, so skip in the first 2h of the day.
-	const now = new Date();
-	const earlyInUtcDay = now.getUTCHours() < 2;
-	(earlyInUtcDay ? it.skip : it.fails)("KNOWN BUG: sends from more than an hour ago don't count toward the hourly limit", async () => {
-		const stub = mailboxStub();
-		const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 1)).toISOString();
-		for (let i = 0; i < 20; i++) await stub.createEmail(Folders.SENT, sentRow(`old${i}`, startOfDay), []);
-		expect(await stub.checkSendRateLimit()).toBeNull();
+		expect(names).toContain("9_add_outbox");
 	});
 });

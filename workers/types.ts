@@ -5,4 +5,8 @@
 export interface Env extends Cloudflare.Env {
 	POLICY_AUD: string;
 	TEAM_DOMAIN: string;
+	/** Resend sending-only API key (secret). */
+	RESEND_API_KEY?: string;
+	/** Resend webhook signing secret, `whsec_…` (secret). */
+	RESEND_WEBHOOK_SECRET?: string;
 }

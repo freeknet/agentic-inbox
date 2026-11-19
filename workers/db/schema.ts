@@ -29,6 +29,8 @@ export const emails = sqliteTable("emails", {
 	thread_id: text("thread_id"),
 	message_id: text("message_id"),
 	raw_headers: text("raw_headers"),
+	/** Outbound only: queued | sent | delayed | delivered | bounced | complained | failed | suppressed */
+	delivery_status: text("delivery_status"),
 });
 
 export const attachments = sqliteTable("attachments", {

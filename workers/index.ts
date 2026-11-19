@@ -6,13 +6,13 @@ import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import PostalMime from "postal-mime";
 import { z } from "zod";
-import { sendEmail } from "./email-sender";
-import { storeAttachments, type StoredAttachment } from "./lib/attachments";
+import type { StoredAttachment } from "./lib/attachments";
+import { queueSend } from "./lib/send";
+import { UNDO_DELAY_MS, type WebhookEvent } from "./durableObject/outbox";
+import { verifySvixSignature } from "./lib/svix";
 import {
 	validateSender,
 	SenderValidationError,
-	generateMessageId,
-	buildThreadingHeaders,
 	listMailboxes,
 } from "./lib/email-helpers";
 import { SendEmailRequestSchema } from "./lib/schemas";
@@ -177,47 +177,45 @@ app.get("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 	const mailboxId = c.req.param("mailboxId")!;
 	const body = SendEmailRequestSchema.parse(await c.req.json());
-	const { to, cc, bcc, from, subject, html, text, attachments, in_reply_to, references, thread_id } = body;
+	const { to, cc, bcc, from, subject, html, text, attachments, in_reply_to, references, thread_id, draft_id } = body;
 
-	let toStr: string, fromEmail: string, fromDomain: string;
 	try {
-		({ toStr, fromEmail, fromDomain } = validateSender(to, from, mailboxId));
+		validateSender(to, from, mailboxId);
 	} catch (e) {
 		if (e instanceof SenderValidationError) return c.json({ error: e.message }, 400);
 		throw e;
 	}
 
-	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
-	const stub = c.var.mailboxStub;
-	const rateLimitError = await (stub as any).checkSendRateLimit();
-	if (rateLimitError) return c.json({ error: rateLimitError }, 429);
-	const attachmentData = await storeAttachments(c.env.BUCKET, messageId, attachments);
+	const result = await queueSend(c.env, c.var.mailboxStub, {
+		mailboxId, from, to, cc, bcc, subject, html, text, attachments,
+		inReplyTo: in_reply_to ?? null, references: references ?? [], threadId: thread_id ?? null,
+		draftId: draft_id ?? null, delayMs: UNDO_DELAY_MS,
+	});
+	if (!result.ok) return c.json({ error: result.error }, result.status);
+	return c.json({ id: result.id, status: "queued", send_at: result.sendAt }, 202);
+});
 
-	await stub.createEmail(Folders.SENT, {
-		id: messageId, subject, sender: fromEmail, recipient: toStr,
-		cc: cc ? (Array.isArray(cc) ? cc.join(", ") : cc).toLowerCase() : null,
-		bcc: bcc ? (Array.isArray(bcc) ? bcc.join(", ") : bcc).toLowerCase() : null,
-		date: new Date().toISOString(), body: html || text || "",
-		in_reply_to: in_reply_to || null, email_references: references ? JSON.stringify(references) : null,
-		thread_id: thread_id || in_reply_to || messageId, message_id: outgoingMessageId,
-		raw_headers: JSON.stringify([
-			{ key: "from", value: typeof from === "string" ? from : `${from.name} <${from.email}>` },
-			{ key: "to", value: Array.isArray(to) ? to.join(", ") : to },
-			...(cc ? [{ key: "cc", value: Array.isArray(cc) ? cc.join(", ") : cc }] : []),
-			...(bcc ? [{ key: "bcc", value: Array.isArray(bcc) ? bcc.join(", ") : bcc }] : []),
-			{ key: "subject", value: subject }, { key: "date", value: new Date().toISOString() },
-			{ key: "message-id", value: `<${outgoingMessageId}>` },
-		]),
-	}, attachmentData);
+// Undo send: only while the message is still inside its undo window.
+app.post("/api/v1/mailboxes/:mailboxId/emails/:id/cancel-send", async (c: AppContext) => {
+	const r = await c.var.mailboxStub.cancelOutgoing(c.req.param("id")!);
+	if (r === "not_found") return c.json({ error: "Not in outbox" }, 404);
+	if (r === "too_late") return c.json({ error: "Already sent" }, 409);
+	return c.json({ id: c.req.param("id"), status: "draft" });
+});
 
-	c.executionCtx.waitUntil(
-		sendEmail(c.env.EMAIL, {
-			to, cc, bcc, from, subject, html, text,
-			attachments: attachments?.map((att) => ({ content: att.content, filename: att.filename, type: att.type, disposition: att.disposition || "attachment", contentId: att.contentId })),
-			...(in_reply_to ? { headers: buildThreadingHeaders(in_reply_to, references || []) } : {}),
-		}).catch((e) => console.error("Deferred email delivery failed:", (e as Error).message)),
-	);
-	return c.json({ id: messageId, status: "sent" }, 202);
+app.get("/api/v1/mailboxes/:mailboxId/outbox/:id", async (c: AppContext) => {
+	const entry = await c.var.mailboxStub.getOutboxEntry(c.req.param("id")!);
+	return entry ? c.json(entry) : c.json({ error: "Not found" }, 404);
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/send-quota", async (c: AppContext) => {
+	return c.json(await c.var.mailboxStub.getSendQuota());
+});
+
+// Compose-time warning: which of these recipients are on Resend's suppression list.
+app.post("/api/v1/mailboxes/:mailboxId/suppressions/check", async (c: AppContext) => {
+	const { emails } = z.object({ emails: z.array(z.string()).max(200) }).parse(await c.req.json());
+	return c.json({ suppressed: await c.var.mailboxStub.checkSuppressed(emails) });
 });
 
 app.post("/api/v1/mailboxes/:mailboxId/drafts", async (c: AppContext) => {
@@ -332,6 +330,51 @@ app.get("/api/v1/mailboxes/:mailboxId/emails/:emailId/attachments/:attachmentId"
 	const sanitized = attachment.filename.replace(/[\x00-\x1f"\\]/g, "_");
 	headers.set("Content-Disposition", `attachment; filename="${sanitized}"; filename*=UTF-8''${encodeURIComponent(attachment.filename)}`);
 	return new Response(obj.body, { headers });
+});
+
+// -- Resend webhooks ------------------------------------------------
+// Reached through an Access Bypass app on this exact path; the Access JWT
+// middleware in app.ts skips it (B3). The Svix signature is the only auth.
+
+const addressOf = (s: string) => (s.match(/<([^>]+)>/)?.[1] ?? s).trim().toLowerCase();
+
+app.post("/webhooks/resend", async (c) => {
+	const secret = c.env.RESEND_WEBHOOK_SECRET;
+	if (!secret) return c.json({ error: "Webhook secret not configured" }, 500);
+
+	const raw = await c.req.text();
+	const svixId = c.req.header("svix-id");
+	const ok = await verifySvixSignature(secret, {
+		id: svixId,
+		timestamp: c.req.header("svix-timestamp"),
+		signature: c.req.header("svix-signature"),
+	}, raw);
+	if (!ok || !svixId) return c.json({ error: "Invalid signature" }, 401);
+
+	let event: WebhookEvent;
+	try {
+		event = JSON.parse(raw) as WebhookEvent;
+	} catch {
+		return c.json({ error: "Invalid JSON" }, 400);
+	}
+	if (typeof event?.type !== "string") return c.json({ error: "Missing type" }, 400);
+
+	// Suppressions are team-wide: mirror them into every mailbox. Email events
+	// belong to the mailbox they were sent from.
+	let targets: string[];
+	if (event.type.startsWith("suppression.")) {
+		targets = (await listMailboxes(c.env.BUCKET)).map((m) => m.id);
+	} else {
+		const from = typeof event.data?.from === "string" ? addressOf(event.data.from) : "";
+		targets = from && (await c.env.BUCKET.head(`mailboxes/${from}.json`)) ? [from] : [];
+	}
+
+	const results: string[] = [];
+	for (const mailboxId of targets) {
+		const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailboxId));
+		results.push(await stub.applyWebhook(svixId, event));
+	}
+	return c.json({ received: true, results });
 });
 
 // -- Receive inbound email ------------------------------------------

@@ -10,6 +10,13 @@ export default defineConfig({
 			main: "./test/worker-entry.ts",
 			// Never reach real Cloudflare services (Workers AI, send_email) from tests.
 			remoteBindings: false,
+			miniflare: {
+				// Test-only values; real secrets are set with `wrangler secret put`.
+				bindings: {
+					RESEND_API_KEY: "re_test_key",
+					RESEND_WEBHOOK_SECRET: "whsec_dGVzdC13ZWJob29rLXNlY3JldC0wMTIzNDU2Nzg5",
+				},
+			},
 		}),
 	],
 	test: {

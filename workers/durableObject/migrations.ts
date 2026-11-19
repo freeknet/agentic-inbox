@@ -168,4 +168,42 @@ export const mailboxMigrations: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_emails_folder_date ON emails(folder_id, date DESC);
         `,
 	},
+	{
+		// Phase 3: Resend outbox, delivery state, webhook dedupe, suppression mirror.
+		name: "9_add_outbox",
+		sql: txn(`
+            ALTER TABLE emails ADD COLUMN delivery_status TEXT;
+
+            CREATE TABLE outbox (
+                id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                recipient_count INTEGER NOT NULL,
+                send_at INTEGER NOT NULL,
+                next_attempt_at INTEGER NOT NULL,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                last_error TEXT,
+                provider_id TEXT,
+                quota_day TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                sent_at INTEGER
+            );
+            CREATE INDEX idx_outbox_due ON outbox(status, next_attempt_at);
+            CREATE INDEX idx_outbox_provider ON outbox(provider_id);
+            CREATE INDEX idx_outbox_quota_day ON outbox(quota_day);
+
+            CREATE TABLE outbox_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+            CREATE TABLE webhook_events (
+                svix_id TEXT PRIMARY KEY,
+                received_at INTEGER NOT NULL
+            );
+
+            CREATE TABLE suppressed_recipients (
+                email TEXT PRIMARY KEY,
+                origin TEXT,
+                created_at TEXT
+            );
+        `),
+	},
 ];

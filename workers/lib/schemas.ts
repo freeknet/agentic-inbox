@@ -84,6 +84,8 @@ export const SendEmailRequestSchema = z
 		in_reply_to: z.string().optional(),
 		references: z.array(z.string()).optional(),
 		thread_id: z.string().optional(),
+		/** Draft consumed by this send, moved server-side in the same transaction (B9). */
+		draft_id: z.string().optional(),
 	})
 	.refine((data) => data.html || data.text, {
 		error: "Either 'html' or 'text' must be provided",
@@ -92,4 +94,5 @@ export const SendEmailRequestSchema = z
 export const SendEmailResponseSchema = z.object({
 	id: z.string(),
 	status: z.string(),
+	send_at: z.number().optional(),
 });

@@ -46,6 +46,12 @@ app.use("*", async (c, next) => {
 		return next();
 	}
 
+	// Resend webhooks come through an Access Bypass app on this exact path and
+	// authenticate with their Svix signature instead (B3). Exact match only.
+	if (c.req.path === "/webhooks/resend") {
+		return next();
+	}
+
 	const { POLICY_AUD, TEAM_DOMAIN } = c.env;
 
 	// Fail closed in production if Access is not configured.
