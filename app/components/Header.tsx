@@ -3,10 +3,11 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Button, Input, Tooltip } from "@cloudflare/kumo";
-import { GearSixIcon, ListIcon, MagnifyingGlassIcon, RobotIcon, XIcon } from "@phosphor-icons/react";
+import { CircleHalfIcon, GearSixIcon, ListIcon, MagnifyingGlassIcon, MoonIcon, RobotIcon, SunIcon, XIcon } from "@phosphor-icons/react";
 import { type KeyboardEvent, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { useUIStore } from "~/hooks/useUIStore";
+import { useTheme } from "~/hooks/useTheme";
 
 export default function Header() {
 	const [searchQuery, setSearchQuery] = useState("");
@@ -16,6 +17,8 @@ export default function Header() {
 	const location = useLocation();
 	const [searchParams] = useSearchParams();
 	const { toggleSidebar, toggleAgentPanel, isAgentPanelOpen } = useUIStore();
+	const { preference: theme, cycle: cycleTheme } = useTheme();
+	const themeLabel = theme === "system" ? "Theme: system" : theme === "light" ? "Theme: light" : "Theme: dark";
 
 	// Sync search input with URL query param so it stays populated
 	const urlQuery = searchParams.get("q") || "";
@@ -127,6 +130,15 @@ export default function Header() {
 						onClick={toggleAgentPanel}
 						aria-label="Toggle agent panel"
 						className="hidden lg:inline-flex"
+					/>
+				</Tooltip>
+				<Tooltip content={themeLabel} side="bottom" asChild>
+					<Button
+						variant="ghost"
+						shape="square"
+						icon={theme === "dark" ? <MoonIcon size={20} /> : theme === "light" ? <SunIcon size={20} /> : <CircleHalfIcon size={20} />}
+						onClick={cycleTheme}
+						aria-label={`${themeLabel} (click to change)`}
 					/>
 				</Tooltip>
 				<Tooltip content="Settings" side="bottom" asChild>

@@ -24,6 +24,7 @@ import {
 } from "react-router";
 import { ApiError } from "~/services/api";
 import "./index.css";
+import { THEME_BOOTSTRAP } from "~/hooks/useTheme";
 
 function makeQueryClient() {
 	return new QueryClient({
@@ -77,7 +78,7 @@ const KumoLink = forwardRef<
 
 export function Layout({ children }: { children: React.ReactNode }) {
 	return (
-		<html lang="en">
+		<html lang="en" data-theme="kumo" data-mode="light" suppressHydrationWarning>
 			<head>
 				<meta charSet="UTF-8" />
 				<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -88,6 +89,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 					sizes="48x48 32x32 16x16"
 				/>
 				<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+				<meta name="color-scheme" content="light dark" />
+				{/* biome-ignore lint/security/noDangerouslySetInnerHtml: static theme bootstrap, no user input */}
+				<script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
 				<title>Agentic Inbox</title>
 				<Meta />
 				<Links />
