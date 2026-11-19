@@ -16,7 +16,9 @@
 		// Secrets (wrangler secret put): RESEND_API_KEY, RESEND_WEBHOOK_SECRET.
 		"DOMAINS": "midwestfreeks.org",
 		"EMAIL_ADDRESSES": ["lawrence@midwestfreeks.org"],
-		"TEAM_DOMAIN": "https://wsllc.cloudflareaccess.com"
+		"TEAM_DOMAIN": "https://wsllc.cloudflareaccess.com",
+		// Audience tag of the "agentic-inbox" Access app on mail.midwestfreeks.org (not a secret).
+		"POLICY_AUD": "0dc6ce644b85a17693e4bfb58708239d2fabd927b2b14eed0e35074b0aac15a1"
 	},
 	"routes": [
 		{ "pattern": "mail.midwestfreeks.org", "custom_domain": true }

@@ -3,8 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 export interface Env extends Cloudflare.Env {
-	POLICY_AUD: string;
-	// TEAM_DOMAIN comes from wrangler.jsonc vars (typed by wrangler types).
+	// POLICY_AUD and TEAM_DOMAIN come from wrangler.jsonc vars (typed by wrangler types).
 	/** Resend sending-only API key (secret). */
 	RESEND_API_KEY?: string;
 	/** Resend webhook signing secret, `whsec_…` (secret). */
