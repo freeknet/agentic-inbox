@@ -254,4 +254,14 @@ export const mailboxMigrations: Migration[] = [
                 FROM emails;
         `),
 	},
+	{
+		// Phase 6: when each sender last got the vacation auto-reply (RFC 3834 rate limit).
+		name: "12_auto_reply",
+		sql: txn(`
+            CREATE TABLE IF NOT EXISTS auto_replied (
+                sender TEXT PRIMARY KEY,
+                replied_at INTEGER NOT NULL
+            );
+        `),
+	},
 ];

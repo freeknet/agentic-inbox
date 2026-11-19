@@ -9,6 +9,7 @@ import { parseSendAt, queueSend } from "./lib/send";
 import { deleteUpload, storeUpload } from "./lib/uploads";
 import { UNDO_DELAY_MS, type WebhookEvent } from "./durableObject/outbox";
 import { verifySvixSignature } from "./lib/svix";
+import type { AutoReplySettings } from "./durableObject/autoreply";
 import {
 	validateSender,
 	SenderValidationError,
@@ -28,7 +29,13 @@ const MailboxSettingsSchema = z.object({
 	fromName: z.string().max(200).optional(),
 	forwarding: z.object({ enabled: z.boolean(), email: z.union([z.email(), z.literal("")]) }).optional(),
 	signature: z.object({ enabled: z.boolean(), text: z.string().max(10_000), html: z.string().max(50_000).optional() }).optional(),
-	autoReply: z.object({ enabled: z.boolean(), subject: z.string().max(500), message: z.string().max(20_000) }).optional(),
+	autoReply: z.object({
+		enabled: z.boolean(),
+		subject: z.string().max(500),
+		message: z.string().max(20_000),
+		startsAt: z.union([z.iso.datetime({ offset: true }), z.literal("")]).optional(),
+		endsAt: z.union([z.iso.datetime({ offset: true }), z.literal("")]).optional(),
+	}).optional(),
 	agentSystemPrompt: z.string().max(20_000).optional(),
 });
 
@@ -431,7 +438,8 @@ async function receiveEmail(message: InboundMessage, env: Env, ctx: ExecutionCon
 	// list mail arrive and nothing is guessed from headers.
 	const mailboxId = message.to.trim().toLowerCase();
 	const allowed = ((env.EMAIL_ADDRESSES ?? []) as string[]).map((a) => a.toLowerCase());
-	if ((allowed.length > 0 && !allowed.includes(mailboxId)) || !(await env.BUCKET.head(`mailboxes/${mailboxId}.json`))) {
+	const mailboxObj = allowed.length > 0 && !allowed.includes(mailboxId) ? null : await env.BUCKET.get(`mailboxes/${mailboxId}.json`);
+	if (!mailboxObj) {
 		message.setReject("550 5.1.1 No such user here");
 		return;
 	}
@@ -449,7 +457,8 @@ async function receiveEmail(message: InboundMessage, env: Env, ctx: ExecutionCon
 	await Promise.all([message.raw.pipeTo(writable), env.BUCKET.put(key, readable)]);
 
 	const stub = env.MAILBOX.get(env.MAILBOX.idFromName(mailboxId));
-	const stored = await stub.ingestRaw({ key, id, envelopeTo: mailboxId });
+	const settings = (await mailboxObj.json().catch(() => ({}))) as { autoReply?: AutoReplySettings; fromName?: string };
+	const stored = await stub.ingestRaw({ key, id, envelopeTo: mailboxId, autoReply: settings.autoReply, fromName: settings.fromName });
 
 	const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));
 	ctx.waitUntil(agentStub.fetch(new Request("https://agents/onNewEmail", {

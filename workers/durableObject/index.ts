@@ -12,7 +12,9 @@ import type { Env } from "../types";
 import { applyMigrations, mailboxMigrations } from "./migrations";
 import { Outbox, type OutboxPayload, type WebhookEvent } from "./outbox";
 import { createResendProvider } from "../lib/resend";
-import { parseInbound } from "./ingest";
+import { parseInbound, type ParsedInbound } from "./ingest";
+import { autoReplySubject, decideAutoReply, safeDisplayName, textToHtml, type AutoReplySettings } from "./autoreply";
+import { buildOutgoing } from "../lib/outgoing";
 
 /**
  * Turn free text into an FTS5 expression: every word must match, as a prefix,
@@ -841,7 +843,7 @@ export class MailboxDO extends DurableObject<Env> {
 	 * Parse a raw message the Worker stored in R2 and file it in the Inbox.
 	 * Runs in the DO because parsing large mail exceeds a plain Worker's CPU on Free.
 	 */
-	async ingestRaw(input: { key: string; id: string; envelopeTo: string }) {
+	async ingestRaw(input: { key: string; id: string; envelopeTo: string; autoReply?: AutoReplySettings; fromName?: string }) {
 		const obj = await this.env.BUCKET.get(input.key);
 		if (!obj) throw new Error(`ingestRaw: raw message not found at ${input.key}`);
 		const p = await parseInbound(await obj.arrayBuffer(), input.id, input.envelopeTo, this.env.BUCKET);
@@ -869,7 +871,65 @@ export class MailboxDO extends DurableObject<Env> {
 			raw_key: input.key,
 		}, p.attachments);
 
-		return { emailId: input.id, threadId, sender: p.sender, subject: p.subject };
+		let autoReplied = false;
+		try {
+			autoReplied = await this.maybeAutoReply(input, p, threadId);
+		} catch (e) {
+			console.error("Auto-reply failed:", (e as Error).message);
+		}
+
+		return { emailId: input.id, threadId, sender: p.sender, subject: p.subject, autoReplied };
+	}
+
+	/** Queue the vacation reply for an inbound message if the rules allow it. */
+	private async maybeAutoReply(
+		input: { envelopeTo: string; autoReply?: AutoReplySettings; fromName?: string },
+		p: ParsedInbound,
+		threadId: string,
+	): Promise<boolean> {
+		if (!input.autoReply?.enabled) return false;
+		const now = Date.now();
+		const last = [...this.ctx.storage.sql.exec(`SELECT replied_at FROM auto_replied WHERE sender = ?`, p.sender)][0] as
+			| { replied_at: number }
+			| undefined;
+		const decision = decideAutoReply({
+			settings: input.autoReply,
+			mailbox: input.envelopeTo,
+			sender: p.sender,
+			headers: JSON.parse(p.rawHeaders || "[]"),
+			nowMs: now,
+			lastRepliedAt: last?.replied_at ?? null,
+		});
+		if (!decision.reply) return false;
+
+		const name = safeDisplayName(input.fromName);
+		const message = input.autoReply.message ?? "";
+		const { email, payload } = buildOutgoing({
+			fromHeader: name ? `"${name}" <${input.envelopeTo}>` : input.envelopeTo,
+			fromEmail: input.envelopeTo,
+			to: [p.sender],
+			cc: [],
+			bcc: [],
+			subject: autoReplySubject(input.autoReply, p.subject),
+			html: textToHtml(message),
+			text: message,
+			inReplyTo: p.messageId,
+			references: p.messageId ? [...p.references, p.messageId] : p.references,
+			threadId,
+			headers: { "Auto-Submitted": "auto-replied" },
+		});
+		const result = await this.enqueueOutgoing({ email, attachments: [], payload, delayMs: 0 });
+		if (!result.ok) {
+			console.warn("Auto-reply not queued:", result.error);
+			return false;
+		}
+		this.ctx.storage.sql.exec(
+			`INSERT INTO auto_replied (sender, replied_at) VALUES (?1, ?2)
+			 ON CONFLICT(sender) DO UPDATE SET replied_at = excluded.replied_at`,
+			p.sender,
+			now,
+		);
+		return true;
 	}
 
 	/** Create or replace a draft in one transaction (the old delete-then-create could lose it). */

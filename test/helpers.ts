@@ -67,6 +67,8 @@ export interface MimeOptions {
 	date?: string;
 	text?: string;
 	attachment?: { filename: string; contentType: string; content: string };
+	/** Extra raw header lines, e.g. "List-Id: <x.example>". */
+	extraHeaders?: string[];
 }
 
 /** Build a small MIME message. CRLF line endings, as on the wire. */
@@ -80,6 +82,7 @@ export function mime(o: MimeOptions = {}): string {
 		...(o.inReplyTo ? [`In-Reply-To: <${o.inReplyTo}>`] : []),
 		...(o.references ? [`References: ${o.references}`] : []),
 		`Date: ${o.date ?? "Tue, 03 Nov 2026 10:00:00 +0000"}`,
+		...(o.extraHeaders ?? []),
 		"MIME-Version: 1.0",
 	];
 	const text = o.text ?? "Hi there.";
