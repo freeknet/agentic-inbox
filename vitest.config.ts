@@ -13,6 +13,9 @@ export default defineConfig({
 			miniflare: {
 				// Test-only values; real secrets are set with `wrangler secret put`.
 				bindings: {
+					// Production restricts mailbox creation to the real address; tests use example.com.
+					DOMAINS: "example.com",
+					EMAIL_ADDRESSES: [],
 					RESEND_API_KEY: "re_test_key",
 					RESEND_WEBHOOK_SECRET: "whsec_dGVzdC13ZWJob29rLXNlY3JldC0wMTIzNDU2Nzg5",
 				},

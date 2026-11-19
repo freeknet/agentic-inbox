@@ -14,9 +14,13 @@
 		// TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
 		// The worker now fails closed outside local development if Access is not configured.
 		// Secrets (wrangler secret put): RESEND_API_KEY, RESEND_WEBHOOK_SECRET.
-		"DOMAINS": "example.com",
-		"EMAIL_ADDRESSES": []
+		"DOMAINS": "midwestfreeks.org",
+		"EMAIL_ADDRESSES": ["lawrence@midwestfreeks.org"],
+		"TEAM_DOMAIN": "https://wsllc.cloudflareaccess.com"
 	},
+	"routes": [
+		{ "pattern": "mail.midwestfreeks.org", "custom_domain": true }
+	],
 	"r2_buckets": [
 		{
 			"binding": "BUCKET",
