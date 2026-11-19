@@ -63,6 +63,21 @@ The simpler option is to run `npx wrangler secret put NAME` interactively and pa
 
 - **R2 lifecycle rule** `expire-unsent-uploads`: deletes `uploads/` objects after 1 day.
 
-## Follow-ups noticed
+## Forwarding, MCP v2 and cleanup (2026-11-19 UTC)
 
-- The pre-existing reusable Access policy "Lawrence B Norton" allows any one-time-PIN login (any email address) plus any service token. It still protects the `matrix` app. It was not changed here.
+Deployed versions `89c4dcef` and `2c02f161` (branch `forwarding-and-cleanup`).
+
+| Check | Result |
+|---|---|
+| `/mcp` `initialize` from a 2025-protocol client | 200, server `agentic-inbox` 1.0.0 |
+| `/mcp` `tools/list` | 200, 13 tools |
+| `/mcp` `tools/call list_emails` | 200, returned the live inbox |
+| `/mcp` from the site's own browser origin | 200 after `8c79fba`; the first deploy returned 403 `Invalid Origin` |
+| Tooltip triggers after `asChild` → `render` | Buttons carry `data-base-ui-tooltip-trigger` and keep their icons; the popup itself was not captured (Chrome screenshots of the tab timed out) |
+| Forwarding on, destination not verified in Email Routing | Gmail message stored in the Inbox; no bounce in Gmail. Forwarding was turned off afterwards |
+| Forwarding to a verified destination | Not tested: the account has no verified Email Routing destination addresses |
+
+## Access changes
+
+- The reusable policy "Lawrence B Norton" used to allow any one-time-PIN login (any email address) plus any service token. On 2026-11-19 it was changed to allow only the owner's email. It is attached to no application.
+- The `matrix` app (matrix.midwestfreeks.org) has no policies, so Access denies everyone. The hostname has no DNS record.
