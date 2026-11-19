@@ -220,12 +220,12 @@ npm run typecheck && npm test && npm run build
 │ React    │  │ • Access JWT check        │   │ • SQLite: mail, FTS5, outbox │
 │ SPA      │  │ • streams raw mail and    │   │ • parses inbound (postal-mime)│
 └────┬─────┘  │   uploads into R2         │   │ • alarm sends from outbox    │
-     │ WS     │ • /mcp (service tokens)   │   │ • auto-reply, AI usage meter │
+     │ WS     │ • /mcp (stateless MCP)    │   │ • auto-reply, AI usage meter │
      └───────▶│ • /agents/* ──────────────┼─▶ │                              │
               └───────────┬───────────────┘   └──────────────────────────────┘
                           ▼                    EmailAgent DO (chat, auto-draft)
-                    R2: raw/, attachments/,     EmailMCP DO (MCP tools)
-                    uploads/, mailboxes/        Workers AI (metered)
+                    R2: raw/, attachments/,     Workers AI (metered)
+                    uploads/, mailboxes/
 ```
 
 ## License

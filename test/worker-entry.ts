@@ -10,7 +10,6 @@ import type { Env } from "../workers/types";
 
 export { MailboxDO } from "../workers/durableObject";
 export { EmailAgent } from "../workers/agent";
-export { EmailMCP } from "../workers/mcp";
 
 export default {
 	fetch: app.fetch,

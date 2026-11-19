@@ -7,13 +7,13 @@ import { Hono } from "hono";
 import { jwtVerify, createRemoteJWKSet, type JWTPayload } from "jose";
 import { createContext, createRequestHandler, RouterContextProvider } from "react-router";
 import { app as apiApp, receiveEmail } from "./index";
-import { EmailMCP } from "./mcp";
+import { createMcpHandler } from "agents/mcp/server";
+import { createEmailMcpServer } from "./mcp";
 import { identify, isAllowed } from "./lib/access";
 import type { Env } from "./types";
 
 export { MailboxDO } from "./durableObject";
 export { EmailAgent } from "./agent";
-export { EmailMCP } from "./mcp";
 
 /**
  * Cloudflare bindings for React Router loaders/actions. React Router 8 removed
@@ -103,12 +103,11 @@ app.use("*", async (c, next) => {
 
 // MCP server endpoint — used by AI coding tools (ProtoAgent, Claude Code, Cursor, etc.)
 // Must be before API routes and React Router catch-all
-const mcpHandler = EmailMCP.serve("/mcp", { binding: "EMAIL_MCP" });
+// Stateless (MCP SDK v2): a fresh server per request, no session Durable Object.
+// Access has already authenticated the caller above.
 app.all("/mcp", async (c) => {
-	return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext);
-});
-app.all("/mcp/*", async (c) => {
-	return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext);
+	const handler = createMcpHandler(() => createEmailMcpServer(c.env), { route: "/mcp" });
+	return handler(c.req.raw, c.env, c.executionCtx as ExecutionContext);
 });
 
 // Mount the API routes

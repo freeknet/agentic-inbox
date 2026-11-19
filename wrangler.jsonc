@@ -42,10 +42,6 @@
 			{
 				"name": "EMAIL_AGENT",
 				"class_name": "EmailAgent"
-			},
-			{
-				"name": "EMAIL_MCP",
-				"class_name": "EmailMCP"
 			}
 		]
 	},
@@ -65,6 +61,14 @@
 		{
 			"tag": "v3",
 			"new_sqlite_classes": [
+				"EmailMCP"
+			]
+		},
+		{
+			// The MCP endpoint is stateless now (MCP SDK v2); its session Durable Object
+			// held only MCP session state.
+			"tag": "v4",
+			"deleted_classes": [
 				"EmailMCP"
 			]
 		}
