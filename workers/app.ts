@@ -7,8 +7,7 @@ import { Hono } from "hono";
 import { jwtVerify, createRemoteJWKSet, type JWTPayload } from "jose";
 import { createContext, createRequestHandler, RouterContextProvider } from "react-router";
 import { app as apiApp, receiveEmail } from "./index";
-import { createMcpHandler } from "agents/mcp/server";
-import { createEmailMcpServer } from "./mcp";
+import { serveMcp } from "./mcp";
 import { identify, isAllowed } from "./lib/access";
 import type { Env } from "./types";
 
@@ -106,8 +105,7 @@ app.use("*", async (c, next) => {
 // Stateless (MCP SDK v2): a fresh server per request, no session Durable Object.
 // Access has already authenticated the caller above.
 app.all("/mcp", async (c) => {
-	const handler = createMcpHandler(() => createEmailMcpServer(c.env), { route: "/mcp" });
-	return handler(c.req.raw, c.env, c.executionCtx as ExecutionContext);
+	return serveMcp(c.req.raw, c.env, c.executionCtx as ExecutionContext);
 });
 
 // Mount the API routes

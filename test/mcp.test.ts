@@ -1,19 +1,17 @@
 import { env, createExecutionContext } from "cloudflare:test";
-import { createMcpHandler } from "agents/mcp/server";
 import { describe, expect, it } from "vitest";
-import { createEmailMcpServer } from "../workers/mcp";
+import { serveMcp } from "../workers/mcp";
 import { MAILBOX, createMailbox, deliver, mime } from "./helpers";
 
 // The /mcp endpoint as workers/app.ts serves it: stateless, MCP SDK v2.
-async function rpc(method: string, params: Record<string, unknown> = {}, id = 1) {
-	const handler = createMcpHandler(() => createEmailMcpServer(env as never), { route: "/mcp" });
-	const res = await handler(
+async function rpc(method: string, params: Record<string, unknown> = {}, id = 1, origin?: string) {
+	const res = await serveMcp(
 		new Request("http://localhost/mcp", {
 			method: "POST",
-			headers: { Host: "localhost", "Content-Type": "application/json", Accept: "application/json, text/event-stream", "MCP-Protocol-Version": "2025-06-18" },
+			headers: { Host: "localhost", "Content-Type": "application/json", Accept: "application/json, text/event-stream", "MCP-Protocol-Version": "2025-06-18", ...(origin ? { Origin: origin } : {}) },
 			body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
 		}),
-		env,
+		env as never,
 		createExecutionContext(),
 	);
 	const text = await res.text();
@@ -49,6 +47,11 @@ describe("MCP endpoint", () => {
 		const { body } = await rpc("tools/call", { name: "list_emails", arguments: { mailboxId: MAILBOX } });
 		expect(body.result.isError).toBeFalsy();
 		expect(body.result.content[0].text).toContain("Hello over MCP");
+	});
+
+	it("accepts the site's own browser origin and blocks other sites", async () => {
+		expect((await rpc("tools/list", {}, 1, "http://localhost")).status).toBe(200);
+		expect((await rpc("tools/list", {}, 1, "https://evil.example")).status).toBe(403);
 	});
 
 	it("rejects invalid arguments", async () => {

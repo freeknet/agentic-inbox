@@ -3,6 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { McpServer } from "@modelcontextprotocol/server";
+import { createMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
 import {
 	toolListMailboxes,
@@ -453,4 +454,17 @@ export function createEmailMcpServer(env: Env): McpServer {
 	);
 
 	return server;
+}
+
+/**
+ * Answer one request to /mcp. Browsers send an Origin header; only this
+ * site's own origin is allowed (other sites stay blocked). MCP clients such
+ * as Claude Code send no Origin.
+ */
+export function serveMcp(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+	const handler = createMcpHandler(() => createEmailMcpServer(env), {
+		route: "/mcp",
+		allowedOriginHostnames: [new URL(request.url).hostname],
+	});
+	return handler(request, env, ctx);
 }
