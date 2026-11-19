@@ -124,6 +124,15 @@ describe("outbox", () => {
 		expect((await emailRow(id)).delivery_status).toBe("sent");
 	});
 
+	it("exposes delivery_status in the threaded Sent list", async () => {
+		mockResend(okResponse());
+		await send();
+		await flush();
+		const res = await api(`${base}/emails?folder=sent&threaded=true`);
+		const { emails } = (await res.json()) as { emails: Array<{ delivery_status: string }> };
+		expect(emails[0].delivery_status).toBe("sent");
+	});
+
 	it("sends attachments as base64 content", async () => {
 		const calls = mockResend(okResponse());
 		const content = btoa("attached bytes");
