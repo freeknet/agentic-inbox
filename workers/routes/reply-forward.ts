@@ -11,7 +11,7 @@ import {
 	resolveOriginalEmail,
 } from "../lib/email-helpers";
 import { SendEmailRequestSchema } from "../lib/schemas";
-import { queueSend } from "../lib/send";
+import { queueSend, type SourceAttachment } from "../lib/send";
 import { UNDO_DELAY_MS } from "../durableObject/outbox";
 import type { MailboxContext } from "../lib/mailbox";
 
@@ -54,7 +54,7 @@ export async function handleForwardEmail(c: AppContext) {
 	const mailboxId = c.req.param("mailboxId") ?? "";
 	const id = c.req.param("id") ?? "";
 	const body = SendEmailRequestSchema.parse(await c.req.json());
-	const { to, cc, bcc, from, subject, html, text, attachments, draft_id } = body;
+	const { to, cc, bcc, from, subject, html, text, attachments, draft_id, forward_attachment_ids } = body;
 
 	const stub = c.var.mailboxStub;
 	const rawOriginal = (await stub.getEmail(id)) as EmailFull | null;
@@ -62,6 +62,20 @@ export async function handleForwardEmail(c: AppContext) {
 		return c.json({ error: "Original email not found" }, 404);
 	}
 	await resolveOriginalEmail(stub, rawOriginal);
+
+	// Forward the original's files: all non-inline ones unless the client picked a subset.
+	const wanted = forward_attachment_ids ? new Set(forward_attachment_ids) : null;
+	const copyAttachments: SourceAttachment[] = (rawOriginal.attachments ?? [])
+		.filter((a) => (wanted ? wanted.has(a.id) : a.disposition !== "inline"))
+		.map((a) => ({
+			key: `attachments/${rawOriginal.id}/${a.id}/${a.filename}`,
+			filename: a.filename,
+			type: a.mimetype,
+			size: a.size,
+			disposition: "attachment",
+			contentId: null,
+			move: false,
+		}));
 
 	try {
 		validateSender(to, from, mailboxId);
@@ -71,7 +85,7 @@ export async function handleForwardEmail(c: AppContext) {
 	}
 
 	const result = await queueSend(c.env, stub, {
-		mailboxId, from, to, cc, bcc, subject, html, text, attachments,
+		mailboxId, from, to, cc, bcc, subject, html, text, attachments, copyAttachments,
 		inReplyTo: null, references: [], threadId: null,
 		draftId: draft_id ?? null, delayMs: UNDO_DELAY_MS,
 	});

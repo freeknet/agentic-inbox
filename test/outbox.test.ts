@@ -143,6 +143,73 @@ describe("outbox", () => {
 		expect(calls[0].body.attachments).toEqual([{ filename: "a.txt", content, content_type: "text/plain" }]);
 	});
 
+	it("rejects an upload without Content-Length (411) or over the size limit (413)", async () => {
+		const stream = new ReadableStream({
+			start(c) {
+				c.enqueue(new TextEncoder().encode("chunked"));
+				c.close();
+			},
+		});
+		const chunked = await api(`${base}/uploads?filename=a.txt`, { method: "PUT", body: stream, duplex: "half" } as RequestInit);
+		expect(chunked.status).toBe(411);
+		const big = await api(`${base}/uploads?filename=a.bin`, {
+			method: "PUT",
+			headers: { "Content-Length": String(19 * 1024 * 1024) },
+			body: "x",
+		});
+		expect(big.status).toBe(413);
+	});
+
+	it("sends an uploaded file, moving it out of uploads/", async () => {
+		const calls = mockResend(okResponse());
+		const up = await api(`${base}/uploads?filename=${encodeURIComponent("re port.pdf")}`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/pdf", "Content-Length": "13" },
+			body: "%PDF-1.7 fake",
+		});
+		expect(up.status).toBe(201);
+		const upload = (await up.json()) as { upload_id: string; filename: string; size: number; type: string };
+		expect(upload).toMatchObject({ filename: "re port.pdf", size: 13, type: "application/pdf" });
+
+		const r = await send({ attachments: [{ upload_id: upload.upload_id }] });
+		expect(r.status).toBe(202);
+		const { id } = (await r.json()) as { id: string };
+		const { env } = await import("cloudflare:workers");
+		expect((await env.BUCKET.list({ prefix: "uploads/" })).objects).toHaveLength(0);
+		const full = (await mailboxStub().getEmail(id)) as Record<string, any>;
+		expect(full.attachments).toMatchObject([{ filename: "re port.pdf", mimetype: "application/pdf", size: 13 }]);
+
+		await flush();
+		expect(calls[0].body.attachments).toEqual([
+			{ filename: "re port.pdf", content: btoa("%PDF-1.7 fake"), content_type: "application/pdf" },
+		]);
+	});
+
+	it("rejects a send that references a missing upload", async () => {
+		const r = await send({ attachments: [{ upload_id: crypto.randomUUID() }] });
+		expect(r.status).toBe(400);
+	});
+
+	it("forwards the original's attachments", async () => {
+		const calls = mockResend(okResponse("re_1"), okResponse("re_2"));
+		const content = btoa("original file");
+		const first = await send({ attachments: [{ content, filename: "orig.txt", type: "text/plain", disposition: "attachment" }] });
+		const { id: originalId } = (await first.json()) as { id: string };
+		const fwd = await api(`${base}/emails/${originalId}/forward`, post({ to: "dan@other.test", from: MAILBOX, subject: "Fwd: Hi", text: "fyi" }));
+		expect(fwd.status).toBe(202);
+		const { id: fwdId } = (await fwd.json()) as { id: string };
+		const full = (await mailboxStub().getEmail(fwdId)) as Record<string, any>;
+		expect(full.attachments).toMatchObject([{ filename: "orig.txt", size: 13 }]);
+		await flush();
+		const fwdCall = calls.find((c) => c.body.to[0] === "dan@other.test")!;
+		expect(fwdCall.body.attachments).toEqual([{ filename: "orig.txt", content, content_type: "text/plain" }]);
+
+		// An explicit empty selection forwards no files.
+		const none = await api(`${base}/emails/${originalId}/forward`, post({ to: "dan@other.test", from: MAILBOX, subject: "Fwd", text: "x", forward_attachment_ids: [] }));
+		const { id: noneId } = (await none.json()) as { id: string };
+		expect(((await mailboxStub().getEmail(noneId)) as Record<string, any>).attachments).toHaveLength(0);
+	});
+
 	it("undo before send_at returns the message to Drafts and nothing is sent", async () => {
 		const calls = mockResend(okResponse());
 		const { id } = (await (await send()).json()) as { id: string };

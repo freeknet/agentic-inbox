@@ -5,9 +5,35 @@
  */
 import type { MailboxDO } from "../durableObject";
 import type { OutboxPayload } from "../durableObject/outbox";
-import { storeAttachments } from "./attachments";
+import { storeAttachments, type StoredAttachment } from "./attachments";
 import { buildThreadingHeaders, generateMessageId } from "./email-helpers";
+import { MAX_MESSAGE_ATTACHMENT_BYTES, copyObject, safeFilename, uploadKey } from "./uploads";
 import type { Env } from "../types";
+
+/** Inline base64 is decoded in the Worker, so keep it small; larger files go through PUT /uploads. */
+const MAX_INLINE_BASE64_BYTES = 1024 * 1024;
+const R2_COPY_CONCURRENCY = 6;
+
+export type Base64Attachment = {
+	content: string;
+	filename: string;
+	type: string;
+	disposition: string;
+	contentId?: string;
+};
+export type UploadAttachment = { upload_id: string; disposition?: string; contentId?: string };
+export type InputAttachment = Base64Attachment | UploadAttachment;
+
+/** An R2 object to copy into the message: an upload (moved) or a forwarded attachment (copied). */
+export interface SourceAttachment {
+	key: string;
+	filename: string;
+	type: string;
+	size: number;
+	disposition: string;
+	contentId: string | null;
+	move: boolean;
+}
 
 export type Address = string | { email: string; name: string };
 type AddressList = string | string[] | undefined | null;
@@ -21,13 +47,9 @@ export interface QueueSendInput {
 	subject: string;
 	html?: string;
 	text?: string;
-	attachments?: {
-		content: string;
-		filename: string;
-		type: string;
-		disposition: string;
-		contentId?: string;
-	}[];
+	attachments?: InputAttachment[];
+	/** Attachments of another message to include, e.g. when forwarding. */
+	copyAttachments?: SourceAttachment[];
 	inReplyTo?: string | null;
 	references?: string[];
 	threadId?: string | null;
@@ -69,7 +91,11 @@ export async function queueSend(
 	const now = new Date().toISOString();
 	const fromHeader = formatFrom(input.from);
 
-	const stored = await storeAttachments(env.BUCKET, messageId, input.attachments);
+	const resolved = await resolveAttachments(env, input);
+	if (!resolved.ok) return { ok: false, error: resolved.error, status: 400 };
+
+	const stored = await storeAttachments(env.BUCKET, messageId, resolved.base64);
+	stored.push(...(await copySources(env.BUCKET, messageId, resolved.sources)));
 	const keys = stored.map((a) => `attachments/${messageId}/${a.id}/${a.filename}`);
 
 	const payload: OutboxPayload = {
@@ -126,5 +152,72 @@ export async function queueSend(
 	});
 
 	if (!result.ok && keys.length > 0) await env.BUCKET.delete(keys);
+	if (result.ok) {
+		const moved = resolved.sources.filter((s) => s.move).map((s) => s.key);
+		if (moved.length > 0) await env.BUCKET.delete(moved);
+	}
 	return result;
+}
+
+type Resolved =
+	| { ok: true; base64: Base64Attachment[]; sources: SourceAttachment[] }
+	| { ok: false; error: string };
+
+async function resolveAttachments(env: Env, input: QueueSendInput): Promise<Resolved> {
+	const base64: Base64Attachment[] = [];
+	const sources: SourceAttachment[] = [...(input.copyAttachments ?? [])];
+	let inlineBytes = 0;
+	for (const att of input.attachments ?? []) {
+		if ("upload_id" in att) {
+			const key = uploadKey(input.mailboxId, att.upload_id);
+			const head = key ? await env.BUCKET.head(key) : null;
+			if (!key || !head) return { ok: false, error: "An attachment upload was not found or has expired; attach the file again" };
+			sources.push({
+				key,
+				filename: safeFilename(head.customMetadata?.filename),
+				type: head.httpMetadata?.contentType || "application/octet-stream",
+				size: head.size,
+				disposition: att.disposition ?? "attachment",
+				contentId: att.contentId ?? null,
+				move: true,
+			});
+		} else {
+			inlineBytes += Math.floor((att.content.length * 3) / 4);
+			base64.push(att);
+		}
+	}
+	if (inlineBytes > MAX_INLINE_BASE64_BYTES) {
+		return { ok: false, error: "Inline attachment content is limited to 1 MB; upload larger files first" };
+	}
+	const total = inlineBytes + sources.reduce((n, s) => n + s.size, 0);
+	if (total > MAX_MESSAGE_ATTACHMENT_BYTES) {
+		return { ok: false, error: `Attachments are limited to ${MAX_MESSAGE_ATTACHMENT_BYTES / 1024 / 1024} MB per message` };
+	}
+	return { ok: true, base64, sources };
+}
+
+async function copySources(bucket: R2Bucket, emailId: string, sources: SourceAttachment[]): Promise<StoredAttachment[]> {
+	const out: StoredAttachment[] = [];
+	for (let i = 0; i < sources.length; i += R2_COPY_CONCURRENCY) {
+		const batch = sources.slice(i, i + R2_COPY_CONCURRENCY);
+		out.push(
+			...(await Promise.all(
+				batch.map(async (s) => {
+					const id = crypto.randomUUID();
+					const obj = await copyObject(bucket, s.key, `attachments/${emailId}/${id}/${s.filename}`);
+					if (!obj) throw new Error(`Attachment source missing: ${s.filename}`);
+					return {
+						id,
+						email_id: emailId,
+						filename: s.filename,
+						mimetype: s.type,
+						size: obj.size,
+						content_id: s.contentId,
+						disposition: s.disposition,
+					};
+				}),
+			)),
+		);
+	}
+	return out;
 }

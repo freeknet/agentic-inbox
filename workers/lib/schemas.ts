@@ -72,15 +72,27 @@ export const SendEmailRequestSchema = z
 		text: z.string().optional(),
 		attachments: z
 			.array(
-				z.object({
-					content: z.string(), // base64 encoded
-					filename: z.string(),
-					type: z.string(),
-					disposition: z.enum(["attachment", "inline"]),
-					contentId: z.string().optional(),
-				}),
+				z.union([
+					// Small inline content (agent/MCP). The UI uploads files instead.
+					z.object({
+						content: z.string(), // base64 encoded
+						filename: z.string(),
+						type: z.string(),
+						disposition: z.enum(["attachment", "inline"]),
+						contentId: z.string().optional(),
+					}),
+					// A file streamed in earlier through PUT /uploads.
+					z.object({
+						upload_id: z.string(),
+						disposition: z.enum(["attachment", "inline"]).optional(),
+						contentId: z.string().optional(),
+					}),
+				]),
 			)
+			.max(50)
 			.optional(),
+		/** Forward only: which of the original's attachments to include (default: all non-inline). */
+		forward_attachment_ids: z.array(z.string()).max(50).optional(),
 		in_reply_to: z.string().optional(),
 		references: z.array(z.string()).optional(),
 		thread_id: z.string().optional(),

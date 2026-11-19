@@ -6,6 +6,7 @@ import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
 import { queueSend } from "./lib/send";
+import { deleteUpload, storeUpload } from "./lib/uploads";
 import { UNDO_DELAY_MS, type WebhookEvent } from "./durableObject/outbox";
 import { verifySvixSignature } from "./lib/svix";
 import {
@@ -214,6 +215,18 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 	});
 	if (!result.ok) return c.json({ error: result.error }, result.status);
 	return c.json({ id: result.id, status: "queued", send_at: result.sendAt }, 202);
+});
+
+// Outgoing attachments: raw PUT, streamed to R2 (plan §A5). 411 without Content-Length.
+app.put("/api/v1/mailboxes/:mailboxId/uploads", async (c: AppContext) => {
+	const r = await storeUpload(c.env, c.req.param("mailboxId")!, c.req.raw);
+	if (!r.ok) return c.json({ error: r.error }, r.status);
+	return c.json(r.upload, 201);
+});
+
+app.delete("/api/v1/mailboxes/:mailboxId/uploads/:uploadId", async (c: AppContext) => {
+	const ok = await deleteUpload(c.env, c.req.param("mailboxId")!, c.req.param("uploadId")!);
+	return ok ? c.body(null, 204) : c.json({ error: "Invalid upload id" }, 400);
 });
 
 // Undo send: only while the message is still inside its undo window.
