@@ -11,6 +11,30 @@ interface EmailIframeProps {
 	autoSize?: boolean;
 }
 
+// Every link opens in a new tab; nothing in an email can navigate the app (B6).
+let hookInstalled = false;
+function installLinkHook() {
+	if (hookInstalled) return;
+	hookInstalled = true;
+	DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+		if (node.tagName === "A" && node.hasAttribute("href")) {
+			node.setAttribute("target", "_blank");
+			node.setAttribute("rel", "noopener noreferrer");
+		}
+	});
+}
+
+const REMOTE_CONTENT = /(?:src|background)\s*=\s*["']?\s*https?:|url\(\s*["']?\s*https?:/i;
+
+// The only script allowed in the frame (B7). Its hash goes in the CSP, so
+// any other inline script that survives sanitising is blocked.
+const HEIGHT_SCRIPT = `function reportHeight(){var h=document.body.scrollHeight;if(h>0)parent.postMessage({__emailIframeHeight:true,height:h},"*");}reportHeight();setTimeout(reportHeight,50);setTimeout(reportHeight,150);setTimeout(reportHeight,400);window.addEventListener("load",reportHeight);`;
+
+async function sha256Base64(text: string): Promise<string> {
+	const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+	return btoa(String.fromCharCode(...new Uint8Array(digest)));
+}
+
 /**
  * Renders email HTML inside a sandboxed iframe.
  *
@@ -30,6 +54,9 @@ interface EmailIframeProps {
 export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 	const iframeRef = useRef<HTMLIFrameElement>(null);
 	const [height, setHeight] = useState(autoSize ? 100 : 0);
+	// Remote images (and CSS url()) are blocked until the user asks; they leak opens and IPs.
+	const [showRemote, setShowRemote] = useState(false);
+	const hasRemote = REMOTE_CONTENT.test(body || "");
 
 	// Listen for height reports from the sandboxed iframe
 	const handleMessage = useCallback(
@@ -58,31 +85,25 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 	useEffect(() => {
 		const iframe = iframeRef.current;
 		if (!iframe || !body) return;
+		let cancelled = false;
+		installLinkHook();
 
+		// <style> is allowed (B8): newsletters depend on it, and the CSP below
+		// (no remote loads unless opted in, no fonts) stops CSS exfiltration.
 		const cleanBody = DOMPurify.sanitize(body, {
 			USE_PROFILES: { html: true },
-			FORBID_TAGS: ["style"],
+			ADD_TAGS: ["style"],
 			ADD_ATTR: ["target"],
 			FORCE_BODY: true,
 		});
 
 		const padding = autoSize ? "0" : "24px";
+		const imgSrc = showRemote ? "data: cid: https:" : "data: cid:";
 
-		// Height-reporting script: sends body.scrollHeight to the parent.
-		// Runs inside the opaque-origin sandbox so it has zero access to
-		// the parent page — it can only postMessage.
-		const heightScript = autoSize
-			? `<script>
-				function reportHeight() {
-					var h = document.body.scrollHeight;
-					if (h > 0) parent.postMessage({ __emailIframeHeight: true, height: h }, "*");
-				}
-				reportHeight();
-				setTimeout(reportHeight, 50);
-				setTimeout(reportHeight, 150);
-				setTimeout(reportHeight, 400);
-			<\/script>`
-			: "";
+		void (async () => {
+		const scriptSrc = autoSize ? `'sha256-${await sha256Base64(HEIGHT_SCRIPT)}'` : "'none'";
+		const heightScript = autoSize ? `<script>${HEIGHT_SCRIPT}<\/script>` : "";
+		if (cancelled) return;
 
 		// Use srcdoc so the iframe is truly sandboxed (no same-origin access).
 		// We can't use doc.write() because that requires allow-same-origin.
@@ -91,7 +112,7 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: cid: https:; script-src 'unsafe-inline';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src ${imgSrc}; script-src ${scriptSrc}; form-action 'none'; base-uri 'none';">
 <style>
 * { box-sizing: border-box; }
 html {
@@ -137,15 +158,32 @@ ul, ol { padding-left: 20px; margin: 4px 0; }
 </head>
 <body>${cleanBody}${heightScript}</body>
 </html>`;
-	}, [body, autoSize]);
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [body, autoSize, showRemote]);
 
-	return (
+	const frame = (
 		<iframe
 			ref={iframeRef}
 			className="block w-full border-0"
 			style={autoSize ? { height: `${height}px` } : { height: "100%" }}
-			sandbox="allow-scripts allow-popups allow-top-navigation-by-user-activation"
+			// No allow-top-navigation: links can only open new tabs (B6).
+			sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
 			title="Email content"
 		/>
+	);
+	if (!hasRemote || showRemote) return frame;
+	return (
+		<div className={autoSize ? "" : "flex h-full flex-col"}>
+			<div className="flex items-center gap-2 border-b border-kumo-line bg-kumo-elevated px-3 py-1.5 text-xs text-kumo-subtle">
+				<span>Remote images are hidden.</span>
+				<button type="button" className="font-medium text-kumo-brand hover:underline" onClick={() => setShowRemote(true)}>
+					Show images
+				</button>
+			</div>
+			<div className={autoSize ? "" : "min-h-0 flex-1"}>{frame}</div>
+		</div>
 	);
 }
