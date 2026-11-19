@@ -4,9 +4,7 @@
 
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
-import PostalMime from "postal-mime";
 import { z } from "zod";
-import type { StoredAttachment } from "./lib/attachments";
 import { queueSend } from "./lib/send";
 import { UNDO_DELAY_MS, type WebhookEvent } from "./durableObject/outbox";
 import { verifySvixSignature } from "./lib/svix";
@@ -17,7 +15,6 @@ import {
 } from "./lib/email-helpers";
 import { SendEmailRequestSchema } from "./lib/schemas";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
-import { Folders } from "../shared/folders";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
 
@@ -25,10 +22,19 @@ type AppContext = Context<MailboxContext>;
 
 // -- Request body schemas (kept for validation) ---------------------
 
+// B13: settings were stored as arbitrary JSON. Unknown keys are dropped.
+const MailboxSettingsSchema = z.object({
+	fromName: z.string().max(200).optional(),
+	forwarding: z.object({ enabled: z.boolean(), email: z.union([z.email(), z.literal("")]) }).optional(),
+	signature: z.object({ enabled: z.boolean(), text: z.string().max(10_000), html: z.string().max(50_000).optional() }).optional(),
+	autoReply: z.object({ enabled: z.boolean(), subject: z.string().max(500), message: z.string().max(20_000) }).optional(),
+	agentSystemPrompt: z.string().max(20_000).optional(),
+});
+
 const CreateMailboxBody = z.object({
 	email: z.email(),
 	name: z.string().min(1),
-	settings: z.record(z.string(), z.any()).optional(), // unvalidated — agentSystemPrompt goes straight to AI
+	settings: MailboxSettingsSchema.optional(),
 });
 
 const DraftBody = z.object({
@@ -103,6 +109,16 @@ app.get("/api/v1/config", (c) => {
 
 // -- Mailboxes ------------------------------------------------------
 
+async function deletePrefix(bucket: R2Bucket, prefix: string) {
+	let cursor: string | undefined;
+	do {
+		const page = await bucket.list({ prefix, cursor });
+		const keys = page.objects.map((o) => o.key);
+		if (keys.length) await bucket.delete(keys);
+		cursor = page.truncated ? page.cursor : undefined;
+	} while (cursor);
+}
+
 app.get("/api/v1/mailboxes", async (c) => {
 	const allMailboxes = await listMailboxes(c.env.BUCKET);
 	return c.json(allMailboxes.map((m) => ({ ...m, name: m.id })));
@@ -134,7 +150,7 @@ app.get("/api/v1/mailboxes/:mailboxId", async (c) => {
 
 app.put("/api/v1/mailboxes/:mailboxId", async (c) => {
 	const mailboxId = c.req.param("mailboxId")!;
-	const { settings } = (await c.req.json()) as { settings: Record<string, unknown> };
+	const { settings } = z.object({ settings: MailboxSettingsSchema }).parse(await c.req.json());
 	const key = `mailboxes/${mailboxId}.json`;
 	if (!(await c.env.BUCKET.head(key))) return c.json({ error: "Not found" }, 404);
 	await c.env.BUCKET.put(key, JSON.stringify(settings));
@@ -145,7 +161,12 @@ app.delete("/api/v1/mailboxes/:mailboxId", async (c) => {
 	const mailboxId = c.req.param("mailboxId")!;
 	const key = `mailboxes/${mailboxId}.json`;
 	if (!(await c.env.BUCKET.head(key))) return c.json({ error: "Not found" }, 404);
-	await c.env.BUCKET.delete(key); // TODO: also delete DO data and R2 attachment blobs
+	// Purge the mailbox's Durable Object data, then its R2 blobs, then the record.
+	const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailboxId));
+	const emailIds = await stub.purge();
+	for (const id of emailIds) await deletePrefix(c.env.BUCKET, `attachments/${id}/`);
+	await deletePrefix(c.env.BUCKET, `raw/${mailboxId}/`);
+	await c.env.BUCKET.delete(key);
 	return c.body(null, 204);
 });
 
@@ -222,15 +243,14 @@ app.post("/api/v1/mailboxes/:mailboxId/drafts", async (c: AppContext) => {
 	const mailboxId = c.req.param("mailboxId")!;
 	const { to, cc, bcc, subject, body, in_reply_to, thread_id, draft_id } = DraftBody.parse(await c.req.json());
 	const stub = c.var.mailboxStub;
-	if (draft_id) await stub.deleteEmail(draft_id); // not atomic — create-then-delete would be safer
 	const messageId = crypto.randomUUID();
 	const now = new Date().toISOString();
-	await stub.createEmail(Folders.DRAFT, {
+	await stub.saveDraft({
 		id: messageId, subject: subject || "", sender: mailboxId.toLowerCase(),
 		recipient: (to || "").toLowerCase(), cc: cc?.toLowerCase() || null, bcc: bcc?.toLowerCase() || null,
 		date: now, body, in_reply_to: in_reply_to || null, email_references: null,
 		thread_id: thread_id || in_reply_to || messageId,
-	}, []);
+	}, draft_id ?? null);
 	return c.json({ id: messageId, status: "draft", subject: subject || "", recipient: to || "", date: now }, 201);
 });
 
@@ -378,86 +398,50 @@ app.post("/webhooks/resend", async (c) => {
 });
 
 // -- Receive inbound email ------------------------------------------
+// Design A (plan §A2): stream the raw message into R2 without buffering or
+// parsing it here (a plain Worker gets ~10 ms CPU on Free), then let the
+// mailbox's Durable Object parse it.
 
 const MAX_EMAIL_SIZE = 25 * 1024 * 1024;
 
-async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
-	if (streamSize > MAX_EMAIL_SIZE) throw new Error(`Email too large: ${streamSize} bytes exceeds ${MAX_EMAIL_SIZE} byte limit`);
-	if (streamSize <= 0) throw new Error(`Invalid stream size: ${streamSize}`);
-	const result = new Uint8Array(streamSize);
-	let bytesRead = 0;
-	const reader = stream.getReader();
-	while (true) {
-		const { done, value } = await reader.read();
-		if (done) break;
-		if (bytesRead + value.length > streamSize) { reader.cancel(); throw new Error(`Stream exceeds declared size`); }
-		result.set(value, bytesRead);
-		bytesRead += value.length;
-	}
-	return result;
+/** The parts of ForwardableEmailMessage this handler uses. */
+export interface InboundMessage {
+	from: string;
+	to: string;
+	raw: ReadableStream<Uint8Array>;
+	rawSize: number;
+	setReject(reason: string): void;
 }
 
-async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env: Env, ctx: ExecutionContext) {
-	const rawEmail = await streamToArrayBuffer(event.raw, event.rawSize);
-	const parsedEmail = await new PostalMime().parse(rawEmail);
+async function receiveEmail(message: InboundMessage, env: Env, ctx: ExecutionContext) {
+	// Route on the SMTP envelope recipient, not header To/Cc, so Cc, Bcc and
+	// list mail arrive and nothing is guessed from headers.
+	const mailboxId = message.to.trim().toLowerCase();
+	const allowed = ((env.EMAIL_ADDRESSES ?? []) as string[]).map((a) => a.toLowerCase());
+	if ((allowed.length > 0 && !allowed.includes(mailboxId)) || !(await env.BUCKET.head(`mailboxes/${mailboxId}.json`))) {
+		message.setReject("550 5.1.1 No such user here");
+		return;
+	}
+	if (message.rawSize > MAX_EMAIL_SIZE) {
+		message.setReject("552 5.3.4 Message size exceeds fixed maximum message size");
+		return;
+	}
+	if (message.rawSize <= 0) throw new Error(`Invalid message size: ${message.rawSize}`);
 
-	if (!parsedEmail.to?.length || !parsedEmail.to[0].address) throw new Error("received email with empty to");
-
-	const allowedAddresses = ((env.EMAIL_ADDRESSES ?? []) as string[]).map((a) => a.toLowerCase());
-	const allRecipients = parsedEmail.to.map((t) => t.address?.toLowerCase()).filter(Boolean) as string[];
-	const ccRecipients = (parsedEmail.cc || []).map((e) => e.address?.toLowerCase()).filter(Boolean) as string[];
-	const bccRecipients = (parsedEmail.bcc || []).map((e) => e.address?.toLowerCase()).filter(Boolean) as string[];
-
-	let mailboxId: string | undefined;
-	if (allowedAddresses.length > 0) {
-		mailboxId = allRecipients.find((addr) => allowedAddresses.includes(addr));
-		if (!mailboxId) { console.log(`Ignoring email: no recipient matches EMAIL_ADDRESSES.`); return; }
-	} else { mailboxId = allRecipients[0]; }
-	if (!mailboxId) throw new Error("received email with no valid recipient address");
-
-	const messageId = crypto.randomUUID();
-	if (!(await env.BUCKET.head(`mailboxes/${mailboxId}.json`))) { console.log(`Ignoring email for ${mailboxId}: mailbox does not exist`); return; }
+	const id = crypto.randomUUID();
+	const key = `raw/${mailboxId}/${id}.eml`;
+	// R2 needs a known length for a streamed body; FixedLengthStream also
+	// rejects a stream that doesn't match the declared size.
+	const { readable, writable } = new FixedLengthStream(message.rawSize);
+	await Promise.all([message.raw.pipeTo(writable), env.BUCKET.put(key, readable)]);
 
 	const stub = env.MAILBOX.get(env.MAILBOX.idFromName(mailboxId));
-
-	const attachmentData: StoredAttachment[] = [];
-	if (parsedEmail.attachments) {
-		for (const att of parsedEmail.attachments) {
-			const attId = crypto.randomUUID();
-			const filename = (att.filename || "untitled").replace(/[\/\\:*?"<>|\x00-\x1f]/g, "_");
-			await env.BUCKET.put(`attachments/${messageId}/${attId}/${filename}`, att.content);
-			attachmentData.push({ id: attId, email_id: messageId, filename, mimetype: att.mimeType,
-				size: typeof att.content === "string" ? att.content.length : att.content.byteLength,
-				content_id: att.contentId || null, disposition: att.disposition || "attachment" });
-		}
-	}
-
-	const extractMsgId = (s: string) => { const m = s.match(/<([^>]+)>/); return m ? m[1] : s.trim().split(/\s+/)[0]; };
-	const inReplyTo = parsedEmail.inReplyTo ? extractMsgId(parsedEmail.inReplyTo) : null;
-	const emailReferences = parsedEmail.references ? parsedEmail.references.split(/\s+/).filter(Boolean).map(extractMsgId) : [];
-	let threadId = emailReferences[0] || inReplyTo || messageId;
-
-	if (!inReplyTo && emailReferences.length === 0) {
-		const subjectThread = await (stub as any).findThreadBySubject(parsedEmail.subject || "", parsedEmail.from?.address || undefined);
-		if (subjectThread) threadId = subjectThread;
-	}
-
-	const originalMessageId = parsedEmail.messageId ? extractMsgId(parsedEmail.messageId) : null;
-
-	await stub.createEmail(Folders.INBOX, {
-		id: messageId, subject: parsedEmail.subject || "",
-		sender: (parsedEmail.from?.address || "").toLowerCase(), recipient: allRecipients.join(", "),
-		cc: ccRecipients.join(", ") || null, bcc: bccRecipients.join(", ") || null,
-		date: new Date().toISOString(), // uses receive time, not the email's Date header
-		body: parsedEmail.html || parsedEmail.text || "",
-		in_reply_to: inReplyTo, email_references: emailReferences.length > 0 ? JSON.stringify(emailReferences) : null,
-		thread_id: threadId, message_id: originalMessageId, raw_headers: JSON.stringify(parsedEmail.headers),
-	}, attachmentData);
+	const stored = await stub.ingestRaw({ key, id, envelopeTo: mailboxId });
 
 	const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));
 	ctx.waitUntil(agentStub.fetch(new Request("https://agents/onNewEmail", {
 		method: "POST", headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ mailboxId, emailId: messageId, sender: (parsedEmail.from?.address || "").toLowerCase(), subject: parsedEmail.subject || "", threadId }),
+		body: JSON.stringify({ mailboxId, emailId: stored.emailId, sender: stored.sender, subject: stored.subject, threadId: stored.threadId }),
 	})).catch((e) => console.error("Auto-draft trigger failed:", (e as Error).message)));
 }
 

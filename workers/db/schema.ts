@@ -31,6 +31,10 @@ export const emails = sqliteTable("emails", {
 	raw_headers: text("raw_headers"),
 	/** Outbound only: queued | sent | delayed | delivered | bounced | complained | failed | suppressed */
 	delivery_status: text("delivery_status"),
+	/** Plain-text rendering of the body, for snippets and search. */
+	body_text: text("body_text"),
+	/** R2 key of the original .eml (inbound only). */
+	raw_key: text("raw_key"),
 });
 
 export const attachments = sqliteTable("attachments", {

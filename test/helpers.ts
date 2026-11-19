@@ -29,13 +29,31 @@ export function mailboxStub(email = MAILBOX) {
 	return env.MAILBOX.get(env.MAILBOX.idFromName(email));
 }
 
-/** Deliver a raw RFC 5322 message through the email() handler. */
-export async function deliver(raw: string): Promise<void> {
+/**
+ * Deliver a raw RFC 5322 message through the email() handler, the way Email
+ * Routing does: `to` is the SMTP envelope recipient (default: the mailbox).
+ * Returns the rejection reason if the handler called setReject().
+ */
+export async function deliver(raw: string, envelope: { to?: string; from?: string } = {}): Promise<{ rejected: string | null }> {
 	const bytes = new TextEncoder().encode(raw);
 	const ctx = createExecutionContext();
-	await worker.email({ raw: new Response(bytes).body!, rawSize: bytes.byteLength }, testEnv, ctx);
+	let rejected: string | null = null;
+	await worker.email(
+		{
+			from: envelope.from ?? "alice@sender.test",
+			to: envelope.to ?? MAILBOX,
+			raw: new Response(bytes).body!,
+			rawSize: bytes.byteLength,
+			setReject: (reason: string) => {
+				rejected = reason;
+			},
+		},
+		testEnv,
+		ctx,
+	);
 	// Flushes the auto-draft trigger; it fails without Workers AI and is caught/logged.
 	await waitOnExecutionContext(ctx);
+	return { rejected };
 }
 
 export interface MimeOptions {

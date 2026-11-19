@@ -36,6 +36,18 @@ function getAccessUrls(teamDomain: string) {
 	return { issuer, certsUrl };
 }
 
+// B4: one JWKS per team domain per isolate. jose caches and refreshes keys
+// inside the set, so rebuilding it per request threw that cache away.
+const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
+function getJwks(certsUrl: URL) {
+	let jwks = jwksCache.get(certsUrl.href);
+	if (!jwks) {
+		jwks = createRemoteJWKSet(certsUrl);
+		jwksCache.set(certsUrl.href, jwks);
+	}
+	return jwks;
+}
+
 // Main app that wraps the API and adds React Router fallback
 const app = new Hono<{ Bindings: Env }>();
 
@@ -69,8 +81,7 @@ app.use("*", async (c, next) => {
 
 	try {
 		const { issuer, certsUrl } = getAccessUrls(TEAM_DOMAIN);
-		const JWKS = createRemoteJWKSet(certsUrl);
-		await jwtVerify(token, JWKS, {
+		await jwtVerify(token, getJwks(certsUrl), {
 			issuer,
 			audience: POLICY_AUD,
 		});
@@ -113,13 +124,9 @@ app.all("*", (c) => {
 // Export the Hono app as the default export with an email handler
 export default {
 	fetch: app.fetch,
-	async email(
-		event: { raw: ReadableStream; rawSize: number },
-		env: Env,
-		ctx: ExecutionContext,
-	) {
+	async email(message: ForwardableEmailMessage, env: Env, ctx: ExecutionContext) {
 		try {
-			await receiveEmail(event, env, ctx);
+			await receiveEmail(message, env, ctx);
 		} catch (e) {
 			console.error("Failed to process incoming email:", (e as Error).message, (e as Error).stack);
 			// Re-throw so Cloudflare's email routing can retry delivery or bounce the message.

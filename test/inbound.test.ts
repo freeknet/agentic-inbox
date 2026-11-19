@@ -2,10 +2,9 @@ import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { MAILBOX, createMailbox, deliver, mailboxStub, mime } from "./helpers";
 
-// Characterization tests for the upstream inbound pipeline (workers/index.ts
-// receiveEmail). Tests named "KNOWN BUG" assert the *correct* behavior and are
-// marked `it.fails`; when a later phase fixes the bug, vitest reports them as
-// unexpectedly passing and the marker must be removed.
+// Inbound pipeline (workers/index.ts receiveEmail → MailboxDO.ingestRaw).
+// Started as characterization tests of upstream; the former "KNOWN BUG" cases
+// (B14, envelope routing, Date header) were fixed in Phase 4.
 
 async function inbox() {
 	return (await mailboxStub().getEmails({ folder: "inbox" })) as Array<Record<string, any>>;
@@ -43,8 +42,9 @@ describe("inbound email", () => {
 		expect(await obj?.text()).toBe("attached bytes");
 	});
 
-	it("ignores mail for a mailbox that does not exist", async () => {
-		await deliver(mime({ to: "nobody@example.com" }));
+	it("rejects mail for a mailbox that does not exist", async () => {
+		const { rejected } = await deliver(mime({ to: "nobody@example.com" }), { to: "nobody@example.com" });
+		expect(rejected).toMatch(/^550/);
 		const other = env.MAILBOX.get(env.MAILBOX.idFromName("nobody@example.com"));
 		expect(await other.getEmails({ folder: "inbox" })).toHaveLength(0);
 		expect(await inbox()).toHaveLength(0);
@@ -57,9 +57,7 @@ describe("inbound email", () => {
 		expect(new Set(emails.map((e) => e.thread_id)).size).toBe(1);
 	});
 
-	it.fails("KNOWN BUG: a reply joins the thread of the message it replies to", async () => {
-		// Root gets thread_id = internal UUID; the reply gets thread_id = root's
-		// Message-ID, so they never meet. Fixed in Phase 4 (thread lookup by message_id).
+	it("a reply joins the thread of the message it replies to (B14)", async () => {
 		await deliver(mime({ subject: "Plan", messageId: "root-2@sender.test" }));
 		await deliver(mime({ subject: "Re: Plan", inReplyTo: "root-2@sender.test", references: "<root-2@sender.test>" }));
 		const emails = await inbox();
@@ -67,23 +65,17 @@ describe("inbound email", () => {
 		expect(new Set(emails.map((e) => e.thread_id)).size).toBe(1);
 	});
 
-	it.fails("KNOWN BUG: mail addressed to the mailbox only via Cc is delivered", async () => {
-		// Routing reads header To: only (workers/index.ts:355-363), never the
-		// envelope recipient. Fixed in Phase 4 (route by message.to).
+	it("mail addressed to the mailbox only via Cc is delivered", async () => {
 		await deliver(mime({ to: "someone-else@other.test", cc: MAILBOX }));
 		expect(await inbox()).toHaveLength(1);
 	});
 
-	it.fails("KNOWN BUG: mail delivered when the mailbox is not the first To address", async () => {
-		// With EMAIL_ADDRESSES unset, routing picks the first header To: address.
-		// postal-mime >= 3 returns addresses in document order (2.x reversed them),
-		// so "To: other, me" is now ignored. Fixed in Phase 4 (route by message.to).
+	it("mail delivered when the mailbox is not the first To address", async () => {
 		await deliver(mime({ to: `Other <other@other.test>, ${MAILBOX}` }));
 		expect(await inbox()).toHaveLength(1);
 	});
 
-	it.fails("KNOWN BUG: the Date header is stored as the message date", async () => {
-		// Upstream stores receive time (workers/index.ts:399). Fixed in Phase 4.
+	it("the Date header is stored as the message date", async () => {
 		await deliver(mime({ date: "Tue, 03 Nov 2026 10:00:00 +0000" }));
 		const [email] = await inbox();
 		expect(email.date).toBe("2026-11-03T10:00:00.000Z");

@@ -5,7 +5,7 @@
 // Cloudflare Access. Tests exercise the API app and the email handler directly,
 // so this entry exports the same Durable Object classes plus a minimal handler.
 
-import { app, receiveEmail } from "../workers/index";
+import { app, receiveEmail, type InboundMessage } from "../workers/index";
 import type { Env } from "../workers/types";
 
 export { MailboxDO } from "../workers/durableObject";
@@ -14,13 +14,9 @@ export { EmailMCP } from "../workers/mcp";
 
 export default {
 	fetch: app.fetch,
-	async email(
-		event: { raw: ReadableStream; rawSize: number },
-		env: Env,
-		ctx: ExecutionContext,
-	) {
-		await receiveEmail(event, env, ctx);
+	async email(message: InboundMessage, env: Env, ctx: ExecutionContext) {
+		await receiveEmail(message, env, ctx);
 	},
 } satisfies ExportedHandler<Env> & {
-	email(event: { raw: ReadableStream; rawSize: number }, env: Env, ctx: ExecutionContext): Promise<void>;
+	email(message: InboundMessage, env: Env, ctx: ExecutionContext): Promise<void>;
 };

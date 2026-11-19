@@ -12,6 +12,7 @@ import type { Env } from "../types";
 import { applyMigrations, mailboxMigrations } from "./migrations";
 import { Outbox, type OutboxPayload, type WebhookEvent } from "./outbox";
 import { createResendProvider } from "../lib/resend";
+import { parseInbound } from "./ingest";
 
 /**
  * SQL expression to normalize email subjects by stripping common
@@ -90,6 +91,8 @@ interface EmailData {
 	message_id?: string | null;
 	raw_headers?: string | null;
 	delivery_status?: string | null;
+	body_text?: string | null;
+	raw_key?: string | null;
 }
 
 interface AttachmentData {
@@ -169,7 +172,7 @@ export class MailboxDO extends DurableObject<Env> {
 				thread_id: schema.emails.thread_id,
 				folder_id: schema.emails.folder_id,
 				delivery_status: schema.emails.delivery_status,
-				snippet: sql<string>`SUBSTR(${schema.emails.body}, 1, 300)`,
+				snippet: sql<string>`SUBSTR(COALESCE(${schema.emails.body_text}, ${schema.emails.body}), 1, 300)`,
 			})
 			.from(schema.emails)
 			.where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -276,7 +279,7 @@ export class MailboxDO extends DurableObject<Env> {
 					lp.id, lp.subject, lp.sender, lp.recipient, lp.date,
 					lp.read, lp.starred, lp.thread_id, lp.folder_id,
 					lp.in_reply_to, lp.email_references,
-					SUBSTR(lp.body, 1, 300) as snippet,
+					SUBSTR(COALESCE(lp.body_text, lp.body), 1, 300) as snippet,
 					ds.thread_count, ds.thread_unread_count, ds.participants
 				FROM latest_per_group lp
 				JOIN draft_stats ds ON lp.draft_group_key = ds.draft_group_key
@@ -364,7 +367,7 @@ export class MailboxDO extends DurableObject<Env> {
 				lif.id, lif.subject, lif.sender, lif.recipient, lif.date,
 				lif.read, lif.starred, lif.thread_id, lif.folder_id,
 				lif.in_reply_to, lif.email_references,
-				SUBSTR(lif.body, 1, 300) as snippet,
+				SUBSTR(COALESCE(lif.body_text, lif.body), 1, 300) as snippet,
 				cs.thread_count, cs.thread_unread_count, cs.participants,
 				CASE WHEN lmc.folder_id != (SELECT id FROM folders WHERE name = 'sent' LIMIT 1)
 					AND lmc.folder_id != (SELECT id FROM folders WHERE name = 'draft' LIMIT 1)
@@ -715,7 +718,7 @@ export class MailboxDO extends DurableObject<Env> {
 			SELECT e.id, e.subject, e.sender, e.recipient, e.cc, e.bcc, e.date,
 				e.read, e.starred, e.in_reply_to, e.email_references,
 				e.thread_id, e.folder_id,
-				SUBSTR(e.body, 1, 300) as snippet,
+				SUBSTR(COALESCE(e.body_text, e.body), 1, 300) as snippet,
 				f.name as folder_name
 			FROM emails e
 			LEFT JOIN folders f ON e.folder_id = f.id
@@ -762,8 +765,7 @@ export class MailboxDO extends DurableObject<Env> {
 			        GROUP_CONCAT(DISTINCT LOWER(recipient)) as recipients
 			 FROM emails
 			 WHERE thread_id IS NOT NULL
-			   AND thread_id != id
-			   AND date >= datetime('now', '-7 days')
+			   AND date >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-7 days')
 			 GROUP BY thread_id
 			 ORDER BY MAX(date) DESC
 			 LIMIT 50`,
@@ -790,6 +792,88 @@ export class MailboxDO extends DurableObject<Env> {
 			return String((row as any).thread_id);
 		}
 		return null;
+	}
+
+	// ── Inbound (see ./ingest.ts) ──────────────────────────────────
+
+	/**
+	 * Thread for an inbound message (B14): the thread of the newest stored
+	 * message it references, else its References root / In-Reply-To (so
+	 * siblings group), else a subject match, else a new thread.
+	 */
+	private resolveThread(p: { inReplyTo: string | null; references: string[]; subject: string; sender: string; fallback: string }): string {
+		const candidates = [...new Set([p.inReplyTo, ...[...p.references].reverse()].filter(Boolean) as string[])];
+		if (candidates.length > 0) {
+			const placeholders = candidates.map((_, i) => `?${i + 1}`).join(", ");
+			const row = [...this.ctx.storage.sql.exec(
+				`SELECT thread_id FROM emails WHERE message_id IN (${placeholders}) AND thread_id IS NOT NULL
+				 ORDER BY date DESC LIMIT 1`,
+				...candidates,
+			)][0] as { thread_id: string } | undefined;
+			if (row) return row.thread_id;
+			return p.references[0] || p.inReplyTo || p.fallback;
+		}
+		return p.fallback;
+	}
+
+	/**
+	 * Parse a raw message the Worker stored in R2 and file it in the Inbox.
+	 * Runs in the DO because parsing large mail exceeds a plain Worker's CPU on Free.
+	 */
+	async ingestRaw(input: { key: string; id: string; envelopeTo: string }) {
+		const obj = await this.env.BUCKET.get(input.key);
+		if (!obj) throw new Error(`ingestRaw: raw message not found at ${input.key}`);
+		const p = await parseInbound(await obj.arrayBuffer(), input.id, input.envelopeTo, this.env.BUCKET);
+
+		let threadId = this.resolveThread({ inReplyTo: p.inReplyTo, references: p.references, subject: p.subject, sender: p.sender, fallback: input.id });
+		if (threadId === input.id && !p.inReplyTo && p.references.length === 0) {
+			threadId = (await this.findThreadBySubject(p.subject, p.sender || undefined)) ?? input.id;
+		}
+
+		this.insertEmail(Folders.INBOX, {
+			id: input.id,
+			subject: p.subject,
+			sender: p.sender,
+			recipient: p.recipient,
+			cc: p.cc,
+			bcc: p.bcc,
+			date: p.date,
+			body: p.body,
+			body_text: p.bodyText,
+			in_reply_to: p.inReplyTo,
+			email_references: p.references.length > 0 ? JSON.stringify(p.references) : null,
+			thread_id: threadId,
+			message_id: p.messageId,
+			raw_headers: p.rawHeaders,
+			raw_key: input.key,
+		}, p.attachments);
+
+		return { emailId: input.id, threadId, sender: p.sender, subject: p.subject };
+	}
+
+	/** Create or replace a draft in one transaction (the old delete-then-create could lose it). */
+	async saveDraft(draft: EmailData, replaceId?: string | null) {
+		this.ctx.storage.transactionSync(() => {
+			if (replaceId) {
+				this.db.delete(schema.emails)
+					.where(and(eq(schema.emails.id, replaceId), eq(schema.emails.folder_id, Folders.DRAFT)))
+					.run();
+			}
+			this.insertEmail(Folders.DRAFT, draft, []);
+		});
+	}
+
+	/**
+	 * Delete all of this mailbox's data. Returns the email ids so the caller
+	 * can remove their R2 attachment blobs.
+	 */
+	async purge(): Promise<string[]> {
+		const ids = [...this.ctx.storage.sql.exec(`SELECT id FROM emails`)].map((r) => String((r as { id: string }).id));
+		await this.ctx.storage.deleteAlarm();
+		await this.ctx.storage.deleteAll();
+		// This instance may keep serving requests (e.g. the mailbox is recreated), so rebuild the schema.
+		applyMigrations(this.ctx.storage.sql, mailboxMigrations, this.ctx.storage);
+		return ids;
 	}
 
 	// ── Outbox (see ./outbox.ts) ───────────────────────────────────
@@ -964,6 +1048,8 @@ export class MailboxDO extends DurableObject<Env> {
 				message_id: email.message_id ?? null,
 				raw_headers: email.raw_headers ?? null,
 				delivery_status: email.delivery_status ?? null,
+				body_text: email.body_text ?? null,
+				raw_key: email.raw_key ?? null,
 			})
 			.run();
 

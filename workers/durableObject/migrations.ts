@@ -206,4 +206,14 @@ export const mailboxMigrations: Migration[] = [
             );
         `),
 	},
+	{
+		// Phase 4: plain-text body for snippets/search, raw .eml location, and a
+		// message_id index for reply threading (B14).
+		name: "10_inbound_pipeline",
+		sql: txn(`
+            ALTER TABLE emails ADD COLUMN body_text TEXT;
+            ALTER TABLE emails ADD COLUMN raw_key TEXT;
+            CREATE INDEX IF NOT EXISTS idx_emails_message_id ON emails(message_id);
+        `),
+	},
 ];
