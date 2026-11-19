@@ -4,9 +4,8 @@
  * the mailbox's outbox, which sends it from a Durable Object alarm.
  */
 import type { MailboxDO } from "../durableObject";
-import type { OutboxPayload } from "../durableObject/outbox";
 import { storeAttachments, type StoredAttachment } from "./attachments";
-import { buildThreadingHeaders, generateMessageId, stripHtmlToText } from "./email-helpers";
+import { attachmentKey, buildOutgoing, newMessageIds } from "./outgoing";
 import { MAX_MESSAGE_ATTACHMENT_BYTES, copyObject, safeFilename, uploadKey } from "./uploads";
 import type { Env } from "../types";
 
@@ -56,6 +55,8 @@ export interface QueueSendInput {
 	draftId?: string | null;
 	/** Undo window. Interactive sends use UNDO_DELAY_MS; agent/MCP sends use 0. */
 	delayMs: number;
+	/** Send later: epoch ms. The message waits in the outbox and can be cancelled until then. */
+	sendAt?: number | null;
 }
 
 export type QueueSendResult =
@@ -86,69 +87,38 @@ export async function queueSend(
 	const to = list(input.to);
 	const cc = list(input.cc);
 	const bcc = list(input.bcc);
-	const references = input.references ?? [];
-	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
-	const now = new Date().toISOString();
-	const fromHeader = formatFrom(input.from);
+	const ids = newMessageIds(fromEmail);
+	const { messageId } = ids;
 
 	const resolved = await resolveAttachments(env, input);
 	if (!resolved.ok) return { ok: false, error: resolved.error, status: 400 };
 
 	const stored = await storeAttachments(env.BUCKET, messageId, resolved.base64);
 	stored.push(...(await copySources(env.BUCKET, messageId, resolved.sources)));
-	const keys = stored.map((a) => `attachments/${messageId}/${a.id}/${a.filename}`);
+	const keys = stored.map(attachmentKey);
 
-	const payload: OutboxPayload = {
-		from: fromHeader,
+	const { email, payload } = buildOutgoing({
+		fromHeader: formatFrom(input.from),
+		fromEmail,
 		to,
-		...(cc.length ? { cc } : {}),
-		...(bcc.length ? { bcc } : {}),
+		cc,
+		bcc,
 		subject: input.subject,
-		...(input.html ? { html: input.html } : {}),
-		...(input.text ? { text: input.text } : {}),
-		...(input.inReplyTo ? { headers: buildThreadingHeaders(input.inReplyTo, references) } : {}),
-		...(stored.length
-			? {
-					attachments: stored.map((a, i) => ({
-						key: keys[i],
-						filename: a.filename,
-						contentType: a.mimetype,
-						...(a.content_id && a.disposition === "inline" ? { contentId: a.content_id } : {}),
-					})),
-				}
-			: {}),
-	};
+		html: input.html,
+		text: input.text,
+		inReplyTo: input.inReplyTo,
+		references: input.references,
+		threadId: input.threadId,
+		ids,
+		attachments: stored,
+	});
 
+	const delayMs = input.sendAt ? Math.max(input.delayMs, input.sendAt - Date.now()) : input.delayMs;
 	const result = await stub.enqueueOutgoing({
-		email: {
-			id: messageId,
-			subject: input.subject,
-			sender: fromEmail,
-			recipient: to.join(", ").toLowerCase(),
-			cc: cc.length ? cc.join(", ").toLowerCase() : null,
-			bcc: bcc.length ? bcc.join(", ").toLowerCase() : null,
-			date: now,
-			body: input.html || input.text || "",
-			body_text: input.text || stripHtmlToText(input.html || ""),
-			in_reply_to: input.inReplyTo ?? null,
-			email_references: references.length ? JSON.stringify(references) : null,
-			thread_id: input.threadId || input.inReplyTo || messageId,
-			// Replaced by Resend's real Message-ID when the email.sent webhook arrives (B2).
-			message_id: outgoingMessageId,
-			raw_headers: JSON.stringify([
-				{ key: "from", value: fromHeader },
-				{ key: "to", value: to.join(", ") },
-				...(cc.length ? [{ key: "cc", value: cc.join(", ") }] : []),
-				...(bcc.length ? [{ key: "bcc", value: bcc.join(", ") }] : []),
-				{ key: "subject", value: input.subject },
-				{ key: "date", value: now },
-				...(input.inReplyTo ? [{ key: "in-reply-to", value: `<${input.inReplyTo}>` }] : []),
-				...(references.length ? [{ key: "references", value: references.map((r) => `<${r}>`).join(" ") }] : []),
-			]),
-		},
+		email,
 		attachments: stored,
 		payload,
-		delayMs: input.delayMs,
+		delayMs,
 		draftId: input.draftId ?? null,
 	});
 
