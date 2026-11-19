@@ -15,6 +15,8 @@ import {
 import { z } from "zod";
 import type { EmailFull, EmailMetadata } from "../lib/schemas";
 import { verifyDraft, isPromptInjection } from "../lib/ai";
+import { mailboxAi } from "../lib/ai-meter";
+import { AUTO_DRAFT_BUDGET_SHARE, DEFAULT_AGENT_MODEL, isAgentModel } from "../../shared/ai-models";
 import {
 	getMailboxStub,
 	stripHtmlToText,
@@ -39,7 +41,7 @@ import type { Env } from "../types";
  * now aliases to kimi-k2.6, which requires a paid billing method. glm-4.7-flash
  * supports tool calling and costs 5,500 / 36,400 Neurons per M input / output tokens.
  */
-export const AGENT_MODEL = "@cf/zai-org/glm-4.7-flash";
+export const AGENT_MODEL = DEFAULT_AGENT_MODEL;
 
 // AI SDK v6 changed tool() overloads significantly. We define tools as plain
 // objects matching the Tool type to avoid overload resolution issues.
@@ -100,6 +102,17 @@ Use discard_draft to delete drafts that the operator rejects or that are no long
  * Fetch the custom system prompt for a mailbox from its R2 settings.
  * Falls back to DEFAULT_SYSTEM_PROMPT if none is configured.
  */
+/** The mailbox's chosen agent model (Settings), or the default. */
+async function getAgentModel(env: Env, mailboxId: string): Promise<string> {
+	try {
+		const obj = await env.BUCKET.get(`mailboxes/${mailboxId}.json`);
+		const model = obj ? (await obj.json<{ agent?: { model?: unknown } }>()).agent?.model : undefined;
+		return isAgentModel(model) ? model : AGENT_MODEL;
+	} catch {
+		return AGENT_MODEL;
+	}
+}
+
 async function getSystemPrompt(env: Env, mailboxId: string): Promise<string> {
 	try {
 		const key = `mailboxes/${mailboxId}.json`;
@@ -282,12 +295,12 @@ export class EmailAgent extends AIChatAgent<Env> {
 	async onChatMessage(onFinish: Parameters<AIChatAgent<Env>["onChatMessage"]>[0]) {
 		const env = this.env;
 		const mailboxId = this.name;
-		const ai = createAI({ binding: env.AI });
+		const ai = createAI({ binding: mailboxAi(env, mailboxId) });
 		const tools = createEmailTools(env, mailboxId);
-		const systemPrompt = await getSystemPrompt(env, mailboxId);
+		const [systemPrompt, model] = await Promise.all([getSystemPrompt(env, mailboxId), getAgentModel(env, mailboxId)]);
 
 		const result = streamText({
-			model: ai(AGENT_MODEL),
+			model: ai(model as typeof AGENT_MODEL),
 			instructions: systemPrompt,
 			messages: await convertToModelMessages(this.messages),
 			tools,
@@ -342,20 +355,36 @@ export class EmailAgent extends AIChatAgent<Env> {
 		threadId: string;
 	}) {
 		const env = this.env as Env;
-		const ai = createAI({ binding: env.AI });
+		const meteredAi = mailboxAi(env, emailData.mailboxId);
+		const ai = createAI({ binding: meteredAi });
 		const tools = createEmailTools(env, emailData.mailboxId);
-		const systemPrompt = await getSystemPrompt(env, emailData.mailboxId);
+		const [systemPrompt, model] = await Promise.all([
+			getSystemPrompt(env, emailData.mailboxId),
+			getAgentModel(env, emailData.mailboxId),
+		]);
 
 		// Pre-read the email and thread so the agent has full context
 		// without needing to waste tool calls discovering it
 		const stub = getMailboxStub(env, emailData.mailboxId);
+
+		// Stay inside the Workers Free allocation: stop auto-drafting for the day near the limit.
+		const usage = await stub.getAiUsage();
+		if (usage.neurons >= usage.limit * AUTO_DRAFT_BUDGET_SHARE) {
+			const note = `Skipped auto-draft: about ${Math.round(usage.neurons).toLocaleString()} of ${usage.limit.toLocaleString()} free Neurons used today (UTC).`;
+			await this.persistMessages([
+				...this.messages,
+				{ id: crypto.randomUUID(), role: "user" as const, parts: [{ type: "text" as const, text: `[Auto-triggered] New email from ${emailData.sender}: "${emailData.subject}"` }] },
+				{ id: crypto.randomUUID(), role: "assistant" as const, parts: [{ type: "text" as const, text: note }] },
+			] as typeof this.messages);
+			return { status: "skipped_budget" };
+		}
 
 		let emailBody = "";
 		let threadContext = "";
 		try {
 			const email = (await stub.getEmail(emailData.emailId)) as EmailFull | null;
 			if (email?.body) {
-				const isInjection = await isPromptInjection(env.AI, email.body);
+				const isInjection = await isPromptInjection(meteredAi, email.body);
 				if (isInjection) {
 					console.warn("Skipping auto-draft due to detected prompt injection:", emailData.emailId);
 					
@@ -403,7 +432,7 @@ export class EmailAgent extends AIChatAgent<Env> {
 			// could plant an injection in an earlier email in the thread
 			// that gets included in the agent's prompt.
 			if (threadContext) {
-				const threadInjection = await isPromptInjection(env.AI, threadContext);
+				const threadInjection = await isPromptInjection(meteredAi, threadContext);
 				if (threadInjection) {
 					console.warn("Skipping auto-draft due to prompt injection in thread context:", emailData.threadId);
 					const newMessages = [
@@ -471,7 +500,7 @@ Based on the email content and thread context above, draft a reply using draft_r
 
 		try {
 			const result = await generateText({
-				model: ai(AGENT_MODEL),
+				model: ai(model as typeof AGENT_MODEL),
 				instructions: systemPrompt,
 				messages: await convertToModelMessages(messages),
 				tools,
@@ -486,7 +515,7 @@ Based on the email content and thread context above, draft a reply using draft_r
 
 			if (!draftToolCalled && result.text.trim()) {
 				// Model generated a draft inline as text -- verify with AI
-				const sanitizedText = await verifyDraft(env.AI, result.text.trim());
+				const sanitizedText = await verifyDraft(meteredAi, result.text.trim());
 				if (!sanitizedText) {
 					// Inline text was entirely agent commentary, skip
 				} else {

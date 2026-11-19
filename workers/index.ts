@@ -10,6 +10,7 @@ import { deleteUpload, storeUpload } from "./lib/uploads";
 import { UNDO_DELAY_MS, type WebhookEvent } from "./durableObject/outbox";
 import { verifySvixSignature } from "./lib/svix";
 import type { AutoReplySettings } from "./durableObject/autoreply";
+import { isAgentModel } from "../shared/ai-models";
 import {
 	validateSender,
 	SenderValidationError,
@@ -37,6 +38,11 @@ const MailboxSettingsSchema = z.object({
 		endsAt: z.union([z.iso.datetime({ offset: true }), z.literal("")]).optional(),
 	}).optional(),
 	agentSystemPrompt: z.string().max(20_000).optional(),
+	agent: z.object({
+		/** Draft a reply to every inbound email (costs Neurons). Off by default (plan §E3). */
+		autoDraft: z.boolean(),
+		model: z.string().refine(isAgentModel, "Unknown model"),
+	}).optional(),
 });
 
 const CreateMailboxBody = z.object({
@@ -251,8 +257,8 @@ app.get("/api/v1/mailboxes/:mailboxId/outbox/:id", async (c: AppContext) => {
 
 app.get("/api/v1/mailboxes/:mailboxId/stats", async (c: AppContext) => {
 	const stub = c.var.mailboxStub;
-	const [storage, quota] = await Promise.all([stub.getStorageStats(), stub.getSendQuota()]);
-	return c.json({ storage, quota });
+	const [storage, quota, ai] = await Promise.all([stub.getStorageStats(), stub.getSendQuota(), stub.getAiUsage()]);
+	return c.json({ storage, quota, ai });
 });
 
 app.get("/api/v1/mailboxes/:mailboxId/send-quota", async (c: AppContext) => {
@@ -463,9 +469,15 @@ async function receiveEmail(message: InboundMessage, env: Env, ctx: ExecutionCon
 	await Promise.all([message.raw.pipeTo(writable), env.BUCKET.put(key, readable)]);
 
 	const stub = env.MAILBOX.get(env.MAILBOX.idFromName(mailboxId));
-	const settings = (await mailboxObj.json().catch(() => ({}))) as { autoReply?: AutoReplySettings; fromName?: string };
+	const settings = (await mailboxObj.json().catch(() => ({}))) as {
+		autoReply?: AutoReplySettings;
+		fromName?: string;
+		agent?: { autoDraft?: boolean };
+	};
 	const stored = await stub.ingestRaw({ key, id, envelopeTo: mailboxId, autoReply: settings.autoReply, fromName: settings.fromName });
 
+	// Auto-draft is opt-in: every draft costs Neurons from the 10,000/day free allocation.
+	if (!settings.agent?.autoDraft) return;
 	const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));
 	ctx.waitUntil(agentStub.fetch(new Request("https://agents/onNewEmail", {
 		method: "POST", headers: { "Content-Type": "application/json" },

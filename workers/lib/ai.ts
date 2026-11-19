@@ -10,6 +10,7 @@
  */
 
 import { escapeHtml, stripHtmlToText, textToHtml } from "./email-helpers";
+import { INJECTION_MODEL, VERIFIER_MODEL } from "../../shared/ai-models";
 
 // ── Prompt Injection Scanner ───────────────────────────────────────
 
@@ -29,7 +30,7 @@ export async function isPromptInjection(ai: Ai, bodyHtml: string | null | undefi
 
 	try {
 		const response = (await ai.run(
-			"@cf/meta/llama-3.1-8b-instruct-fast",
+			INJECTION_MODEL,
 			{
 				messages: [
 					{ role: "system", content: INJECTION_PROMPT },
@@ -135,7 +136,7 @@ export async function verifyDraft(ai: Ai, body: string): Promise<string> {
 
 	try {
 		const response = (await ai.run(
-			"@cf/meta/llama-4-scout-17b-16e-instruct",
+			VERIFIER_MODEL,
 			{
 				messages: [
 					{ role: "system", content: VERIFIER_PROMPT },

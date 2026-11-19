@@ -264,4 +264,19 @@ export const mailboxMigrations: Migration[] = [
             );
         `),
 	},
+	{
+		// Phase 7: Workers AI usage per UTC day and model, for the Neuron meter (plan §A1).
+		name: "13_ai_usage",
+		sql: txn(`
+            CREATE TABLE IF NOT EXISTS ai_usage (
+                day TEXT NOT NULL,
+                model TEXT NOT NULL,
+                calls INTEGER NOT NULL DEFAULT 0,
+                input_tokens INTEGER NOT NULL DEFAULT 0,
+                output_tokens INTEGER NOT NULL DEFAULT 0,
+                neurons REAL NOT NULL DEFAULT 0,
+                PRIMARY KEY (day, model)
+            );
+        `),
+	},
 ];

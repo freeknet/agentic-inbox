@@ -15,6 +15,7 @@ import { createResendProvider } from "../lib/resend";
 import { parseInbound, type ParsedInbound } from "./ingest";
 import { autoReplySubject, decideAutoReply, safeDisplayName, textToHtml, type AutoReplySettings } from "./autoreply";
 import { buildOutgoing } from "../lib/outgoing";
+import { FREE_NEURONS_PER_DAY, neuronsFor } from "../../shared/ai-models";
 
 /**
  * Turn free text into an FTS5 expression: every word must match, as a prefix,
@@ -1038,6 +1039,33 @@ export class MailboxDO extends DurableObject<Env> {
 			attachments: row.attachments,
 			attachmentBytes: row.attachment_bytes,
 		};
+	}
+
+	/** Add one AI call to today's (UTC) usage. */
+	async recordAiUsage(model: string, inputTokens: number, outputTokens: number) {
+		const day = new Date().toISOString().slice(0, 10);
+		const input = Math.max(0, Math.round(inputTokens || 0));
+		const output = Math.max(0, Math.round(outputTokens || 0));
+		this.ctx.storage.sql.exec(
+			`INSERT INTO ai_usage (day, model, calls, input_tokens, output_tokens, neurons) VALUES (?1, ?2, 1, ?3, ?4, ?5)
+			 ON CONFLICT(day, model) DO UPDATE SET calls = calls + 1, input_tokens = input_tokens + ?3,
+			   output_tokens = output_tokens + ?4, neurons = neurons + ?5`,
+			day, model, input, output, neuronsFor(model, input, output),
+		);
+		// Keep 60 days.
+		const cutoff = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
+		this.ctx.storage.sql.exec(`DELETE FROM ai_usage WHERE day < ?`, cutoff);
+	}
+
+	/** Today's AI usage (UTC day) by model, with the estimated Neuron total. */
+	async getAiUsage() {
+		const day = new Date().toISOString().slice(0, 10);
+		const models = [...this.ctx.storage.sql.exec(
+			`SELECT model, calls, input_tokens, output_tokens, neurons FROM ai_usage WHERE day = ? ORDER BY neurons DESC`,
+			day,
+		)] as Array<{ model: string; calls: number; input_tokens: number; output_tokens: number; neurons: number }>;
+		const neurons = models.reduce((n, m) => n + m.neurons, 0);
+		return { day, neurons, limit: FREE_NEURONS_PER_DAY, models };
 	}
 
 	async checkSuppressed(emails: string[]) {

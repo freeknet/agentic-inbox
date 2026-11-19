@@ -149,6 +149,7 @@ const api = {
 		get<{
 			storage: { databaseBytes: number; databaseLimitBytes: number; emails: number; attachments: number; attachmentBytes: number };
 			quota: { day: string; used: number; limit: number; pausedUntil: number | null };
+			ai: { day: string; neurons: number; limit: number; models: Array<{ model: string; calls: number; input_tokens: number; output_tokens: number; neurons: number }> };
 		}>(`/api/v1/mailboxes/${mailboxId}/stats`),
 	checkSuppressions: (mailboxId: string, emails: string[]) =>
 		post<{ suppressed: Array<{ email: string; origin: string | null }> }>(`/api/v1/mailboxes/${mailboxId}/suppressions/check`, { emails }),

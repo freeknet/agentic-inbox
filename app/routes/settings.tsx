@@ -10,6 +10,7 @@ import { useParams } from "react-router";
 import { formatBytes } from "~/lib/utils";
 import { useMailbox, useUpdateMailbox } from "~/queries/mailboxes";
 import api from "~/services/api";
+import { AGENT_MODELS, DEFAULT_AGENT_MODEL } from "shared/ai-models";
 
 // Placeholder shown in the textarea when no custom prompt is set.
 // The authoritative default prompt lives in workers/agent/index.ts (DEFAULT_SYSTEM_PROMPT).
@@ -98,11 +99,15 @@ export default function SettingsRoute() {
 	const [arMessage, setArMessage] = useState("");
 	const [arStart, setArStart] = useState("");
 	const [arEnd, setArEnd] = useState("");
+	const [autoDraft, setAutoDraft] = useState(false);
+	const [agentModel, setAgentModel] = useState(DEFAULT_AGENT_MODEL);
 	const [isSaving, setIsSaving] = useState(false);
 
 	useEffect(() => {
 		if (!mailbox) return;
 		const st = mailbox.settings;
+		setAutoDraft(!!st?.agent?.autoDraft);
+		setAgentModel(st?.agent?.model || DEFAULT_AGENT_MODEL);
 		setDisplayName(st?.fromName || mailbox.name || "");
 		setAgentPrompt(st?.agentSystemPrompt || "");
 		setSigEnabled(!!st?.signature?.enabled);
@@ -125,6 +130,7 @@ export default function SettingsRoute() {
 			...mailbox.settings,
 			fromName: displayName,
 			agentSystemPrompt: agentPrompt.trim() || undefined,
+			agent: { autoDraft, model: agentModel },
 			// Plain-text signature only; an old HTML version is dropped so the two can't disagree.
 			signature: { enabled: sigEnabled, text: sigText },
 			autoReply: {
@@ -228,6 +234,27 @@ export default function SettingsRoute() {
 							</Button>
 						)}
 					</div>
+					<div className="mb-4 space-y-3 border-b border-kumo-line pb-4">
+						<Toggle checked={autoDraft} onChange={setAutoDraft} label="Draft a reply to every new email automatically" />
+						<p className="text-xs text-kumo-subtle">
+							Off by default. Each auto-draft uses Workers AI Neurons (roughly 50 to 150 per email, including the safety scans).
+							Auto-drafting stops for the day at 90% of the free 10,000 daily Neurons. The chat panel works either way.
+						</p>
+						<label className="block text-xs text-kumo-subtle">
+							Model
+							<select
+								value={agentModel}
+								onChange={(e) => setAgentModel(e.target.value)}
+								className="mt-1 w-full rounded border border-kumo-line bg-kumo-recessed px-2 py-1.5 text-sm text-kumo-default"
+							>
+								{AGENT_MODELS.map((m) => (
+									<option key={m.id} value={m.id}>
+										{m.label}
+									</option>
+								))}
+							</select>
+						</label>
+					</div>
 					<p className="text-xs text-kumo-subtle mb-3">
 						Customize how the AI agent behaves for this mailbox. Leave empty to use the built-in default prompt.
 					</p>
@@ -272,6 +299,21 @@ export default function SettingsRoute() {
 										Sending is paused until {new Date(stats.quota.pausedUntil).toLocaleString()} (Resend quota).
 									</p>
 								) : null}
+							</div>
+							<div className="space-y-1">
+								<div className="flex justify-between text-kumo-default">
+									<span>Workers AI today (UTC, estimate)</span>
+									<span>
+										{Math.round(stats.ai.neurons).toLocaleString()} of {stats.ai.limit.toLocaleString()} Neurons
+									</span>
+								</div>
+								<UsageBar label="Workers AI Neurons today" value={stats.ai.neurons} max={stats.ai.limit} />
+								<p className="text-xs text-kumo-subtle">
+									{stats.ai.models.length === 0
+										? "No AI calls today."
+										: stats.ai.models.map((m) => `${m.model.split("/").pop()}: ${m.calls} calls, ${Math.round(m.neurons)} Neurons`).join(" · ")}
+									{" "}The free allocation is shared by everything on this Cloudflare account.
+								</p>
 							</div>
 						</div>
 					) : (

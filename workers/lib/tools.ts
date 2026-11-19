@@ -25,6 +25,7 @@ import {
 	buildReferencesChain,
 } from "./email-helpers";
 import { verifyDraft } from "./ai";
+import { mailboxAi } from "./ai-meter";
 import { queueSend } from "./send";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
@@ -130,7 +131,7 @@ export async function toolDraftReply(
 	// Verify/sanitize if requested
 	let processedBody = params.body.trim();
 	if (params.runVerifyDraft) {
-		const sanitized = await verifyDraft(env.AI, processedBody);
+		const sanitized = await verifyDraft(mailboxAi(env, mailboxId), processedBody);
 		if (!sanitized) {
 			return { error: "Draft verification failed — body could not be verified. Please try again." };
 		}
@@ -211,7 +212,7 @@ export async function toolDraftEmail(
 
 	let processedBody = params.body.trim();
 	if (params.runVerifyDraft) {
-		const sanitized = await verifyDraft(env.AI, processedBody);
+		const sanitized = await verifyDraft(mailboxAi(env, mailboxId), processedBody);
 		if (!sanitized) {
 			return { error: "Draft verification failed — body could not be verified. Please try again." };
 		}
@@ -288,7 +289,7 @@ export async function toolUpdateDraft(
 	// Verify the body BEFORE deleting the old draft to prevent data loss
 	const newDraftId = crypto.randomUUID();
 	const rawBody = params.bodyHtml ?? oldDraft.body ?? "";
-	const verifiedBody = await verifyDraft(env.AI, rawBody);
+	const verifiedBody = await verifyDraft(mailboxAi(env, mailboxId), rawBody);
 
 	if (!verifiedBody) {
 		return { error: "Draft verification failed — keeping existing draft unchanged. Please try again." };
@@ -410,7 +411,7 @@ export async function toolSendReply(
 	if (!mailboxId.split("@")[1]) throw new Error("Invalid mailbox email address");
 
 	// Verify and append quoted original message
-	const sanitizedBody = await verifyDraft(env.AI, params.bodyHtml);
+	const sanitizedBody = await verifyDraft(mailboxAi(env, mailboxId), params.bodyHtml);
 	if (!sanitizedBody) {
 		return { error: "Draft verification failed — refusing to send unverified content. Please try again." };
 	}
@@ -454,7 +455,7 @@ export async function toolSendEmail(
 	const stub = getMailboxStub(env, mailboxId);
 	if (!mailboxId.split("@")[1]) throw new Error("Invalid mailbox email address");
 
-	const sanitizedBody = await verifyDraft(env.AI, params.bodyHtml);
+	const sanitizedBody = await verifyDraft(mailboxAi(env, mailboxId), params.bodyHtml);
 	if (!sanitizedBody) {
 		return { error: "Draft verification failed — refusing to send unverified content. Please try again." };
 	}
