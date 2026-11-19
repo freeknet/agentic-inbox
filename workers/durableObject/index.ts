@@ -1024,6 +1024,22 @@ export class MailboxDO extends DurableObject<Env> {
 		return { day, used: this.outbox.recipientsUsed(day), limit: 100, pausedUntil: this.outbox.pausedUntil() || null };
 	}
 
+	/** Storage use for the Settings meter. DO SQLite is capped at 1 GB per object on Free (plan §A6). */
+	async getStorageStats() {
+		const row = [...this.ctx.storage.sql.exec(
+			`SELECT (SELECT COUNT(*) FROM emails) AS emails,
+			        (SELECT COUNT(*) FROM attachments) AS attachments,
+			        (SELECT COALESCE(SUM(size), 0) FROM attachments) AS attachment_bytes`,
+		)][0] as { emails: number; attachments: number; attachment_bytes: number };
+		return {
+			databaseBytes: this.ctx.storage.sql.databaseSize,
+			databaseLimitBytes: 1024 * 1024 * 1024,
+			emails: row.emails,
+			attachments: row.attachments,
+			attachmentBytes: row.attachment_bytes,
+		};
+	}
+
 	async checkSuppressed(emails: string[]) {
 		return this.outbox.suppressed(emails);
 	}

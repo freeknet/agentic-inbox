@@ -145,6 +145,11 @@ const api = {
 		post<{ id: string; status: "draft" }>(`/api/v1/mailboxes/${mailboxId}/emails/${id}/cancel-send`),
 	getOutboxEntry: (mailboxId: string, id: string) =>
 		get<{ id: string; status: string; send_at: number; attempts: number; last_error?: string | null }>(`/api/v1/mailboxes/${mailboxId}/outbox/${id}`),
+	getStats: (mailboxId: string) =>
+		get<{
+			storage: { databaseBytes: number; databaseLimitBytes: number; emails: number; attachments: number; attachmentBytes: number };
+			quota: { day: string; used: number; limit: number; pausedUntil: number | null };
+		}>(`/api/v1/mailboxes/${mailboxId}/stats`),
 	checkSuppressions: (mailboxId: string, emails: string[]) =>
 		post<{ suppressed: Array<{ email: string; origin: string | null }> }>(`/api/v1/mailboxes/${mailboxId}/suppressions/check`, { emails }),
 	getEmail: (mailboxId: string, id: string, opts?: { signal?: AbortSignal }) =>

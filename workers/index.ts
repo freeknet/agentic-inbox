@@ -249,6 +249,12 @@ app.get("/api/v1/mailboxes/:mailboxId/outbox/:id", async (c: AppContext) => {
 	return entry ? c.json(entry) : c.json({ error: "Not found" }, 404);
 });
 
+app.get("/api/v1/mailboxes/:mailboxId/stats", async (c: AppContext) => {
+	const stub = c.var.mailboxStub;
+	const [storage, quota] = await Promise.all([stub.getStorageStats(), stub.getSendQuota()]);
+	return c.json({ storage, quota });
+});
+
 app.get("/api/v1/mailboxes/:mailboxId/send-quota", async (c: AppContext) => {
 	return c.json(await c.var.mailboxStub.getSendQuota());
 });

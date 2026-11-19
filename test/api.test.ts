@@ -75,6 +75,17 @@ describe("REST API", () => {
 		expect(((await (await api(`${base}/search?query=zebra`)).json()) as { emails: unknown[] }).emails).toHaveLength(0);
 	});
 
+	it("reports storage and send-quota stats", async () => {
+		await deliver(mime({ subject: "One" }));
+		const res = await api(`${base}/stats`);
+		expect(res.status).toBe(200);
+		const { storage, quota } = (await res.json()) as { storage: Record<string, number>; quota: Record<string, number> };
+		expect(storage.emails).toBe(1);
+		expect(storage.databaseBytes).toBeGreaterThan(0);
+		expect(storage.databaseLimitBytes).toBe(1024 * 1024 * 1024);
+		expect(quota).toMatchObject({ used: 0, limit: 100 });
+	});
+
 	it("records a sent email in Sent", async () => {
 		const res = await api(
 			`${base}/emails`,
