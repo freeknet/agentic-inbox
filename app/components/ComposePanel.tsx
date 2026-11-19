@@ -76,6 +76,7 @@ export default function ComposePanel() {
 							<div className="flex-1 flex items-center gap-2 min-w-0">
 								<Input
 									type="text"
+									className="w-full"
 									placeholder="recipient@example.com"
 									size="sm"
 									value={to}
@@ -102,6 +103,7 @@ export default function ComposePanel() {
 								<div className="flex-1">
 									<Input
 										type="text"
+										className="w-full"
 										size="sm"
 										value={cc}
 										onChange={(e) => setCc(e.target.value)}
@@ -119,6 +121,7 @@ export default function ComposePanel() {
 								<div className="flex-1">
 									<Input
 										type="text"
+										className="w-full"
 										size="sm"
 										value={bcc}
 										onChange={(e) => setBcc(e.target.value)}
@@ -135,6 +138,7 @@ export default function ComposePanel() {
 							<div className="flex-1">
 								<Input
 									type="text"
+									className="w-full"
 									placeholder="Email subject"
 									size="sm"
 									value={subject}
@@ -156,7 +160,7 @@ export default function ComposePanel() {
 
 				{/* Footer actions */}
 				<div className="mt-auto px-4 py-3 border-t border-kumo-line bg-kumo-fill/30 shrink-0 md:px-6">
-					<div className="flex items-center justify-between">
+					<div className="flex flex-wrap items-center justify-between gap-2">
 						<Button type="button" variant="ghost" size="sm" onClick={discardCompose} disabled={isSending}>
 							Discard
 						</Button>
