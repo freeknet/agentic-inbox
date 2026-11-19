@@ -7,6 +7,7 @@ import { FloppyDiskIcon, PaperPlaneTiltIcon, XIcon } from "@phosphor-icons/react
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor from "./RichTextEditor";
+import { AttachButton, AttachmentChips, useFileDrop } from "./ComposeAttachments";
 
 export default function ComposePanel() {
 	const { mailboxId, folder } = useParams<{
@@ -33,9 +34,11 @@ export default function ComposePanel() {
 		formTitle,
 		handleSaveDraft,
 		handleSend,
-		closeCompose,
+		discardCompose,
 		closePanel,
+		attachments,
 	} = useComposeForm(mailboxId, folder);
+	const { dragging, dropProps } = useFileDrop(attachments);
 
 	return (
 		<div className="flex flex-col h-full bg-kumo-base">
@@ -49,7 +52,7 @@ export default function ComposePanel() {
 						shape="square"
 						size="sm"
 						icon={<XIcon size={18} />}
-						onClick={closeCompose}
+						onClick={discardCompose}
 						disabled={isSending}
 						aria-label="Close compose"
 					/>
@@ -58,7 +61,8 @@ export default function ComposePanel() {
 
 			<form
 				onSubmit={(e) => handleSend(e, closePanel)}
-				className="flex flex-col flex-1 min-h-0 overflow-y-auto"
+				className={`flex flex-col flex-1 min-h-0 overflow-y-auto ${dragging ? "outline-2 -outline-offset-4 outline-dashed outline-kumo-brand" : ""}`}
+				{...dropProps}
 			>
 				<div className="p-4 md:p-6 space-y-4">
 					{error && <Banner variant="error" text={error} />}
@@ -146,15 +150,17 @@ export default function ComposePanel() {
 							onChange={setBody}
 						/>
 					</div>
+					<AttachmentChips attachments={attachments} />
 				</div>
 
 				{/* Footer actions */}
 				<div className="mt-auto px-4 py-3 border-t border-kumo-line bg-kumo-fill/30 shrink-0 md:px-6">
 					<div className="flex items-center justify-between">
-						<Button type="button" variant="ghost" size="sm" onClick={closeCompose} disabled={isSending}>
+						<Button type="button" variant="ghost" size="sm" onClick={discardCompose} disabled={isSending}>
 							Discard
 						</Button>
 						<div className="flex items-center gap-2">
+							<AttachButton attachments={attachments} disabled={isSending} />
 							<Button
 								type="button"
 								variant="secondary"

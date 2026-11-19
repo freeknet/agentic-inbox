@@ -85,6 +85,32 @@ function del<T>(url: string) {
 	return request<T>(url, { method: "DELETE" });
 }
 
+export interface UploadedFile {
+	upload_id: string;
+	filename: string;
+	type: string;
+	size: number;
+}
+
+/**
+ * Upload one file as a raw PUT body. The browser sets Content-Length from the
+ * File, which the server requires so it can stream the body into R2. No
+ * timeout: large files on slow links can take minutes.
+ */
+async function uploadFile(mailboxId: string, file: File, signal?: AbortSignal): Promise<UploadedFile> {
+	const res = await fetch(`/api/v1/mailboxes/${mailboxId}/uploads?filename=${encodeURIComponent(file.name)}`, {
+		method: "PUT",
+		headers: { "Content-Type": file.type || "application/octet-stream" },
+		body: file,
+		signal,
+	});
+	if (!res.ok) {
+		const body = await res.json().catch(() => ({}));
+		throw new ApiError(res.status, body as Record<string, unknown>);
+	}
+	return res.json() as Promise<UploadedFile>;
+}
+
 // ---------- Typed response shapes ----------
 
 interface EmailListResponse {
@@ -133,6 +159,9 @@ const api = {
 		post<void>(`/api/v1/mailboxes/${mailboxId}/threads/${threadId}/read`),
 	getAttachment: (mailboxId: string, emailId: string, attachmentId: string) =>
 		get<Blob>(`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/attachments/${attachmentId}`, { responseType: "blob" }),
+	uploadFile,
+	deleteUpload: (mailboxId: string, uploadId: string) =>
+		del<void>(`/api/v1/mailboxes/${mailboxId}/uploads/${uploadId}`),
 	saveDraft: (
 		mailboxId: string,
 		draft: {

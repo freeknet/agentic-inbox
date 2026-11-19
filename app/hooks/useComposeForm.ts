@@ -8,6 +8,7 @@ import {
 	buildQuotedReplyBlock,
 	escapeHtml,
 	formatComposeDate,
+	getNonInlineAttachments,
 	getSignatureBlock,
 	htmlToPlainText,
 	splitEmailList,
@@ -19,6 +20,7 @@ import { useSendFeedback } from "~/hooks/useSendFeedback";
 import type { QueuedSend } from "~/types";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
+import { useComposeAttachments } from "~/hooks/useComposeAttachments";
 
 function appendUniqueAddress(
 	addresses: string[],
@@ -173,6 +175,8 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const replyMutation = useReplyToEmail();
 	const forwardMutation = useForwardEmail();
 	const { confirmSuppressed, notifyQueued } = useSendFeedback();
+	const attachments = useComposeAttachments(mailboxId);
+	const resetAttachments = attachments.reset;
 
 	const [to, setTo] = useState("");
 	const [cc, setCc] = useState("");
@@ -209,7 +213,9 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		setShowCcBcc(initialFields.showCcBcc);
 		setSubject(initialFields.subject);
 		setBody(initialFields.body);
-	}, [composeOptions, currentMailbox?.email, sigBlock]);
+		const forwarding = composeOptions.mode === "forward" && !composeOptions.draftEmail;
+		resetAttachments({ forwarded: forwarding ? getNonInlineAttachments(composeOptions.originalEmail?.attachments) : [] });
+	}, [composeOptions, currentMailbox?.email, sigBlock, resetAttachments]);
 
 	const handleSaveDraft = async () => {
 		if (!mailboxId || isSending) return; setIsSavingDraft(true); setError(null);
@@ -240,6 +246,8 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		const toRecipients = splitEmailList(to);
 		if (toRecipients.length === 0) { setError("Add at least one recipient."); return; }
 		const ccRecipients = splitEmailList(cc); const bccRecipients = splitEmailList(bcc);
+		if (attachments.isUploading) { setError("Wait for attachments to finish uploading."); return; }
+		if (attachments.hasErrors) { setError("Remove the attachments that failed to upload."); return; }
 		const fromName = currentMailbox.settings?.fromName || currentMailbox.name;
 		const from = fromName && fromName !== currentMailbox.email ? { email: currentMailbox.email, name: fromName } : currentMailbox.email;
 		const emailData = {
@@ -254,7 +262,13 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		const draftId = composeOptions.draftEmail?.id; const mode = composeOptions.mode; const originalId = composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to;
 		if (!(await confirmSuppressed(mailboxId, [...toRecipients, ...ccRecipients, ...bccRecipients]))) return;
 		// The server consumes the draft in the same transaction that queues the send (B9).
-		const payload = { ...emailData, ...(draftId ? { draft_id: draftId } : {}) };
+		const originalAttachments = composeOptions.originalEmail?.attachments;
+		const payload = {
+			...emailData,
+			...(draftId ? { draft_id: draftId } : {}),
+			...(attachments.uploadIds.length ? { attachments: attachments.uploadIds.map((upload_id) => ({ upload_id })) } : {}),
+			...(mode === "forward" && Array.isArray(originalAttachments) ? { forward_attachment_ids: attachments.forwarded.map((a) => a.id) } : {}),
+		};
 		setIsSending(true);
 		try {
 			let result: QueuedSend;
@@ -262,10 +276,16 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 			else if (mode === "forward" && originalId) result = await forwardMutation.mutateAsync({ mailboxId, emailId: originalId, email: payload });
 			else result = await sendEmailMutation.mutateAsync({ mailboxId, email: payload });
 			notifyQueued(mailboxId, result);
+			resetAttachments();
 			onClose();
 		} catch (err: unknown) { const message = (err instanceof Error ? err.message : null) || "Failed to send email."; setError(message); toastManager.add({ title: message, variant: "error" }); }
 		finally { setIsSending(false); }
 	};
 
-	return { to, setTo, cc, setCc, bcc, setBcc, showCcBcc, setShowCcBcc, subject, setSubject, body, setBody, error, setError, isSavingDraft, isSending, formTitle, handleSaveDraft, handleSend, closeCompose, closePanel };
+	const discardCompose = () => {
+		resetAttachments({ discard: true });
+		closeCompose();
+	};
+
+	return { attachments, discardCompose, to, setTo, cc, setCc, bcc, setBcc, showCcBcc, setShowCcBcc, subject, setSubject, body, setBody, error, setError, isSavingDraft, isSending, formTitle, handleSaveDraft, handleSend, closeCompose, closePanel };
 }

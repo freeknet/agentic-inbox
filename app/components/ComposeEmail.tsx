@@ -7,6 +7,7 @@ import { FloppyDiskIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react";
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor from "./RichTextEditor";
+import { AttachButton, AttachmentChips, useFileDrop } from "./ComposeAttachments";
 import { useUIStore } from "~/hooks/useUIStore";
 
 export default function ComposeEmail() {
@@ -36,18 +37,28 @@ export default function ComposeEmail() {
 		formTitle,
 		handleSaveDraft,
 		handleSend,
+		attachments,
 	} = useComposeForm(mailboxId, folder);
+	const { dragging, dropProps } = useFileDrop(attachments);
+	const discard = () => {
+		attachments.reset({ discard: true });
+		closeComposeModal();
+	};
 
 	return (
 		<Dialog.Root
 			open={isComposeModalOpen}
-			onOpenChange={(open) => !open && !isSending && closeComposeModal()}
+			onOpenChange={(open) => !open && !isSending && discard()}
 		>
 			<Dialog size="lg" className="p-6 max-h-[85vh] overflow-y-auto">
 				<Dialog.Title className="text-lg font-semibold mb-5">
 					{formTitle}
 				</Dialog.Title>
-				<form onSubmit={(e) => handleSend(e, closeComposeModal)} className="space-y-4">
+				<form
+					onSubmit={(e) => handleSend(e, closeComposeModal)}
+					className={`space-y-4 rounded-md ${dragging ? "outline-2 outline-dashed outline-kumo-brand" : ""}`}
+					{...dropProps}
+				>
 					{error && <Banner variant="error" text={error} />}
 					<div className="flex items-center gap-2">
 						<div className="flex-1">
@@ -106,17 +117,19 @@ export default function ComposeEmail() {
 						</Text>
 						<RichTextEditor value={body} onChange={setBody} />
 					</div>
+					<AttachmentChips attachments={attachments} />
 					<div className="flex justify-between items-center pt-2">
 						<Button
 							type="button"
 							variant="ghost"
 							size="sm"
-							onClick={closeComposeModal}
+							onClick={discard}
 							disabled={isSending}
 						>
 							Discard
 						</Button>
 						<div className="flex items-center gap-2">
+							<AttachButton attachments={attachments} disabled={isSending} />
 							<Button
 								type="button"
 								variant="secondary"
