@@ -22,6 +22,7 @@ import { useParams } from "react-router";
 import { Folders } from "shared/folders";
 import { formatListDate } from "shared/dates";
 import MailboxSplitView from "~/components/MailboxSplitView";
+import { DeliveryBadge } from "~/components/DeliveryBadge";
 import { getSnippetText } from "~/lib/utils";
 import {
 	useDeleteEmail,
@@ -377,6 +378,7 @@ export default function EmailListRoute() {
 														Draft
 													</span>
 												)}
+												{email.folder_id === Folders.SENT && <DeliveryBadge status={email.delivery_status} />}
 												{email.needs_reply && !email.has_draft && (
 													<Tooltip content="Needs reply" asChild>
 														<span className="shrink-0 text-kumo-warning">

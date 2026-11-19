@@ -17,6 +17,7 @@ import { useDeleteEmail, useEmail, useMoveEmail, useReplyToEmail, useSendEmail, 
 import { useFolders } from "~/queries/folders";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
+import { useSendFeedback } from "~/hooks/useSendFeedback";
 import type { Email, Folder, Mailbox } from "~/types";
 
 function EmailPanelSkeleton() {
@@ -46,6 +47,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	};
 	const { closePanel, startCompose } = useUIStore();
 	const toastManager = useKumoToastManager();
+	const { confirmSuppressed, notifyQueued } = useSendFeedback();
 	const [isSending, setIsSending] = useState(false);
 	const [sourceViewEmail, setSourceViewEmail] = useState<Email | null>(null);
 	const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
@@ -127,9 +129,13 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 				html: target.body || "",
 				text: target.body ? target.body.replace(/<[^>]*>/g, "").trim() : "",
 			};
-			if (originalEmail) await replyMut.mutateAsync({ mailboxId, emailId: originalEmail.id, email: emailData }); else await sendEmailMut.mutateAsync({ mailboxId, email: emailData });
-			await deleteEmailMut.mutateAsync({ mailboxId, id: target.id });
-			toastManager.add({ title: "Email sent!" });
+			if (!(await confirmSuppressed(mailboxId, [...toRecipients, ...splitEmailList(target.cc), ...splitEmailList(target.bcc)]))) return;
+			// draft_id: the server moves the draft into the outbox atomically (B9).
+			const payload = { ...emailData, draft_id: target.id };
+			const result = originalEmail
+				? await replyMut.mutateAsync({ mailboxId, emailId: originalEmail.id, email: payload })
+				: await sendEmailMut.mutateAsync({ mailboxId, email: payload });
+			notifyQueued(mailboxId, result);
 			if (isDraftFolder) closePanel();
 		} catch (err) {
 			const message = (err instanceof Error ? err.message : null) || "Failed to send email.";

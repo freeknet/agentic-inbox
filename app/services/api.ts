@@ -2,7 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import type { Email, Folder, Mailbox } from "~/types";
+import type { Email, Folder, Mailbox, QueuedSend } from "~/types";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -114,7 +114,11 @@ const api = {
 	listEmails: (mailboxId: string, params: Record<string, string>, opts?: { signal?: AbortSignal }) =>
 		get<EmailListResponse | Email[]>(`/api/v1/mailboxes/${mailboxId}/emails`, { params, signal: opts?.signal }),
 	sendEmail: (mailboxId: string, email: unknown) =>
-		post<void>(`/api/v1/mailboxes/${mailboxId}/emails`, email),
+		post<QueuedSend>(`/api/v1/mailboxes/${mailboxId}/emails`, email),
+	cancelSend: (mailboxId: string, id: string) =>
+		post<{ id: string; status: "draft" }>(`/api/v1/mailboxes/${mailboxId}/emails/${id}/cancel-send`),
+	checkSuppressions: (mailboxId: string, emails: string[]) =>
+		post<{ suppressed: Array<{ email: string; origin: string | null }> }>(`/api/v1/mailboxes/${mailboxId}/suppressions/check`, { emails }),
 	getEmail: (mailboxId: string, id: string, opts?: { signal?: AbortSignal }) =>
 		get<Email>(`/api/v1/mailboxes/${mailboxId}/emails/${id}`, { signal: opts?.signal }),
 	updateEmail: (mailboxId: string, id: string, data: unknown) =>
@@ -143,9 +147,9 @@ const api = {
 		},
 	) => post<{ draft_id: string }>(`/api/v1/mailboxes/${mailboxId}/drafts`, draft),
 	replyToEmail: (mailboxId: string, emailId: string, email: unknown) =>
-		post<void>(`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/reply`, email),
+		post<QueuedSend>(`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/reply`, email),
 	forwardEmail: (mailboxId: string, emailId: string, email: unknown) =>
-		post<void>(`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/forward`, email),
+		post<QueuedSend>(`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/forward`, email),
 
 	// Folders
 	listFolders: (mailboxId: string) =>

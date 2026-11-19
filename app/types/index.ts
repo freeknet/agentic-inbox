@@ -40,6 +40,8 @@ export interface Email {
 	email_references?: string | null;
 	message_id?: string | null;
 	raw_headers?: string | null;
+	/** Outbound only: queued | sent | delayed | delivered | bounced | complained | failed | suppressed */
+	delivery_status?: string | null;
 	attachments?: Attachment[];
 	snippet?: string | null;
 	// Thread aggregate fields (only present in threaded list view)
@@ -63,4 +65,12 @@ export interface Folder {
 	id: string;
 	name: string;
 	unreadCount: number;
+}
+
+/** Response of the send, reply and forward endpoints. */
+export interface QueuedSend {
+	id: string;
+	status: "queued";
+	/** Epoch ms when the undo window closes. */
+	send_at: number;
 }

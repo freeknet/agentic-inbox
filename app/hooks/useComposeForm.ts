@@ -14,7 +14,9 @@ import {
 	stripHtml,
 	toEmailListValue,
 } from "~/lib/utils";
-import { useDeleteEmail, useForwardEmail, useReplyToEmail, useSaveDraft, useSendEmail } from "~/queries/emails";
+import { useForwardEmail, useReplyToEmail, useSaveDraft, useSendEmail } from "~/queries/emails";
+import { useSendFeedback } from "~/hooks/useSendFeedback";
+import type { QueuedSend } from "~/types";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
 
@@ -170,7 +172,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const saveDraftMutation = useSaveDraft();
 	const replyMutation = useReplyToEmail();
 	const forwardMutation = useForwardEmail();
-	const deleteEmailMutation = useDeleteEmail();
+	const { confirmSuppressed, notifyQueued } = useSendFeedback();
 
 	const [to, setTo] = useState("");
 	const [cc, setCc] = useState("");
@@ -250,13 +252,16 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 			text: htmlToPlainText(body),
 		};
 		const draftId = composeOptions.draftEmail?.id; const mode = composeOptions.mode; const originalId = composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to;
-		setIsSending(true); toastManager.add({ title: "Sending email..." });
+		if (!(await confirmSuppressed(mailboxId, [...toRecipients, ...ccRecipients, ...bccRecipients]))) return;
+		// The server consumes the draft in the same transaction that queues the send (B9).
+		const payload = { ...emailData, ...(draftId ? { draft_id: draftId } : {}) };
+		setIsSending(true);
 		try {
-			if ((mode === "reply" || mode === "reply-all") && originalId) await replyMutation.mutateAsync({ mailboxId, emailId: originalId, email: emailData });
-			else if (mode === "forward" && originalId) await forwardMutation.mutateAsync({ mailboxId, emailId: originalId, email: emailData });
-			else await sendEmailMutation.mutateAsync({ mailboxId, email: emailData });
-			if (draftId) deleteEmailMutation.mutate({ mailboxId, id: draftId });
-			toastManager.add({ title: "Email sent!" });
+			let result: QueuedSend;
+			if ((mode === "reply" || mode === "reply-all") && originalId) result = await replyMutation.mutateAsync({ mailboxId, emailId: originalId, email: payload });
+			else if (mode === "forward" && originalId) result = await forwardMutation.mutateAsync({ mailboxId, emailId: originalId, email: payload });
+			else result = await sendEmailMutation.mutateAsync({ mailboxId, email: payload });
+			notifyQueued(mailboxId, result);
 			onClose();
 		} catch (err: unknown) { const message = (err instanceof Error ? err.message : null) || "Failed to send email."; setError(message); toastManager.add({ title: message, variant: "error" }); }
 		finally { setIsSending(false); }
