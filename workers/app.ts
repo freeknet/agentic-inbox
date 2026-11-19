@@ -4,10 +4,11 @@
 
 import { routeAgentRequest } from "agents";
 import { Hono } from "hono";
-import { jwtVerify, createRemoteJWKSet } from "jose";
+import { jwtVerify, createRemoteJWKSet, type JWTPayload } from "jose";
 import { createContext, createRequestHandler, RouterContextProvider } from "react-router";
 import { app as apiApp, receiveEmail } from "./index";
 import { EmailMCP } from "./mcp";
+import { identify, isAllowed } from "./lib/access";
 import type { Env } from "./types";
 
 export { MailboxDO } from "./durableObject";
@@ -79,14 +80,20 @@ app.use("*", async (c, next) => {
 		return c.text("Missing required CF Access JWT", 403);
 	}
 
+	let payload: JWTPayload;
 	try {
 		const { issuer, certsUrl } = getAccessUrls(TEAM_DOMAIN);
-		await jwtVerify(token, getJwks(certsUrl), {
+		({ payload } = await jwtVerify(token, getJwks(certsUrl), {
 			issuer,
 			audience: POLICY_AUD,
-		});
+		}));
 	} catch {
 		return c.text("Invalid or expired Access token", 403);
+	}
+
+	// Service tokens (MCP clients, B5) may only reach /mcp.
+	if (!isAllowed(identify(payload), c.req.path, (c.env as { MCP_SERVICE_TOKEN_IDS?: string }).MCP_SERVICE_TOKEN_IDS)) {
+		return c.text("This Access identity may not use this path", 403);
 	}
 
 	// Authorization model note: once a teammate passes the shared Cloudflare
