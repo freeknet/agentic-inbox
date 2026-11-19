@@ -43,7 +43,7 @@ describe("inbound pipeline (Phase 4)", () => {
 			},
 		});
 		await worker.email(
-			{ from: "a@x.test", to: MAILBOX, raw, rawSize: 26 * 1024 * 1024, setReject: (r: string) => { rejected = r; } },
+			{ from: "a@x.test", to: MAILBOX, raw, rawSize: 26 * 1024 * 1024, setReject: (r: string) => { rejected = r; }, forward: async () => {} },
 			env as Env,
 			ctx,
 		);

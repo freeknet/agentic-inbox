@@ -22,6 +22,7 @@ This is a fork of [cloudflare/agentic-inbox](https://github.com/cloudflare/agent
 - A warning before you send to an address on Resend's suppression list.
 - **Full-text search** (SQLite FTS5) over subject, people and body, with `from:`, `to:`, `subject:`, `is:unread`, `is:starred`, `has:attachment` and date filters.
 - **Vacation auto-reply** with optional start and end times. It never answers mailing lists, automated mail or no-reply senders, and answers each sender at most once every 4 days (RFC 3834).
+- **Forwarding**: keep mail here and also forward each incoming message, unchanged, to another address through Email Routing (the address must be a verified Email Routing destination; it costs no Resend quota).
 - Signature; folders; a safe HTML viewer (sandboxed frame, remote images blocked until you allow them, inline `cid:` images shown).
 - Dark mode (system, light or dark); works on phones.
 - An AI agent panel with email tools; optional auto-drafted replies; a choice of model; a daily Neuron meter.

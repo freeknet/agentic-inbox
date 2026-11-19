@@ -34,18 +34,27 @@ export function mailboxStub(email = MAILBOX) {
  * Routing does: `to` is the SMTP envelope recipient (default: the mailbox).
  * Returns the rejection reason if the handler called setReject().
  */
-export async function deliver(raw: string, envelope: { to?: string; from?: string } = {}): Promise<{ rejected: string | null }> {
+export async function deliver(
+	raw: string,
+	envelope: { to?: string; from?: string; canBeForwarded?: boolean; forwardError?: string } = {},
+): Promise<{ rejected: string | null; forwards: Array<{ to: string; headers: Record<string, string> }> }> {
 	const bytes = new TextEncoder().encode(raw);
 	const ctx = createExecutionContext();
 	let rejected: string | null = null;
+	const forwards: Array<{ to: string; headers: Record<string, string> }> = [];
 	await worker.email(
 		{
 			from: envelope.from ?? "alice@sender.test",
 			to: envelope.to ?? MAILBOX,
 			raw: new Response(bytes).body!,
 			rawSize: bytes.byteLength,
+			canBeForwarded: envelope.canBeForwarded,
 			setReject: (reason: string) => {
 				rejected = reason;
+			},
+			forward: async (to: string, headers?: Headers) => {
+				if (envelope.forwardError) throw new Error(envelope.forwardError);
+				forwards.push({ to, headers: Object.fromEntries(headers?.entries() ?? []) });
 			},
 		},
 		testEnv,
@@ -53,7 +62,7 @@ export async function deliver(raw: string, envelope: { to?: string; from?: strin
 	);
 	// Flushes the auto-draft trigger; it fails without Workers AI and is caught/logged.
 	await waitOnExecutionContext(ctx);
-	return { rejected };
+	return { rejected, forwards };
 }
 
 export interface MimeOptions {

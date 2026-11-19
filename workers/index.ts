@@ -442,7 +442,11 @@ export interface InboundMessage {
 	to: string;
 	raw: ReadableStream<Uint8Array>;
 	rawSize: number;
+	/** False when Email Routing won't forward this message (e.g. it already looped). */
+	canBeForwarded?: boolean;
 	setReject(reason: string): void;
+	/** Send the original message on unchanged; the address must be a verified Email Routing destination. */
+	forward(rcptTo: string, headers?: Headers): Promise<unknown>;
 }
 
 async function receiveEmail(message: InboundMessage, env: Env, ctx: ExecutionContext) {
@@ -473,8 +477,10 @@ async function receiveEmail(message: InboundMessage, env: Env, ctx: ExecutionCon
 		autoReply?: AutoReplySettings;
 		fromName?: string;
 		agent?: { autoDraft?: boolean };
+		forwarding?: { enabled?: boolean; email?: string };
 	};
 	const stored = await stub.ingestRaw({ key, id, envelopeTo: mailboxId, autoReply: settings.autoReply, fromName: settings.fromName });
+	await forwardCopy(message, mailboxId, settings.forwarding);
 
 	// Auto-draft is opt-in: every draft costs Neurons from the 10,000/day free allocation.
 	if (!settings.agent?.autoDraft) return;
@@ -483,6 +489,23 @@ async function receiveEmail(message: InboundMessage, env: Env, ctx: ExecutionCon
 		method: "POST", headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({ mailboxId, emailId: stored.emailId, sender: stored.sender, subject: stored.subject, threadId: stored.threadId }),
 	})).catch((e) => console.error("Auto-draft trigger failed:", (e as Error).message)));
+}
+
+/**
+ * Forwarding (Settings): keep the message here and also send the original on
+ * to another address through Email Routing, so DKIM, headers and attachments
+ * stay intact and it costs no Resend quota. Email Routing only forwards to
+ * verified destination addresses; a failure is logged and the stored copy is
+ * kept, so the sender never sees a bounce.
+ */
+async function forwardCopy(message: InboundMessage, mailboxId: string, forwarding?: { enabled?: boolean; email?: string }) {
+	const to = forwarding?.email?.trim().toLowerCase();
+	if (!forwarding?.enabled || !to || to === mailboxId || message.canBeForwarded === false) return;
+	try {
+		await message.forward(to, new Headers({ "X-Forwarded-For": mailboxId }));
+	} catch (e) {
+		console.error(`Forward to ${to} failed (is it a verified Email Routing destination?):`, (e as Error).message);
+	}
 }
 
 export { app, receiveEmail };

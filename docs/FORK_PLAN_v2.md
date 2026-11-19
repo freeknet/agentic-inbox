@@ -315,7 +315,7 @@ Full results: `docs/probe-results.md` (2026-11-18).
   - send later;
   - signature settings;
   - storage and quota meters.
-  Forwarding of inbound mail (the `forwarding` setting) is **not** implemented. Email Routing rules can forward directly.
+  Forwarding of inbound mail (the `forwarding` setting) was added after Phase 8. It uses `message.forward()` after the message is stored, so the original is sent on unchanged and no Resend quota is used. The destination must be a verified Email Routing address. A failed forward is logged and never bounces the sender.
 - **Neuron meter.** Usage is recorded by wrapping the `AI` binding, so every caller is metered. For streams, usage is read from the final SSE event.
   - The injection scan now uses `@cf/meta/llama-3.1-8b-instruct-fp8-fast`. `llama-3.1-8b-instruct-fast` is not on the pricing page.
   - Prices, per M input / output tokens:

@@ -3,7 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Badge, Button, Input, Loader, useKumoToastManager } from "@cloudflare/kumo";
-import { AirplaneTiltIcon, ArrowCounterClockwiseIcon, DatabaseIcon, RobotIcon, SignatureIcon } from "@phosphor-icons/react";
+import { AirplaneTiltIcon, ArrowBendUpRightIcon, ArrowCounterClockwiseIcon, DatabaseIcon, RobotIcon, SignatureIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
 import { useParams } from "react-router";
@@ -99,6 +99,8 @@ export default function SettingsRoute() {
 	const [arMessage, setArMessage] = useState("");
 	const [arStart, setArStart] = useState("");
 	const [arEnd, setArEnd] = useState("");
+	const [fwdEnabled, setFwdEnabled] = useState(false);
+	const [fwdEmail, setFwdEmail] = useState("");
 	const [autoDraft, setAutoDraft] = useState(false);
 	const [agentModel, setAgentModel] = useState(DEFAULT_AGENT_MODEL);
 	const [isSaving, setIsSaving] = useState(false);
@@ -117,12 +119,19 @@ export default function SettingsRoute() {
 		setArMessage(st?.autoReply?.message || "");
 		setArStart(isoToLocal(st?.autoReply?.startsAt));
 		setArEnd(isoToLocal(st?.autoReply?.endsAt));
+		setFwdEnabled(!!st?.forwarding?.enabled);
+		setFwdEmail(st?.forwarding?.email || "");
 	}, [mailbox]);
 
 	const handleSave = async () => {
 		if (!mailbox || !mailboxId) return;
 		if (arEnabled && !arMessage.trim()) {
 			toastManager.add({ title: "Write an auto-reply message first", variant: "error" });
+			return;
+		}
+		const fwd = fwdEmail.trim();
+		if (fwdEnabled && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fwd)) {
+			toastManager.add({ title: "Enter the address to forward to", variant: "error" });
 			return;
 		}
 		setIsSaving(true);
@@ -140,6 +149,7 @@ export default function SettingsRoute() {
 				startsAt: localToIso(arStart),
 				endsAt: localToIso(arEnd),
 			},
+			forwarding: { enabled: fwdEnabled, email: fwd },
 		};
 		try {
 			await updateMailboxMutation.mutateAsync({ mailboxId, settings });
@@ -217,6 +227,22 @@ export default function SettingsRoute() {
 						<p className="text-xs text-kumo-subtle">
 							Each sender gets at most one reply every 4 days. Mailing lists, automated mail and no-reply senders never get one.
 							Replies count against the daily send limit.
+						</p>
+					</div>
+				</Section>
+
+				<Section
+					icon={<ArrowBendUpRightIcon size={16} weight="duotone" className={iconClass} />}
+					title="Forwarding"
+					aside={fwdEnabled ? <Badge variant="primary">On</Badge> : <Badge variant="secondary">Off</Badge>}
+				>
+					<div className="space-y-3">
+						<Toggle checked={fwdEnabled} onChange={setFwdEnabled} label="Also send a copy of every incoming email to another address" />
+						<Input label="Forward to" type="email" value={fwdEmail} onChange={(e) => setFwdEmail(e.target.value)} placeholder="you@example.com" />
+						<p className="text-xs text-kumo-subtle">
+							Mail stays in this inbox too. The address must first be added and verified under Email Routing → Destination
+							addresses in the Cloudflare dashboard, or forwarding silently does nothing. Forwarding doesn't count against the
+							daily send limit.
 						</p>
 					</div>
 				</Section>
