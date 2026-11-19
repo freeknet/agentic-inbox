@@ -100,6 +100,26 @@ describe("inbound pipeline (Phase 4)", () => {
 		expect(listed.objects).toHaveLength(10);
 	});
 
+	it("stores 30 attachments without exceeding the 100-parameter limit (§A6)", async () => {
+		const b = "MANY";
+		const parts = Array.from({ length: 30 }, (_, i) => [
+			`--${b}`,
+			`Content-Type: text/plain; name="n${i}.txt"`,
+			`Content-Disposition: attachment; filename="n${i}.txt"`,
+			"",
+			`file ${i}`,
+		].join("\r\n"));
+		const raw = [
+			"From: a@sender.test", `To: ${MAILBOX}`, "Subject: Many", "Message-ID: <many@sender.test>", "MIME-Version: 1.0",
+			`Content-Type: multipart/mixed; boundary="${b}"`, "", `--${b}`, "Content-Type: text/plain", "", "lots",
+			...parts, `--${b}--`, "",
+		].join("\r\n");
+		await deliver(raw);
+		const [email] = await inbox();
+		const full = (await mailboxStub().getEmail(email.id)) as Record<string, any>;
+		expect(full.attachments).toHaveLength(30);
+	});
+
 	it("threads an inbound reply to our sent message via Resend's message_id (B2 + B14)", async () => {
 		vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ id: "re_t" }));
 		const sent = (await (await api(`${base}/emails`, json("POST", { to: "bob@other.test", from: MAILBOX, subject: "Lunch?", text: "Noon?" }))).json()) as { id: string };

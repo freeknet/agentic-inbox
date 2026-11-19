@@ -14,6 +14,9 @@ import { Outbox, type OutboxPayload, type WebhookEvent } from "./outbox";
 import { createResendProvider } from "../lib/resend";
 import { parseInbound } from "./ingest";
 
+/** Rows per attachments INSERT: 7 columns × 14 = 98 of the 100 allowed parameters. */
+const ATTACHMENT_ROWS_PER_INSERT = 14;
+
 /**
  * SQL expression to normalize email subjects by stripping common
  * reply/forward prefixes (Re:, Fwd:, FW:, AW:, WG:, Réf:, SV:).
@@ -1053,8 +1056,10 @@ export class MailboxDO extends DurableObject<Env> {
 			})
 			.run();
 
-		if (attachments.length > 0) {
-			this.db.insert(schema.attachments).values(attachments).run();
+		// DO SQLite allows 100 bound parameters per statement (plan §A6); an
+		// attachment row binds 7, so insert at most 14 rows at a time.
+		for (let i = 0; i < attachments.length; i += ATTACHMENT_ROWS_PER_INSERT) {
+			this.db.insert(schema.attachments).values(attachments.slice(i, i + ATTACHMENT_ROWS_PER_INSERT)).run();
 		}
 	}
 }
