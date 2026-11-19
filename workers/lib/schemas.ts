@@ -98,6 +98,8 @@ export const SendEmailRequestSchema = z
 		thread_id: z.string().optional(),
 		/** Draft consumed by this send, moved server-side in the same transaction (B9). */
 		draft_id: z.string().optional(),
+		/** Send later: ISO-8601 time, up to a year ahead. Cancellable until then. */
+		send_at: z.iso.datetime({ offset: true }).optional(),
 	})
 	.refine((data) => data.html || data.text, {
 		error: "Either 'html' or 'text' must be provided",

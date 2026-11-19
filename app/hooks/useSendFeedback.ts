@@ -39,6 +39,30 @@ export function useSendFeedback() {
 			return;
 		}
 		const windowMs = Math.max(result.send_at - Date.now(), 0);
+		if (windowMs > 60_000) {
+			// Scheduled: it waits in the outbox and can be cancelled from here until it goes out.
+			const when = new Date(result.send_at).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+			const toastId = toastManager.add({
+				title: `Scheduled for ${when}`,
+				actions: [
+					{
+						children: "Cancel",
+						onClick: async () => {
+							toastManager.close(toastId);
+							try {
+								await api.cancelSend(mailboxId, result.id);
+								toastManager.add({ title: "Schedule cancelled. Message moved to Drafts." });
+							} catch (err) {
+								toastManager.add({ title: err instanceof Error ? err.message : "Could not cancel", variant: "error" });
+							} finally {
+								refresh(mailboxId);
+							}
+						},
+					},
+				],
+			});
+			return;
+		}
 		if (windowMs < 1000) {
 			toastManager.add({ title: "Sending…" });
 			return;

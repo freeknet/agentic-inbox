@@ -11,7 +11,7 @@ import {
 	resolveOriginalEmail,
 } from "../lib/email-helpers";
 import { SendEmailRequestSchema } from "../lib/schemas";
-import { queueSend, type SourceAttachment } from "../lib/send";
+import { parseSendAt, queueSend, type SourceAttachment } from "../lib/send";
 import { UNDO_DELAY_MS } from "../durableObject/outbox";
 import type { MailboxContext } from "../lib/mailbox";
 
@@ -21,7 +21,7 @@ export async function handleReplyEmail(c: AppContext) {
 	const mailboxId = c.req.param("mailboxId") ?? "";
 	const id = c.req.param("id") ?? "";
 	const body = SendEmailRequestSchema.parse(await c.req.json());
-	const { to, cc, bcc, from, subject, html, text, attachments, draft_id } = body;
+	const { to, cc, bcc, from, subject, html, text, attachments, draft_id, send_at } = body;
 
 	const stub = c.var.mailboxStub;
 	const rawOriginal = (await stub.getEmail(id)) as EmailFull | null;
@@ -42,7 +42,7 @@ export async function handleReplyEmail(c: AppContext) {
 	const result = await queueSend(c.env, stub, {
 		mailboxId, from, to, cc, bcc, subject, html, text, attachments,
 		inReplyTo: originalMsgId, references, threadId,
-		draftId: draft_id ?? null, delayMs: UNDO_DELAY_MS,
+		draftId: draft_id ?? null, delayMs: UNDO_DELAY_MS, sendAt: parseSendAt(send_at),
 	});
 	if (!result.ok) return c.json({ error: result.error }, result.status);
 
@@ -54,7 +54,7 @@ export async function handleForwardEmail(c: AppContext) {
 	const mailboxId = c.req.param("mailboxId") ?? "";
 	const id = c.req.param("id") ?? "";
 	const body = SendEmailRequestSchema.parse(await c.req.json());
-	const { to, cc, bcc, from, subject, html, text, attachments, draft_id, forward_attachment_ids } = body;
+	const { to, cc, bcc, from, subject, html, text, attachments, draft_id, forward_attachment_ids, send_at } = body;
 
 	const stub = c.var.mailboxStub;
 	const rawOriginal = (await stub.getEmail(id)) as EmailFull | null;
@@ -87,7 +87,7 @@ export async function handleForwardEmail(c: AppContext) {
 	const result = await queueSend(c.env, stub, {
 		mailboxId, from, to, cc, bcc, subject, html, text, attachments, copyAttachments,
 		inReplyTo: null, references: [], threadId: null,
-		draftId: draft_id ?? null, delayMs: UNDO_DELAY_MS,
+		draftId: draft_id ?? null, delayMs: UNDO_DELAY_MS, sendAt: parseSendAt(send_at),
 	});
 	if (!result.ok) return c.json({ error: result.error }, result.status);
 	return c.json({ id: result.id, status: "queued", send_at: result.sendAt }, 202);

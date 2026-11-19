@@ -8,6 +8,7 @@ import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor from "./RichTextEditor";
 import { AttachButton, AttachmentChips, useFileDrop } from "./ComposeAttachments";
+import ScheduleSendButton from "./ScheduleSendButton";
 import { useUIStore } from "~/hooks/useUIStore";
 
 export default function ComposeEmail() {
@@ -141,6 +142,7 @@ export default function ComposeEmail() {
 							>
 								{isSavingDraft ? "Saving..." : "Save as Draft"}
 							</Button>
+							<ScheduleSendButton disabled={isSavingDraft || isSending} onSchedule={(at) => handleSend(null, closeComposeModal, at)} />
 							<Button
 								type="submit"
 								variant="primary"

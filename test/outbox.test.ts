@@ -210,6 +210,25 @@ describe("outbox", () => {
 		expect(((await mailboxStub().getEmail(noneId)) as Record<string, any>).attachments).toHaveLength(0);
 	});
 
+	it("send later: waits until send_at, can be cancelled until then, rejects > 1 year", async () => {
+		const calls = mockResend(okResponse());
+		const at = new Date(Date.now() + 3 * 60 * 60 * 1000);
+		const r = await send({ send_at: at.toISOString() });
+		expect(r.status).toBe(202);
+		const { id, send_at } = (await r.json()) as { id: string; send_at: number };
+		expect(Math.abs(send_at - at.getTime())).toBeLessThan(2_000);
+		await runInDurableObject(mailboxStub(), async (instance) => {
+			await instance.alarm();
+		});
+		expect(calls).toHaveLength(0);
+		// Still cancellable an hour before.
+		const cancel = await api(`${base}/emails/${id}/cancel-send`, { method: "POST" });
+		expect(cancel.status).toBe(200);
+
+		const far = await send({ send_at: new Date(Date.now() + 400 * 24 * 60 * 60 * 1000).toISOString() });
+		expect(far.status).toBe(400);
+	});
+
 	it("undo before send_at returns the message to Drafts and nothing is sent", async () => {
 		const calls = mockResend(okResponse());
 		const { id } = (await (await send()).json()) as { id: string };

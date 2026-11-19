@@ -5,7 +5,7 @@
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
-import { queueSend } from "./lib/send";
+import { parseSendAt, queueSend } from "./lib/send";
 import { deleteUpload, storeUpload } from "./lib/uploads";
 import { UNDO_DELAY_MS, type WebhookEvent } from "./durableObject/outbox";
 import { verifySvixSignature } from "./lib/svix";
@@ -199,7 +199,7 @@ app.get("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 	const mailboxId = c.req.param("mailboxId")!;
 	const body = SendEmailRequestSchema.parse(await c.req.json());
-	const { to, cc, bcc, from, subject, html, text, attachments, in_reply_to, references, thread_id, draft_id } = body;
+	const { to, cc, bcc, from, subject, html, text, attachments, in_reply_to, references, thread_id, draft_id, send_at } = body;
 
 	try {
 		validateSender(to, from, mailboxId);
@@ -211,7 +211,7 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 	const result = await queueSend(c.env, c.var.mailboxStub, {
 		mailboxId, from, to, cc, bcc, subject, html, text, attachments,
 		inReplyTo: in_reply_to ?? null, references: references ?? [], threadId: thread_id ?? null,
-		draftId: draft_id ?? null, delayMs: UNDO_DELAY_MS,
+		draftId: draft_id ?? null, delayMs: UNDO_DELAY_MS, sendAt: parseSendAt(send_at),
 	});
 	if (!result.ok) return c.json({ error: result.error }, result.status);
 	return c.json({ id: result.id, status: "queued", send_at: result.sendAt }, 202);

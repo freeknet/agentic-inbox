@@ -913,11 +913,12 @@ export class MailboxDO extends DurableObject<Env> {
 	}): Promise<{ ok: true; id: string; sendAt: number } | { ok: false; error: string; status: 400 | 429 }> {
 		const now = Date.now();
 		const count = input.payload.to.length + (input.payload.cc?.length ?? 0) + (input.payload.bcc?.length ?? 0);
-		const quotaError = this.outbox.checkQuota(count, now);
+		const sendAt = now + Math.max(0, input.delayMs);
+		// A scheduled message counts against the UTC day it will be sent on.
+		const quotaError = this.outbox.checkQuota(count, Math.max(now, sendAt));
 		if (quotaError) {
 			return { ok: false, error: quotaError, status: count > 0 && count <= 50 ? 429 : 400 };
 		}
-		const sendAt = now + Math.max(0, input.delayMs);
 
 		this.ctx.storage.transactionSync(() => {
 			if (input.draftId) {

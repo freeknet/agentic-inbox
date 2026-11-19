@@ -143,6 +143,8 @@ const api = {
 		post<QueuedSend>(`/api/v1/mailboxes/${mailboxId}/emails`, email),
 	cancelSend: (mailboxId: string, id: string) =>
 		post<{ id: string; status: "draft" }>(`/api/v1/mailboxes/${mailboxId}/emails/${id}/cancel-send`),
+	getOutboxEntry: (mailboxId: string, id: string) =>
+		get<{ id: string; status: string; send_at: number; attempts: number; last_error?: string | null }>(`/api/v1/mailboxes/${mailboxId}/outbox/${id}`),
 	checkSuppressions: (mailboxId: string, emails: string[]) =>
 		post<{ suppressed: Array<{ email: string; origin: string | null }> }>(`/api/v1/mailboxes/${mailboxId}/suppressions/check`, { emails }),
 	getEmail: (mailboxId: string, id: string, opts?: { signal?: AbortSignal }) =>

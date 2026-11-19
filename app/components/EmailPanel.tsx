@@ -8,6 +8,7 @@ import { useParams } from "react-router";
 import { Folders } from "shared/folders";
 import EmailPanelDialogs from "~/components/email-panel/EmailPanelDialogs";
 import EmailPanelHeader from "~/components/email-panel/EmailPanelHeader";
+import ScheduledBanner from "./email-panel/ScheduledBanner";
 import EmailPanelToolbar from "~/components/email-panel/EmailPanelToolbar";
 import SingleMessageView from "~/components/email-panel/SingleMessageView";
 import ThreadMessage from "~/components/email-panel/ThreadMessage";
@@ -186,6 +187,10 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 				messageCount={allMessages.length}
 				showThreadCount={hasThread}
 			/>
+
+			{mailboxId && allMessages.filter((m) => m.delivery_status === "queued").map((m) => (
+				<ScheduledBanner key={m.id} mailboxId={mailboxId} emailId={m.id} />
+			))}
 
 			<div className="flex-1 overflow-y-auto">
 				{hasThread ? (

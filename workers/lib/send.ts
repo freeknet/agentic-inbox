@@ -59,6 +59,15 @@ export interface QueueSendInput {
 	sendAt?: number | null;
 }
 
+const MAX_SEND_LATER_MS = 366 * 24 * 60 * 60 * 1000;
+
+/** `send_at` from the API as epoch ms; a time in the past means "now". */
+export function parseSendAt(iso: string | undefined | null): number | null {
+	if (!iso) return null;
+	const t = Date.parse(iso);
+	return Number.isNaN(t) ? null : t;
+}
+
 export type QueueSendResult =
 	| { ok: true; id: string; sendAt: number }
 	| { ok: false; error: string; status: 400 | 429 };
@@ -83,6 +92,10 @@ export async function queueSend(
 	const fromEmail = (typeof input.from === "string" ? input.from : input.from.email).toLowerCase();
 	const fromDomain = fromEmail.split("@")[1];
 	if (!fromDomain) return { ok: false, error: "Invalid sender email address", status: 400 };
+
+	if (input.sendAt && input.sendAt - Date.now() > MAX_SEND_LATER_MS) {
+		return { ok: false, error: "send_at can be at most a year ahead", status: 400 };
+	}
 
 	const to = list(input.to);
 	const cc = list(input.cc);

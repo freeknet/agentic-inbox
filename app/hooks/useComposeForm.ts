@@ -240,8 +240,9 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		finally { setIsSavingDraft(false); }
 	};
 
-	const handleSend = async (e: FormEvent, onClose: () => void) => {
-		e.preventDefault(); if (isSending) return; setError(null);
+	/** Send now, or at `sendAt` (send later). */
+	const handleSend = async (e: FormEvent | null, onClose: () => void, sendAt?: Date) => {
+		e?.preventDefault(); if (isSending) return; setError(null);
 		if (!currentMailbox || !mailboxId) { setError("No mailbox selected."); return; }
 		const toRecipients = splitEmailList(to);
 		if (toRecipients.length === 0) { setError("Add at least one recipient."); return; }
@@ -266,6 +267,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		const payload = {
 			...emailData,
 			...(draftId ? { draft_id: draftId } : {}),
+			...(sendAt ? { send_at: sendAt.toISOString() } : {}),
 			...(attachments.uploadIds.length ? { attachments: attachments.uploadIds.map((upload_id) => ({ upload_id })) } : {}),
 			...(mode === "forward" && Array.isArray(originalAttachments) ? { forward_attachment_ids: attachments.forwarded.map((a) => a.id) } : {}),
 		};
