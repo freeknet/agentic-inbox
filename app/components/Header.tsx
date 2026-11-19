@@ -97,15 +97,13 @@ export default function Header() {
 						</button>
 					)}
 				</div>
-				<Tooltip content="Search" side="bottom" asChild>
-					<Button
+				<Tooltip content="Search" side="bottom" render={<Button
 						variant="ghost"
 						shape="square"
 						icon={<MagnifyingGlassIcon size={20} />}
 						onClick={performSearch}
 						aria-label="Search"
-					/>
-				</Tooltip>
+					/>} />
 			</div>
 
 			{/* Search toggle button - mobile only, hidden when search is expanded */}
@@ -122,27 +120,22 @@ export default function Header() {
 			)}
 
 			<div className="flex items-center gap-1 ml-auto shrink-0">
-				<Tooltip content={isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"} side="bottom" asChild>
-					<Button
+				<Tooltip content={isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"} side="bottom" render={<Button
 						variant={isAgentPanelOpen ? "secondary" : "ghost"}
 						shape="square"
 						icon={<RobotIcon size={20} />}
 						onClick={toggleAgentPanel}
 						aria-label="Toggle agent panel"
 						className="hidden lg:inline-flex"
-					/>
-				</Tooltip>
-				<Tooltip content={themeLabel} side="bottom" asChild>
-					<Button
+					/>} />
+				<Tooltip content={themeLabel} side="bottom" render={<Button
 						variant="ghost"
 						shape="square"
 						icon={theme === "dark" ? <MoonIcon size={20} /> : theme === "light" ? <SunIcon size={20} /> : <CircleHalfIcon size={20} />}
 						onClick={cycleTheme}
 						aria-label={`${themeLabel} (click to change)`}
-					/>
-				</Tooltip>
-				<Tooltip content="Settings" side="bottom" asChild>
-					<Button
+					/>} />
+				<Tooltip content="Settings" side="bottom" render={<Button
 						variant={isSettingsActive ? "secondary" : "ghost"}
 						shape="square"
 						icon={<GearSixIcon size={20} />}
@@ -154,8 +147,7 @@ export default function Header() {
 							)
 						}
 						aria-label="Settings"
-					/>
-				</Tooltip>
+					/>} />
 			</div>
 		</header>
 	);

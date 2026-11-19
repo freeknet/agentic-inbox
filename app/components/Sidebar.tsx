@@ -94,7 +94,7 @@ export default function Sidebar() {
 		return found?.unreadCount || 0;
 	};
 
-	const handleCreateFolder = (e: React.FormEvent) => {
+	const handleCreateFolder = (e: React.SubmitEvent) => {
 		e.preventDefault();
 		if (newFolderName.trim() && mailboxId) {
 			createFolderMutation.mutate({ mailboxId, name: newFolderName.trim() });
@@ -177,16 +177,14 @@ export default function Sidebar() {
 							<span className="text-xs uppercase tracking-wider font-semibold text-kumo-subtle">
 								Folders
 							</span>
-							<Tooltip content="New folder" asChild>
-								<Button
+							<Tooltip content="New folder" render={<Button
 									variant="ghost"
 									shape="square"
 									size="sm"
 									icon={<PlusIcon size={16} />}
 									onClick={() => setIsCreateFolderOpen(true)}
 									aria-label="Create new folder"
-								/>
-							</Tooltip>
+								/>} />
 						</div>
 						{customFolders.map((folder) => (
 							<FolderLink
@@ -208,16 +206,14 @@ export default function Sidebar() {
 							<span className="text-xs uppercase tracking-wider font-semibold text-kumo-subtle">
 								Folders
 							</span>
-							<Tooltip content="New folder" asChild>
-								<Button
+							<Tooltip content="New folder" render={<Button
 									variant="ghost"
 									shape="square"
 									size="sm"
 									icon={<PlusIcon size={16} />}
 									onClick={() => setIsCreateFolderOpen(true)}
 									aria-label="Create new folder"
-								/>
-							</Tooltip>
+								/>} />
 						</div>
 					</div>
 				)}

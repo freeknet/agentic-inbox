@@ -3,11 +3,11 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { useKumoToastManager } from "@cloudflare/kumo";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type SubmitEvent, useEffect, useMemo, useRef, useState } from "react";
+import { formatQuotedDate } from "shared/dates";
 import {
 	buildQuotedReplyBlock,
 	escapeHtml,
-	formatComposeDate,
 	getNonInlineAttachments,
 	getSignatureBlock,
 	htmlToPlainText,
@@ -71,7 +71,7 @@ function buildForwardBody(
 	const safeSubject = escapeHtml(original.subject);
 	const safeBody = escapeHtml(stripHtml(original.body || "")).replace(/\n/g, "<br>");
 
-	return `<p><br></p>${sigBlock ? `${sigBlock}<br>` : ""}<div style="border: 1px solid #ddd; padding: 1em; background-color: #f9f9f9; margin: 1em 0;"><strong>Forwarded message:</strong><br><strong>From:</strong> ${safeSender}<br><strong>Date:</strong> ${formatComposeDate(original.date)}<br><strong>Subject:</strong> ${safeSubject}<br><br>${safeBody}</div>`;
+	return `<p><br></p>${sigBlock ? `${sigBlock}<br>` : ""}<div style="border: 1px solid #ddd; padding: 1em; background-color: #f9f9f9; margin: 1em 0;"><strong>Forwarded message:</strong><br><strong>From:</strong> ${safeSender}<br><strong>Date:</strong> ${formatQuotedDate(original.date)}<br><strong>Subject:</strong> ${safeSubject}<br><br>${safeBody}</div>`;
 }
 
 function buildReplyAllFields(
@@ -241,7 +241,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	};
 
 	/** Send now, or at `sendAt` (send later). */
-	const handleSend = async (e: FormEvent | null, onClose: () => void, sendAt?: Date) => {
+	const handleSend = async (e: SubmitEvent | null, onClose: () => void, sendAt?: Date) => {
 		e?.preventDefault(); if (isSending) return; setError(null);
 		if (!currentMailbox || !mailboxId) { setError("No mailbox selected."); return; }
 		const toRecipients = splitEmailList(to);

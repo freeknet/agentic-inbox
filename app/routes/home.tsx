@@ -14,7 +14,7 @@ import {
 } from "@cloudflare/kumo";
 import { EnvelopeIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type SubmitEvent, useEffect, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router";
 import api from "~/services/api";
 import {
@@ -89,7 +89,7 @@ export default function HomeRoute() {
 		return () => { cancelled = true; };
 	}, [emailAddresses, mailboxes, refetchMailboxes]);
 
-	const handleCreate = async (e: FormEvent) => {
+	const handleCreate = async (e: SubmitEvent) => {
 		e.preventDefault();
 		setCreateError(null);
 		if (!newPrefix || !selectedDomain) {

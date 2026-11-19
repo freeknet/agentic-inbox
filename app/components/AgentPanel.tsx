@@ -353,8 +353,7 @@ function AgentChatConnected({
 				<div className="flex items-center gap-1">
 					{isStreaming && <Loader size="sm" />}
 					{messages.length > 0 && (
-						<Tooltip content="Clear chat" asChild>
-							<Button
+						<Tooltip content="Clear chat" render={<Button
 								variant="ghost"
 								shape="square"
 								size="sm"
@@ -365,8 +364,7 @@ function AgentChatConnected({
 									}
 								}}
 								aria-label="Clear chat"
-							/>
-						</Tooltip>
+							/>} />
 					)}
 				</div>
 			</div>

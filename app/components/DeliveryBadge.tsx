@@ -17,8 +17,8 @@ export function DeliveryBadge({ status }: { status?: string | null }) {
 	const info = LABELS[status];
 	if (!info) return null;
 	return (
-		<Tooltip content={info.hint} asChild>
-			<span className={`shrink-0 text-xs font-medium ${info.className}`}>{info.label}</span>
+		<Tooltip content={info.hint} render={<span className={`shrink-0 text-xs font-medium ${info.className}`} />}>
+			{info.label}
 		</Tooltip>
 	);
 }

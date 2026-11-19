@@ -66,7 +66,7 @@ export default function ComposePanel() {
 				{...dropProps}
 			>
 				<div className="p-4 md:p-6 space-y-4">
-					{error && <Banner variant="error" text={error} />}
+					{error && <Banner variant="error" description={error} />}
 
 					<div className="space-y-3">
 						<div className="flex items-center gap-2">

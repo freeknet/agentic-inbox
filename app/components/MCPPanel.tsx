@@ -26,8 +26,7 @@ function CopyButton({ text }: { text: string }) {
 	};
 
 	return (
-		<Tooltip content={copied ? "Copied!" : "Copy"} asChild>
-			<Button
+		<Tooltip content={copied ? "Copied!" : "Copy"} render={<Button
 				variant="ghost"
 				shape="square"
 				size="sm"
@@ -40,8 +39,7 @@ function CopyButton({ text }: { text: string }) {
 				}
 				onClick={handleCopy}
 				aria-label="Copy to clipboard"
-			/>
-		</Tooltip>
+			/>} />
 	);
 }
 

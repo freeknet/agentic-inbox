@@ -287,10 +287,7 @@ export default function EmailListRoute() {
 						)}
 						<Tooltip
 							content={isRefreshing ? "Refreshing..." : "Refresh"}
-							side="bottom"
-							asChild
-						>
-							<Button
+							side="bottom" render={<Button
 								variant="ghost"
 								shape="square"
 								size="sm"
@@ -303,8 +300,7 @@ export default function EmailListRoute() {
 								onClick={handleRefresh}
 								disabled={isRefreshing}
 								aria-label="Refresh"
-							/>
-						</Tooltip>
+							/>} />
 					</div>
 				</div>
 
@@ -380,10 +376,8 @@ export default function EmailListRoute() {
 												)}
 												{email.folder_id === Folders.SENT && <DeliveryBadge status={email.delivery_status} />}
 												{email.needs_reply && !email.has_draft && (
-													<Tooltip content="Needs reply" asChild>
-														<span className="shrink-0 text-kumo-warning">
-															<ArrowBendUpLeftIcon size={14} weight="bold" />
-														</span>
+													<Tooltip content="Needs reply" render={<span className="shrink-0 text-kumo-warning" />}>
+														<ArrowBendUpLeftIcon size={14} weight="bold" />
 													</Tooltip>
 												)}
 												<span className="text-sm text-kumo-subtle shrink-0 ml-auto">
@@ -406,8 +400,7 @@ export default function EmailListRoute() {
 
 										{/* Hover actions */}
 										<div className="hidden group-hover:flex items-center shrink-0">
-											<Tooltip content={email.read ? "Mark unread" : "Mark read"} asChild>
-												<Button
+											<Tooltip content={email.read ? "Mark unread" : "Mark read"} render={<Button
 													variant="ghost"
 													shape="square"
 													size="sm"
@@ -422,18 +415,15 @@ export default function EmailListRoute() {
 															});
 													}}
 													aria-label={email.read ? "Mark unread" : "Mark read"}
-												/>
-											</Tooltip>
-											<Tooltip content="Delete" asChild>
-												<Button
+												/>} />
+											<Tooltip content="Delete" render={<Button
 													variant="ghost"
 													shape="square"
 													size="sm"
 													icon={<TrashIcon size={14} />}
 													onClick={(e) => handleDelete(e, email.id)}
 													aria-label="Delete"
-												/>
-											</Tooltip>
+												/>} />
 										</div>
 									</div>
 								);

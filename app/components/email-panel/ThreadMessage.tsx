@@ -132,8 +132,7 @@ export default function ThreadMessage({
 							{formatShortDate(email.date)}
 						</span>
 						{onViewSource && (
-							<Tooltip content="View source" side="bottom" asChild>
-								<Button
+							<Tooltip content="View source" side="bottom" render={<Button
 									variant="ghost"
 									shape="square"
 									size="sm"
@@ -141,8 +140,7 @@ export default function ThreadMessage({
 									onClick={onViewSource}
 									aria-label="View source"
 									className="transition-opacity !h-6 !w-6"
-								/>
-							</Tooltip>
+								/>} />
 						)}
 						<button
 							type="button"

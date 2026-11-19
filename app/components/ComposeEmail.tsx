@@ -60,7 +60,7 @@ export default function ComposeEmail() {
 					className={`space-y-4 rounded-md ${dragging ? "outline-2 outline-dashed outline-kumo-brand" : ""}`}
 					{...dropProps}
 				>
-					{error && <Banner variant="error" text={error} />}
+					{error && <Banner variant="error" description={error} />}
 					<div className="flex items-center gap-2">
 						<div className="flex-1">
 							<Input
