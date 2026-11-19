@@ -13,10 +13,10 @@ import {
 } from "@phosphor-icons/react";
 import EmailAttachmentList from "~/components/EmailAttachmentList";
 import EmailIframe from "~/components/EmailIframe";
+import { useInlineImages } from "~/hooks/useInlineImages";
 import {
 	formatDetailDate,
 	formatShortDate,
-	rewriteInlineImages,
 	stripHtml,
 } from "~/lib/utils";
 import type { Email } from "~/types";
@@ -68,6 +68,8 @@ export default function ThreadMessage({
 	onViewSource,
 	onPreviewImage,
 }: ThreadMessageProps) {
+	// Called before the collapsed early return so hook order stays stable.
+	const inlineBody = useInlineImages(isExpanded ? email.body || "" : "", mailboxId, email.id, email.attachments);
 	const isSelf = email.sender === mailboxEmail;
 	const containerClassName = `${!isLast ? "border-b border-kumo-line" : ""} ${isDraft ? "border-l-2 border-l-kumo-warning bg-kumo-warning/[0.02]" : ""}`;
 	const senderLabel = isDraft ? "Draft reply" : isSelf ? "You" : email.sender;
@@ -158,12 +160,7 @@ export default function ThreadMessage({
 
 				<div className="md:ml-[42px]">
 					<EmailIframe
-						body={rewriteInlineImages(
-							email.body || "",
-							mailboxId || "",
-							email.id,
-							email.attachments,
-						)}
+						body={inlineBody}
 						autoSize
 					/>
 				</div>

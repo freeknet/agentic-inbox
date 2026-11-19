@@ -176,26 +176,14 @@ export function buildQuotedReplyBlock(
 }
 
 /**
- * Rewrite CID references in email HTML to API URLs for inline images.
- * Replaces `src="cid:image001@example.com"` with the attachment API endpoint.
+ * Replace `cid:<id>` references (case-insensitive) with the given URLs.
+ * Keys are bare Content-IDs, without angle brackets.
  */
-export function rewriteInlineImages(
-	body: string,
-	mailboxId: string,
-	emailId: string,
-	attachments?: { id: string; content_id?: string | null; disposition?: string | null }[],
-): string {
-	if (!body || !attachments?.length) return body;
+export function replaceCidReferences(body: string, urls: Map<string, string>): string {
 	let result = body;
-	for (const att of attachments) {
-		if (att.disposition === "inline" && att.content_id) {
-			const url = `/api/v1/mailboxes/${mailboxId}/emails/${emailId}/attachments/${att.id}`;
-			// Strip angle brackets from content_id if present
-			const cid = att.content_id.startsWith("<")
-				? att.content_id.slice(1, -1)
-				: att.content_id;
-			result = result.replace(new RegExp(`cid:${cid.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "gi"), url);
-		}
+	for (const [cid, url] of urls) {
+		const pattern = new RegExp(`cid:${cid.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "gi");
+		result = result.replace(pattern, () => url);
 	}
 	return result;
 }

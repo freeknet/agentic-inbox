@@ -4,7 +4,8 @@
 
 import EmailAttachmentList from "~/components/EmailAttachmentList";
 import EmailIframe from "~/components/EmailIframe";
-import { formatDetailDate, rewriteInlineImages } from "~/lib/utils";
+import { formatDetailDate } from "~/lib/utils";
+import { useInlineImages } from "~/hooks/useInlineImages";
 import type { Email } from "~/types";
 
 interface SingleMessageViewProps {
@@ -18,6 +19,7 @@ export default function SingleMessageView({
 	mailboxId,
 	onPreviewImage,
 }: SingleMessageViewProps) {
+	const inlineBody = useInlineImages(email.body || "", mailboxId, email.id, email.attachments);
 	return (
 		<div className="flex flex-col h-full">
 			<div className="px-4 py-4 border-b border-kumo-line md:px-6">
@@ -41,12 +43,7 @@ export default function SingleMessageView({
 
 			<div className="flex-1 min-h-0">
 				<EmailIframe
-					body={rewriteInlineImages(
-						email.body || "",
-						mailboxId || "",
-						email.id,
-						email.attachments,
-					)}
+					body={inlineBody}
 				/>
 			</div>
 
