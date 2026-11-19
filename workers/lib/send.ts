@@ -6,7 +6,7 @@
 import type { MailboxDO } from "../durableObject";
 import type { OutboxPayload } from "../durableObject/outbox";
 import { storeAttachments, type StoredAttachment } from "./attachments";
-import { buildThreadingHeaders, generateMessageId } from "./email-helpers";
+import { buildThreadingHeaders, generateMessageId, stripHtmlToText } from "./email-helpers";
 import { MAX_MESSAGE_ATTACHMENT_BYTES, copyObject, safeFilename, uploadKey } from "./uploads";
 import type { Env } from "../types";
 
@@ -129,6 +129,7 @@ export async function queueSend(
 			bcc: bcc.length ? bcc.join(", ").toLowerCase() : null,
 			date: now,
 			body: input.html || input.text || "",
+			body_text: input.text || stripHtmlToText(input.html || ""),
 			in_reply_to: input.inReplyTo ?? null,
 			email_references: references.length ? JSON.stringify(references) : null,
 			thread_id: input.threadId || input.inReplyTo || messageId,

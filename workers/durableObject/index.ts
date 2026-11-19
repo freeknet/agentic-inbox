@@ -14,6 +14,23 @@ import { Outbox, type OutboxPayload, type WebhookEvent } from "./outbox";
 import { createResendProvider } from "../lib/resend";
 import { parseInbound } from "./ingest";
 
+/**
+ * Turn free text into an FTS5 expression: every word must match, as a prefix,
+ * optionally within one column. Words are quoted, so FTS5 syntax characters
+ * typed by the user are searched for literally instead of parsed.
+ */
+export function ftsTerms(text: string | undefined, column?: string): string {
+	if (!text) return "";
+	const words = text
+		.split(/[\s@.,;:<>()"'!?/\\]+/)
+		.map((w) => w.replace(/[*^]/g, ""))
+		.filter(Boolean)
+		.slice(0, 16);
+	if (words.length === 0) return "";
+	const expr = words.map((w) => `"${w.replace(/"/g, '""')}"*`).join(" ");
+	return column ? `${column} : (${expr})` : `(${expr})`;
+}
+
 /** Rows per attachments INSERT: 7 columns × 14 = 98 of the 100 allowed parameters. */
 const ATTACHMENT_ROWS_PER_INSERT = 14;
 
@@ -686,20 +703,21 @@ export class MailboxDO extends DurableObject<Env> {
 			return `?${paramIdx}`;
 		};
 
-		if (query) {
-			const p1 = addParam(`%${query}%`);
-			const p2 = addParam(`%${query}%`);
-			const p3 = addParam(`%${query}%`);
-			const p4 = addParam(`%${query}%`);
-			conditions.push(`(${prefix}subject LIKE ${p1} OR ${prefix}body LIKE ${p2} OR ${prefix}sender LIKE ${p3} OR ${prefix}recipient LIKE ${p4} OR ${prefix}cc LIKE ${p4} OR ${prefix}bcc LIKE ${p4})`);
+		// Text filters go through the FTS5 index (migration 11), combined into one MATCH.
+		const match = [
+			ftsTerms(query),
+			ftsTerms(from, "sender"),
+			ftsTerms(to, "recipients"),
+			ftsTerms(subject, "subject"),
+		].filter(Boolean).join(" AND ");
+		if (match) {
+			const p = addParam(match);
+			conditions.push(`${prefix}rowid IN (SELECT rowid FROM emails_fts WHERE emails_fts MATCH ${p})`);
 		}
 		if (folder) {
 			const p = addParam(folder);
 			conditions.push(`${prefix}folder_id = (SELECT id FROM folders WHERE name = ${p} OR id = ${p} LIMIT 1)`);
 		}
-		if (from) { const p = addParam(`%${from}%`); conditions.push(`${prefix}sender LIKE ${p}`); }
-		if (to) { const p = addParam(`%${to}%`); conditions.push(`(${prefix}recipient LIKE ${p} OR ${prefix}cc LIKE ${p} OR ${prefix}bcc LIKE ${p})`); }
-		if (subject) { const p = addParam(`%${subject}%`); conditions.push(`${prefix}subject LIKE ${p}`); }
 		if (date_start) { const p = addParam(date_start); conditions.push(`${prefix}date >= ${p}`); }
 		if (date_end) { const p = addParam(date_end); conditions.push(`${prefix}date <= ${p}`); }
 		if (is_read !== undefined) { const p = addParam(is_read ? 1 : 0); conditions.push(`${prefix}read = ${p}`); }

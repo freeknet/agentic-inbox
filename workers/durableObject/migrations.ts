@@ -216,4 +216,42 @@ export const mailboxMigrations: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_emails_message_id ON emails(message_id);
         `),
 	},
+	{
+		// Phase 6: full-text search (plan §A6). LIKE '%q%' fails on DO SQLite for
+		// patterns over 50 bytes and scans every row. The index is contentless
+		// (no second copy of every body) and kept in sync by triggers. Updates
+		// that only change flags or folder don't touch it, which saves rows
+		// written against the Free daily quota.
+		name: "11_fts5_search",
+		sql: txn(`
+            CREATE VIRTUAL TABLE IF NOT EXISTS emails_fts USING fts5(
+                subject, sender, recipients, body,
+                content='', contentless_delete=1,
+                tokenize='unicode61 remove_diacritics 2', prefix='2 3'
+            );
+            CREATE TRIGGER IF NOT EXISTS emails_fts_ai AFTER INSERT ON emails BEGIN
+                INSERT INTO emails_fts(rowid, subject, sender, recipients, body) VALUES (
+                    new.rowid, new.subject, new.sender,
+                    COALESCE(new.recipient, '') || ' ' || COALESCE(new.cc, '') || ' ' || COALESCE(new.bcc, ''),
+                    COALESCE(new.body_text, new.body)
+                );
+            END;
+            CREATE TRIGGER IF NOT EXISTS emails_fts_ad AFTER DELETE ON emails BEGIN
+                DELETE FROM emails_fts WHERE rowid = old.rowid;
+            END;
+            CREATE TRIGGER IF NOT EXISTS emails_fts_au AFTER UPDATE OF subject, sender, recipient, cc, bcc, body, body_text ON emails BEGIN
+                DELETE FROM emails_fts WHERE rowid = old.rowid;
+                INSERT INTO emails_fts(rowid, subject, sender, recipients, body) VALUES (
+                    new.rowid, new.subject, new.sender,
+                    COALESCE(new.recipient, '') || ' ' || COALESCE(new.cc, '') || ' ' || COALESCE(new.bcc, ''),
+                    COALESCE(new.body_text, new.body)
+                );
+            END;
+            INSERT INTO emails_fts(rowid, subject, sender, recipients, body)
+                SELECT rowid, subject, sender,
+                    COALESCE(recipient, '') || ' ' || COALESCE(cc, '') || ' ' || COALESCE(bcc, ''),
+                    COALESCE(body_text, body)
+                FROM emails;
+        `),
+	},
 ];

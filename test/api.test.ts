@@ -45,6 +45,36 @@ describe("REST API", () => {
 		expect(emails.map((e) => e.subject)).toEqual(["Quarterly invoice"]);
 	});
 
+	it("full-text search: body words, prefixes, sender, long and odd queries (FTS5)", async () => {
+		await deliver(mime({ subject: "Trip", text: "The ferry to Mackinac leaves at noon", from: "Pat <pat@ferries.test>" }));
+		await deliver(mime({ subject: "Other", text: "nothing relevant here" }));
+		const search = async (q: string) => {
+			const res = await api(`${base}/search?${q}`);
+			expect(res.status).toBe(200);
+			return ((await res.json()) as { emails: Array<{ subject: string }> }).emails.map((e) => e.subject);
+		};
+		expect(await search("query=mackinac")).toEqual(["Trip"]);
+		expect(await search("query=mack")).toEqual(["Trip"]);
+		expect(await search("query=ferry%20noon")).toEqual(["Trip"]);
+		expect(await search("query=ferry%20midnight")).toEqual([]);
+		expect(await search("from=ferries.test")).toEqual(["Trip"]);
+		// Over the 50-byte LIKE limit that broke the old search.
+		expect(await search(`query=${encodeURIComponent("the ferry to mackinac leaves at noon ".repeat(3))}`)).toEqual(["Trip"]);
+		// FTS5 operators are searched literally (as words), not parsed, so this is no error.
+		expect(await search(`query=${encodeURIComponent('ferry" OR NEAR(* -')}`)).toEqual([]);
+		expect(await search(`query=${encodeURIComponent('"ferry*" (noon')}`)).toEqual(["Trip"]);
+	});
+
+	it("keeps the search index in sync on update and delete", async () => {
+		await deliver(mime({ subject: "Gone soon", text: "zebra" }));
+		const { emails } = (await (await api(`${base}/search?query=zebra`)).json()) as { emails: Array<{ id: string }> };
+		expect(emails).toHaveLength(1);
+		await api(`${base}/emails/${emails[0].id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ read: true, starred: true }) });
+		expect(((await (await api(`${base}/search?query=zebra`)).json()) as { emails: unknown[] }).emails).toHaveLength(1);
+		await api(`${base}/emails/${emails[0].id}`, { method: "DELETE" });
+		expect(((await (await api(`${base}/search?query=zebra`)).json()) as { emails: unknown[] }).emails).toHaveLength(0);
+	});
+
 	it("records a sent email in Sent", async () => {
 		const res = await api(
 			`${base}/emails`,
