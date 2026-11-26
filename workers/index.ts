@@ -21,6 +21,7 @@ import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { registerDriveRoutes } from "./routes/drive";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
+import { sameOriginOnly } from "./lib/same-origin";
 
 type AppContext = Context<MailboxContext>;
 
@@ -96,12 +97,15 @@ app.use("/api/*", cors({
 			const url = new URL(origin);
 			if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return origin;
 		} catch { /* invalid origin */ }
-		// Block all other cross-origin requests. The app is served from the
-		// same origin as the API, so legitimate browser requests never send
-		// an Origin header. Returning undefined omits Access-Control-Allow-Origin.
+		// Returning undefined omits Access-Control-Allow-Origin, which only stops
+		// another site *reading* responses. Stopping it *making* requests is
+		// sameOriginOnly's job, below.
 		return undefined;
 	},
 }));
+// CSRF: Access authenticates by cookie, so refuse cross-site writes (and in
+// app.ts, cross-site WebSocket upgrades). The Svix webhook sends no Origin.
+app.use("*", sameOriginOnly);
 app.use("/api/v1/mailboxes/:mailboxId/*", requireMailbox);
 
 // Invalid request bodies (schema.parse throws ZodError) are client errors, not 500s.
@@ -379,15 +383,31 @@ app.get("/api/v1/mailboxes/:mailboxId/emails/:emailId/attachments/:attachmentId"
 	const emailId = c.req.param("emailId")!;
 	const attachmentId = c.req.param("attachmentId")!;
 	const attachment = await c.var.mailboxStub.getAttachment(attachmentId);
-	if (!attachment) return c.json({ error: "Attachment not found" }, 404);
+	if (!attachment || attachment.email_id !== emailId) return c.json({ error: "Attachment not found" }, 404);
 	const obj = await c.env.BUCKET.get(`attachments/${emailId}/${attachmentId}/${attachment.filename}`);
 	if (!obj) return c.json({ error: "Attachment file not found" }, 404);
-	const headers = new Headers();
-	headers.set("Content-Type", attachment.mimetype);
-	const sanitized = attachment.filename.replace(/[\x00-\x1f"\\]/g, "_");
-	headers.set("Content-Disposition", `attachment; filename="${sanitized}"; filename*=UTF-8''${encodeURIComponent(attachment.filename)}`);
-	return new Response(obj.body, { headers });
+	return new Response(obj.body, { headers: attachmentHeaders(attachment.mimetype, attachment.filename) });
 });
+
+/**
+ * Headers for an attachment download. The type and name come from whoever
+ * sent the email, so: always a download, never sniffed into something else,
+ * text never served as a page, and a sandbox CSP in case a browser renders it
+ * anyway. Header values must be Latin-1, so the plain filename is ASCII-only
+ * and the real one goes in filename*.
+ */
+export function attachmentHeaders(mimetype: string, filename: string): Headers {
+	const m = (mimetype ?? "").trim().toLowerCase();
+	const type = /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/.test(m) ? m : "application/octet-stream";
+	const ascii = filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
+	return new Headers({
+		"Content-Type": type.startsWith("text/") ? "text/plain; charset=utf-8" : type,
+		"Content-Disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+		"X-Content-Type-Options": "nosniff",
+		"Content-Security-Policy": "sandbox; default-src 'none'",
+		"Cache-Control": "private, no-store",
+	});
+}
 
 // -- Resend webhooks ------------------------------------------------
 // Reached through an Access Bypass app on this exact path; the Access JWT
@@ -484,7 +504,7 @@ async function receiveEmail(message: InboundMessage, env: Env, ctx: ExecutionCon
 		agent?: { autoDraft?: boolean };
 		forwarding?: { enabled?: boolean; email?: string };
 	};
-	const stored = await stub.ingestRaw({ key, id, envelopeTo: mailboxId, autoReply: settings.autoReply, fromName: settings.fromName });
+	const stored = await stub.ingestRaw({ key, id, envelopeTo: mailboxId, envelopeFrom: message.from, autoReply: settings.autoReply, fromName: settings.fromName });
 	await forwardCopy(message, mailboxId, settings.forwarding);
 
 	// Auto-draft is opt-in: every draft costs Neurons from the 10,000/day free allocation.

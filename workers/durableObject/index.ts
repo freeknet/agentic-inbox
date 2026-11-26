@@ -844,7 +844,7 @@ export class MailboxDO extends DurableObject<Env> {
 	 * Parse a raw message the Worker stored in R2 and file it in the Inbox.
 	 * Runs in the DO because parsing large mail exceeds a plain Worker's CPU on Free.
 	 */
-	async ingestRaw(input: { key: string; id: string; envelopeTo: string; autoReply?: AutoReplySettings; fromName?: string }) {
+	async ingestRaw(input: { key: string; id: string; envelopeTo: string; envelopeFrom?: string; autoReply?: AutoReplySettings; fromName?: string }) {
 		const obj = await this.env.BUCKET.get(input.key);
 		if (!obj) throw new Error(`ingestRaw: raw message not found at ${input.key}`);
 		const p = await parseInbound(await obj.arrayBuffer(), input.id, input.envelopeTo, this.env.BUCKET);
@@ -884,7 +884,7 @@ export class MailboxDO extends DurableObject<Env> {
 
 	/** Queue the vacation reply for an inbound message if the rules allow it. */
 	private async maybeAutoReply(
-		input: { envelopeTo: string; autoReply?: AutoReplySettings; fromName?: string },
+		input: { envelopeTo: string; envelopeFrom?: string; autoReply?: AutoReplySettings; fromName?: string },
 		p: ParsedInbound,
 		threadId: string,
 	): Promise<boolean> {
@@ -897,6 +897,7 @@ export class MailboxDO extends DurableObject<Env> {
 			settings: input.autoReply,
 			mailbox: input.envelopeTo,
 			sender: p.sender,
+			envelopeFrom: input.envelopeFrom ?? "",
 			headers: JSON.parse(p.rawHeaders || "[]"),
 			nowMs: now,
 			lastRepliedAt: last?.replied_at ?? null,

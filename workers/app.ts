@@ -9,6 +9,7 @@ import { createContext, createRequestHandler, RouterContextProvider } from "reac
 import { app as apiApp, receiveEmail } from "./index";
 import { serveMcp } from "./mcp";
 import { identify, isAllowed } from "./lib/access";
+import { sameOriginOnly } from "./lib/same-origin";
 import type { Env } from "./types";
 
 export { MailboxDO } from "./durableObject";
@@ -99,6 +100,11 @@ app.use("*", async (c, next) => {
 	// Access policy, they can access all mailboxes in this app by design.
 	return next();
 });
+
+// CSRF and cross-site WebSocket hijacking: the Access cookie rides along on
+// requests other sites start, so writes and upgrades (the agent chat socket)
+// must come from this origin. MCP clients send no Origin and pass.
+app.use("*", sameOriginOnly);
 
 // MCP server endpoint — used by AI coding tools (ProtoAgent, Claude Code, Cursor, etc.)
 // Must be before API routes and React Router catch-all

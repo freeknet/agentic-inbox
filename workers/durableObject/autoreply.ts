@@ -28,10 +28,27 @@ function header(headers: Header[], name: string): string | null {
 
 export type AutoReplyDecision = { reply: true } | { reply: false; reason: string };
 
+/**
+ * The newest Authentication-Results (or ARC-Authentication-Results) header
+ * says SPF or DMARC failed and DKIM didn't save it. Receivers add these at
+ * the top, so the first one is from the last hop (Email Routing, when it
+ * adds one); a sender can only forge ones below it.
+ */
+export function failedAuthentication(headers: Header[]): boolean {
+	const h = headers.find((x) => /^(arc-)?authentication-results$/i.test(x.key));
+	if (!h) return false;
+	const v = String(h.value).toLowerCase();
+	if (/\bdmarc=fail\b/.test(v)) return true;
+	return /\bspf=(fail|softfail)\b/.test(v) && !/\bdkim=pass\b/.test(v);
+}
+
 export function decideAutoReply(input: {
 	settings: AutoReplySettings | undefined;
 	mailbox: string;
+	/** Header From address. */
 	sender: string;
+	/** SMTP MAIL FROM, which SPF checks; "" for bounces. */
+	envelopeFrom: string;
 	headers: Header[];
 	nowMs: number;
 	lastRepliedAt: number | null;
@@ -45,6 +62,13 @@ export function decideAutoReply(input: {
 
 	if (!sender || !sender.includes("@")) return { reply: false, reason: "no sender" };
 	if (sender === mailbox.toLowerCase()) return { reply: false, reason: "self" };
+	// The From header is free text: answering it lets anyone aim this reply at
+	// a third party (backscatter). Only answer when it is the envelope sender,
+	// the address SPF vouches for, and authentication didn't fail.
+	const envelope = input.envelopeFrom.trim().toLowerCase();
+	if (!envelope) return { reply: false, reason: "bounce" };
+	if (envelope !== sender) return { reply: false, reason: "envelope sender differs" };
+	if (failedAuthentication(headers)) return { reply: false, reason: "failed authentication" };
 	if (ROBOT_LOCAL_PART.test(sender.split("@")[0])) return { reply: false, reason: "automated sender" };
 
 	const autoSubmitted = header(headers, "auto-submitted");

@@ -33,7 +33,7 @@ describe("vacation auto-reply", () => {
 
 	it("replies once per sender through the outbox, threaded, with Auto-Submitted", async () => {
 		await setAutoReply({ enabled: true, subject: "", message: "Away until Monday.\nBack soon." });
-		await deliver(mime({ from: "Bob <bob@friend.test>", subject: "Dinner?", messageId: "m1@friend.test" }));
+		await deliver(mime({ from: "Bob <bob@friend.test>", subject: "Dinner?", messageId: "m1@friend.test" }), { from: "bob@friend.test" });
 
 		const rows = await sentRows();
 		expect(rows).toHaveLength(1);
@@ -45,7 +45,7 @@ describe("vacation auto-reply", () => {
 		expect(payload.html).toBe("<div>Away until Monday.<br>Back soon.</div>");
 
 		// The sender's next message within the interval gets no second reply.
-		await deliver(mime({ from: "bob@friend.test", subject: "Also", messageId: "m2@friend.test" }));
+		await deliver(mime({ from: "bob@friend.test", subject: "Also", messageId: "m2@friend.test" }), { from: "bob@friend.test" });
 		expect(await sentRows()).toHaveLength(1);
 	});
 
@@ -59,18 +59,49 @@ describe("vacation auto-reply", () => {
 		expect(await sentRows()).toHaveLength(0);
 
 		await setAutoReply({ enabled: false, subject: "", message: "Away." });
-		await deliver(mime({ from: "carol@friend.test" }));
+		await deliver(mime({ from: "carol@friend.test" }), { from: "carol@friend.test" });
 		expect(await sentRows()).toHaveLength(0);
 	});
 
 	it("respects the start and end times", () => {
 		const now = Date.parse("2026-11-19T12:00:00Z");
-		const common = { mailbox: MAILBOX, sender: "a@b.test", headers: [], nowMs: now, lastRepliedAt: null };
+		const common = { mailbox: MAILBOX, sender: "a@b.test", envelopeFrom: "a@b.test", headers: [], nowMs: now, lastRepliedAt: null };
 		const s = (startsAt: string, endsAt: string) => ({ enabled: true, message: "x", startsAt, endsAt });
 		expect(decideAutoReply({ ...common, settings: s("2026-11-20T00:00:00Z", "") })).toMatchObject({ reply: false, reason: "not started" });
 		expect(decideAutoReply({ ...common, settings: s("", "2026-11-18T00:00:00Z") })).toMatchObject({ reply: false, reason: "ended" });
 		expect(decideAutoReply({ ...common, settings: s("2026-11-18T00:00:00Z", "2026-11-20T00:00:00Z") })).toEqual({ reply: true });
 		expect(decideAutoReply({ ...common, settings: s("", ""), lastRepliedAt: now - 5 * 86_400_000 })).toEqual({ reply: true });
+	});
+
+	it("does not answer a From address the envelope or authentication doesn't back", async () => {
+		await setAutoReply({ enabled: true, subject: "", message: "Away." });
+		// Forged From aimed at a third party; the envelope is the real sender.
+		await deliver(mime({ from: "victim@third.test" }), { from: "spammer@evil.test" });
+		// Bounce (null envelope sender).
+		await deliver(mime({ from: "dave@friend.test" }), { from: "" });
+		// Envelope matches, but the receiving hop says SPF failed.
+		await deliver(
+			mime({ from: "erin@friend.test", extraHeaders: ["Authentication-Results: mx.cloudflare.net; spf=fail smtp.mailfrom=erin@friend.test; dkim=none"] }),
+			{ from: "erin@friend.test" },
+		);
+		expect(await sentRows()).toHaveLength(0);
+
+		// DKIM pass outweighs an SPF softfail (e.g. a forwarder).
+		await deliver(
+			mime({ from: "fay@friend.test", extraHeaders: ["Authentication-Results: mx.cloudflare.net; spf=softfail; dkim=pass header.d=friend.test"] }),
+			{ from: "FAY@friend.test" },
+		);
+		expect((await sentRows()).map((r) => r.recipient)).toEqual(["fay@friend.test"]);
+	});
+
+	it("only trusts the newest Authentication-Results header", () => {
+		const common = { settings: { enabled: true, message: "x" }, mailbox: MAILBOX, sender: "a@b.test", envelopeFrom: "a@b.test", nowMs: 0, lastRepliedAt: null };
+		const top = (v: string) => ({ key: "authentication-results", value: v });
+		// A forged "pass" below the receiver's own "fail" doesn't help.
+		expect(decideAutoReply({ ...common, headers: [top("mx.cloudflare.net; dmarc=fail"), top("forged; spf=pass dkim=pass")] }))
+			.toMatchObject({ reply: false, reason: "failed authentication" });
+		expect(decideAutoReply({ ...common, headers: [{ key: "arc-authentication-results", value: "i=1; mx.cloudflare.net; spf=pass" }] }))
+			.toEqual({ reply: true });
 	});
 
 	it("rejects invalid auto-reply dates in settings", async () => {
