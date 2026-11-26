@@ -2,8 +2,12 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import Avatar from "@mui/material/Avatar";
+import ForwardOutlinedIcon from "@mui/icons-material/ForwardOutlined";
+import ReplyAllOutlinedIcon from "@mui/icons-material/ReplyAllOutlined";
+import ReplyOutlinedIcon from "@mui/icons-material/ReplyOutlined";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import ButtonBase from "@mui/material/ButtonBase";
 import Skeleton from "@mui/material/Skeleton";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
@@ -12,7 +16,6 @@ import EmailPanelDialogs from "~/components/email-panel/EmailPanelDialogs";
 import EmailPanelHeader from "~/components/email-panel/EmailPanelHeader";
 import ScheduledBanner from "./email-panel/ScheduledBanner";
 import EmailPanelToolbar from "~/components/email-panel/EmailPanelToolbar";
-import SingleMessageView from "~/components/email-panel/SingleMessageView";
 import ThreadMessage from "~/components/email-panel/ThreadMessage";
 import { splitEmailList, toEmailListValue } from "~/lib/utils";
 import api from "~/services/api";
@@ -86,13 +89,23 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 
 	const allMessages = useMemo(() => {
 		if (!email) return [];
-		return [email, ...threadReplies].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+		// Oldest first, newest at the bottom, as in Gmail.
+		return [email, ...threadReplies].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 	}, [email, threadReplies]);
 
-	// Reset expanded state only when the selected email changes, not on every refetch.
-	// Using allMessages as a dependency would reset user expand/collapse state on background refetches.
+	// Gmail opens the newest message, unread ones and drafts; the rest are one line.
+	// Reset only when the selected email (or the thread's size) changes, not on
+	// every refetch, so the reader's own expand/collapse choices stay.
+	const [showAllMessages, setShowAllMessages] = useState(false);
 	const currentEmailId = email?.id;
-	useEffect(() => { if (allMessages.length > 1) setExpandedMessages(new Set([allMessages[0].id])); }, [currentEmailId]); // eslint-disable-line react-hooks/exhaustive-deps
+	const messageCount = allMessages.length;
+	useEffect(() => {
+		const ids = new Set(allMessages.filter((m) => !m.read || m.folder_id === Folders.DRAFT).map((m) => m.id));
+		const last = allMessages.at(-1);
+		if (last) ids.add(last.id);
+		setExpandedMessages(ids);
+		setShowAllMessages(false);
+	}, [currentEmailId, messageCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const toggleExpand = (msgId: string) => { setExpandedMessages((prev) => { const next = new Set(prev); if (next.has(msgId)) next.delete(msgId); else next.add(msgId); return next; }); };
 
@@ -105,9 +118,9 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	const lastReceivedMessage = useMemo(() => {
 		const ce = currentMailbox?.email;
 		const received = allMessages.filter((msg) => !draftMessageIds.has(msg.id) && msg.sender !== ce);
-		if (received.length > 0) return received[0];
+		if (received.length > 0) return received[received.length - 1];
 		const nonDrafts = allMessages.filter((msg) => !draftMessageIds.has(msg.id));
-		return nonDrafts.length > 0 ? nonDrafts[0] : email;
+		return nonDrafts.length > 0 ? nonDrafts[nonDrafts.length - 1] : email;
 	}, [allMessages, draftMessageIds, currentMailbox?.email, email]);
 
 	const moveToFolders = useMemo(() => { const cur = folder || email?.folder_id; return folders.filter((f) => f.id !== cur); }, [folders, folder, email?.folder_id]);
@@ -258,6 +271,21 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 
 	const hasThread = allMessages.length > 1;
 
+	// Long conversations fold their middle into "N older messages" (Gmail does
+	// this past four), unless one of those is open or the reader unfolded it.
+	type Row = { kind: "msg"; msg: Email } | { kind: "fold"; count: number };
+	const middle = allMessages.slice(1, -2);
+	const fold = !showAllMessages && middle.length >= 2 && middle.every((m) => !expandedMessages.has(m.id));
+	const visibleMessages: Row[] = fold
+		? [{ kind: "msg", msg: allMessages[0] }, { kind: "fold", count: middle.length }, ...allMessages.slice(-2).map((msg) => ({ kind: "msg" as const, msg }))]
+		: allMessages.map((msg) => ({ kind: "msg" as const, msg }));
+
+	// The reply bar under the conversation answers its latest received message.
+	const replyTarget = isDraftFolder || allMessages.every((m) => draftMessageIds.has(m.id)) ? null : lastReceivedMessage;
+	const replyAllUseful =
+		!!replyTarget &&
+		splitEmailList(replyTarget.recipient).length + splitEmailList(replyTarget.cc).length + (replyTarget.sender === currentMailbox?.email ? 0 : 1) > 2;
+
 	return (
 		<Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
 			<EmailPanelToolbar
@@ -304,35 +332,50 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 				<ScheduledBanner key={m.id} mailboxId={mailboxId} emailId={m.id} />
 			))}
 
-			<Box sx={{ flex: 1, overflowY: "auto" }}>
-				{hasThread ? (
-					allMessages.map((msg, idx) => {
-						const isDraft = draftMessageIds.has(msg.id);
-						return (
-							<ThreadMessage
-								key={msg.id}
-								email={msg}
-								mailboxId={mailboxId}
-								mailboxEmail={currentMailbox?.email}
-								isLast={idx === allMessages.length - 1}
-								isDraft={isDraft}
-								isSending={isDraft ? isSending : false}
-								isExpanded={expandedMessages.has(msg.id)}
-								onToggleExpand={() => toggleExpand(msg.id)}
-								onSendDraft={isDraft ? () => handleSendDraft(msg) : undefined}
-								onEditDraft={isDraft ? () => handleEditDraft(msg) : undefined}
-								onDeleteDraft={isDraft ? () => handleDeleteDraft(msg) : undefined}
-								onViewSource={() => setSourceViewEmail(msg)}
-								onPreviewImage={(url, filename) => setPreviewImage({ url, filename })}
-							/>
-						);
-					})
-				) : (
-					<SingleMessageView
-						email={email}
-						mailboxId={mailboxId}
-						onPreviewImage={(url, filename) => setPreviewImage({ url, filename })}
-					/>
+			<Box sx={{ flex: 1, overflowY: "auto", pb: 3, containerType: "inline-size", containerName: "thread" }}>
+				{visibleMessages.map((item) =>
+					item.kind === "fold" ? (
+						<OlderMessagesFold key="fold" count={item.count} onClick={() => setShowAllMessages(true)} />
+					) : (
+						<ThreadMessage
+							key={item.msg.id}
+							email={item.msg}
+							mailboxId={mailboxId}
+							mailboxEmail={currentMailbox?.email}
+							isDraft={draftMessageIds.has(item.msg.id)}
+							isSending={draftMessageIds.has(item.msg.id) ? isSending : false}
+							isExpanded={expandedMessages.has(item.msg.id)}
+							canCollapse={item.msg.id !== allMessages.at(-1)?.id}
+							onToggleExpand={() => toggleExpand(item.msg.id)}
+							onReply={() => startCompose({ mode: "reply", originalEmail: item.msg })}
+							onReplyAll={() => startCompose({ mode: "reply-all", originalEmail: item.msg })}
+							onForward={() => startCompose({ mode: "forward", originalEmail: item.msg })}
+							onToggleStar={() => {
+								if (mailboxId) updateEmail.mutate({ mailboxId, id: item.msg.id, data: { starred: !item.msg.starred } });
+							}}
+							onSendDraft={draftMessageIds.has(item.msg.id) ? () => handleSendDraft(item.msg) : undefined}
+							onEditDraft={draftMessageIds.has(item.msg.id) ? () => handleEditDraft(item.msg) : undefined}
+							onDeleteDraft={draftMessageIds.has(item.msg.id) ? () => handleDeleteDraft(item.msg) : undefined}
+							onViewSource={() => setSourceViewEmail(item.msg)}
+							onPreviewImage={(url, filename) => setPreviewImage({ url, filename })}
+						/>
+					),
+				)}
+
+				{replyTarget && (
+					<Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, px: { xs: 2, md: 3 }, pt: 2.5, "@container thread (min-width: 560px)": { pl: 10 }, borderTop: 1, borderColor: "divider" }}>
+						<Button variant="outlined" startIcon={<ReplyOutlinedIcon />} onClick={() => startCompose({ mode: "reply", originalEmail: replyTarget })} sx={replyButtonSx}>
+							Reply
+						</Button>
+						{replyAllUseful && (
+							<Button variant="outlined" startIcon={<ReplyAllOutlinedIcon />} onClick={() => startCompose({ mode: "reply-all", originalEmail: replyTarget })} sx={replyButtonSx}>
+								Reply all
+							</Button>
+						)}
+						<Button variant="outlined" startIcon={<ForwardOutlinedIcon />} onClick={() => startCompose({ mode: "forward", originalEmail: allMessages.filter((m) => !draftMessageIds.has(m.id)).at(-1) ?? email })} sx={replyButtonSx}>
+							Forward
+						</Button>
+					</Box>
 				)}
 			</Box>
 
@@ -342,6 +385,38 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 				onCloseSource={() => setSourceViewEmail(null)}
 				onClosePreview={() => setPreviewImage(null)}
 			/>
+		</Box>
+	);
+}
+
+const replyButtonSx = { borderRadius: 999, px: 2.5, color: "text.secondary", borderColor: "divider", textTransform: "none" } as const;
+
+/** Gmail's fold: a rule with a count bubble that opens the hidden messages. */
+function OlderMessagesFold({ count, onClick }: { count: number; onClick: () => void }) {
+	return (
+		<Box sx={{ position: "relative", height: 40, borderTop: 1, borderColor: "divider" }}>
+			<Box sx={{ position: "absolute", left: 0, right: 0, top: 6, borderTop: 1, borderColor: "divider" }} />
+			<ButtonBase
+				onClick={onClick}
+				aria-label={`Show ${count} older messages`}
+				sx={{
+					position: "absolute",
+					left: { xs: 16, md: 24 },
+					top: 0,
+					width: 40,
+					height: 40,
+					borderRadius: "50%",
+					border: 1,
+					borderColor: "divider",
+					bgcolor: "background.paper",
+					typography: "body2",
+					fontWeight: 500,
+					color: "text.secondary",
+					"&:hover": { bgcolor: "action.hover" },
+				}}
+			>
+				{count}
+			</ButtonBase>
 		</Box>
 	);
 }

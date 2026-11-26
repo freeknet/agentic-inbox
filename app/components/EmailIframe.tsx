@@ -4,15 +4,21 @@
 
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import DOMPurify from "dompurify";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { isHtmlBody, plainTextToHtml } from "~/lib/plainText";
+import { isSimpleHtml, splitQuoted } from "~/lib/quotes";
 
 interface EmailIframeProps {
 	body: string;
 	/** When true, iframe auto-sizes to content height instead of filling parent */
 	autoSize?: boolean;
+	/** Hide the quoted history at the end behind a "•••" button, as Gmail does. */
+	trimQuotes?: boolean;
+	/** Sit directly on the card (conversation view) instead of in a bordered box. */
+	flush?: boolean;
 }
 
 // Every link opens in a new tab; nothing in an email can navigate the app (B6).
@@ -73,25 +79,31 @@ async function sha256Base64(text: string): Promise<string> {
  * - A strict CSP meta tag blocks external resource loads inside the
  *   iframe as a defense-in-depth layer.
  */
-export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
+export default function EmailIframe({ body, autoSize, trimQuotes, flush }: EmailIframeProps) {
 	const iframeRef = useRef<HTMLIFrameElement>(null);
 	const [height, setHeight] = useState(autoSize ? 100 : 0);
 	// Remote images (and CSS url()) are blocked until the user asks; they leak opens and IPs.
 	const [showRemote, setShowRemote] = useState(false);
 	// Text-only messages become paragraphs, breaks and links first.
 	const textOnly = !isHtmlBody(body ?? "");
-	const htmlBody = plainTextToHtml(body);
+	const fullBody = plainTextToHtml(body);
+	const [showQuoted, setShowQuoted] = useState(false);
+	const split = useMemo(() => (trimQuotes ? splitQuoted(fullBody) : { main: fullBody, quoted: null }), [fullBody, trimQuotes]);
+	const htmlBody = showQuoted || !split.quoted ? fullBody : split.main;
 	const hasRemote = REMOTE_CONTENT.test(htmlBody);
 
 	// Plain-text mail has no colours of its own, so follow the app's scheme.
 	// HTML mail keeps whatever it sets, as email clients do.
 	// HTML newsletters often set dark text and assume a white page, so only
 	// text-only mail goes dark.
+	// Typed HTML with no colours of its own (most personal mail) follows it too.
 	const appDark = useDarkScheme();
-	const dark = appDark && textOnly;
+	const dark = appDark && (textOnly || isSimpleHtml(split.main));
+	// Designed HTML in the dark theme gets its own light page with a margin.
+	const lightPage = appDark && !dark;
 	const c = useMemo(() => (dark
 		? {
-				bg: "#1b1c1f",
+				bg: "#131314",
 				fg: "#e4e6e9",
 				muted: "#9aa0a6",
 				link: "#8ab4f8",
@@ -152,7 +164,7 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 			// Converted plain text gets a readable measure; HTML mail keeps its layout.
 			const content = textOnly ? `<div class="plain">${cleanBody}</div>` : cleanBody;
 
-		const padding = autoSize ? "0" : "24px";
+		const padding = autoSize ? (lightPage ? "16px" : "0") : "24px";
 		const imgSrc = showRemote ? "data: cid: https:" : "data: cid:";
 
 		void (async () => {
@@ -242,7 +254,7 @@ th { background: ${c.tableHeader}; text-align: left; }
 		return () => {
 			cancelled = true;
 		};
-	}, [htmlBody, autoSize, showRemote, textOnly, dark, c]);
+	}, [htmlBody, autoSize, showRemote, textOnly, dark, lightPage, c]);
 
 	const hideRemote = hasRemote && !showRemote;
 
@@ -259,9 +271,9 @@ th { background: ${c.tableHeader}; text-align: left; }
 				minHeight: 0,
 				height: autoSize ? "auto" : "100%",
 				borderRadius: "12px",
-				border: 1,
+				border: flush ? 0 : 1,
 				borderColor: "divider",
-				bgcolor: "background.paper",
+				bgcolor: lightPage ? "#ffffff" : "background.paper",
 				overflow: "hidden",
 			}}
 		>
@@ -299,6 +311,33 @@ th { background: ${c.tableHeader}; text-align: left; }
 				sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
 				title="Email content"
 			/>
+			{split.quoted && (
+				<Box sx={{ px: lightPage ? 2 : 0, pb: lightPage ? 1.5 : 0, pt: 0.5, bgcolor: lightPage ? "#ffffff" : undefined }}>
+					<Tooltip title={showQuoted ? "Hide expanded content" : "Show trimmed content"}>
+						<Button
+							size="small"
+							aria-label={showQuoted ? "Hide expanded content" : "Show trimmed content"}
+							aria-expanded={showQuoted}
+							onClick={() => setShowQuoted((v) => !v)}
+							sx={{
+								minWidth: 0,
+								height: 14,
+								px: 0.75,
+								py: 0,
+								lineHeight: 1,
+								fontSize: 14,
+								letterSpacing: 1,
+								borderRadius: 1,
+								color: lightPage ? "#444" : "text.secondary",
+								bgcolor: lightPage ? "#e8eaed" : "action.selected",
+								"&:hover": { bgcolor: lightPage ? "#dadce0" : "action.focus" },
+							}}
+						>
+							•••
+						</Button>
+					</Tooltip>
+				</Box>
+			)}
 		</Box>
 	);
 }
