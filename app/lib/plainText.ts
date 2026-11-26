@@ -18,14 +18,18 @@ const escape = (text: string) =>
 
 const TRAILING_PUNCTUATION = /[.,;:!?)\]]+$/;
 
-/** Linkify text that has already been HTML-escaped. */
+/**
+ * Linkify text that has already been HTML-escaped. URLs and addresses are
+ * matched in one pass, so an address inside a URL (?e=bob@example.com) stays
+ * part of that URL instead of getting a link nested in the href.
+ */
 export function linkify(text: string): string {
-	const withUrls = text.replace(/https?:\/\/[^\s<>"]+/gi, (raw) => {
+	return text.replace(/(https?:\/\/[^\s<>"]+)|(\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b)/gi, (raw, url: string | undefined) => {
+		if (!url) return `<a href="mailto:${raw}">${raw}</a>`;
 		const trailing = raw.match(TRAILING_PUNCTUATION)?.[0] ?? "";
-		const url = trailing ? raw.slice(0, -trailing.length) : raw;
-		return `<a href="${url}">${url}</a>${trailing}`;
+		const href = trailing ? raw.slice(0, -trailing.length) : raw;
+		return `<a href="${href}">${href}</a>${trailing}`;
 	});
-	return withUrls.replace(/\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b/g, (address) => `<a href="mailto:${address}">${address}</a>`);
 }
 
 export function isHtmlBody(body: string): boolean {

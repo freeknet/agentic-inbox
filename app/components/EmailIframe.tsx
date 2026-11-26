@@ -85,7 +85,10 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 
 	// Plain-text mail has no colours of its own, so follow the app's scheme.
 	// HTML mail keeps whatever it sets, as email clients do.
-	const dark = useDarkScheme();
+	// HTML newsletters often set dark text and assume a white page, so only
+	// text-only mail goes dark.
+	const appDark = useDarkScheme();
+	const dark = appDark && textOnly;
 	const c = useMemo(() => (dark
 		? {
 				bg: "#1b1c1f",
