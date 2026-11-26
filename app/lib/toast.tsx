@@ -38,14 +38,22 @@ function snapshot() {
 	return toasts;
 }
 
+const timers = new Map<string, ReturnType<typeof setTimeout>>();
+
 export function addToast(input: ToastInput): string {
 	const id = `toast-${++seq}`;
 	toasts = [...toasts, { ...input, id }];
 	emit();
+	// Toasts close themselves; ones with an action (Undo) get a little longer.
+	const ms = input.timeout ?? (input.actions?.length ? 8000 : 6000);
+	timers.set(id, setTimeout(() => closeToast(id), ms));
 	return id;
 }
 
 export function closeToast(id: string) {
+	const timer = timers.get(id);
+	if (timer) clearTimeout(timer);
+	timers.delete(id);
 	toasts = toasts.filter((t) => t.id !== id);
 	emit();
 }
