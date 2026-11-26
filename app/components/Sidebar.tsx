@@ -4,42 +4,40 @@
 
 import AddIcon from "@mui/icons-material/Add";
 import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import DraftsOutlinedIcon from "@mui/icons-material/DraftsOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined";
-import InboxIcon from "@mui/icons-material/Inbox";
+import InboxOutlinedIcon from "@mui/icons-material/InboxOutlined";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import Chip from "@mui/material/Chip";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import IconButton from "@mui/material/IconButton";
+import Link from "@mui/material/Link";
 import List from "@mui/material/List";
-import ListItemButton from "@mui/material/ListItemButton";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
 import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { type FormEvent, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router";
+import { Link as RouterLink, useLocation, useNavigate, useParams } from "react-router";
 import { Folders, SYSTEM_FOLDER_IDS } from "shared/folders";
 import { useCreateFolder, useFolders } from "~/queries/folders";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
 import { useToast } from "~/lib/toast";
+import { SidebarFooter, SidebarFrame, SidebarItem, SidebarPrimaryButton, SidebarSection } from "~/shell/Sidebar";
 
 const FOLDER_ICONS: Record<string, React.ReactNode> = {
-	[Folders.INBOX]: <InboxIcon fontSize="small" />,
-	[Folders.SENT]: <SendOutlinedIcon fontSize="small" />,
-	[Folders.DRAFT]: <DraftsOutlinedIcon fontSize="small" />,
-	[Folders.ARCHIVE]: <ArchiveOutlinedIcon fontSize="small" />,
-	[Folders.TRASH]: <DeleteOutlinedIcon fontSize="small" />,
+	[Folders.INBOX]: <InboxOutlinedIcon />,
+	[Folders.SENT]: <SendOutlinedIcon />,
+	[Folders.DRAFT]: <DraftsOutlinedIcon />,
+	[Folders.ARCHIVE]: <ArchiveOutlinedIcon />,
+	[Folders.TRASH]: <DeleteOutlinedIcon />,
 };
 
 const SYSTEM_FOLDER_LINKS = [
@@ -56,7 +54,7 @@ export default function Sidebar() {
 	const { pathname } = useLocation();
 	const { data: folders = [] } = useFolders(mailboxId);
 	const createFolderMutation = useCreateFolder();
-	const { startCompose, closeSidebar } = useUIStore();
+	const { startCompose, closeSidebar, isSidebarOpen } = useUIStore();
 	const { data: currentMailbox } = useMailbox(mailboxId);
 	const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
 	const [newFolderName, setNewFolderName] = useState("");
@@ -108,101 +106,53 @@ export default function Sidebar() {
 		pathname === `/mailbox/${mailboxId}/emails/${folderId}`;
 
 	const folderRow = (folderId: string, label: string, icon: React.ReactNode, unread?: number) => (
-		<ListItemButton
-			key={folderId}
-			selected={isActive(folderId)}
-			onClick={() => go(folderId)}
-			sx={{ borderRadius: 999, py: 0.75, gap: 1 }}
-		>
-			<ListItemIcon sx={{ minWidth: 0, color: "inherit" }}>{icon}</ListItemIcon>
-			<ListItemText
-				primary={label}
-				slotProps={{ primary: { sx: { fontSize: 14, fontWeight: isActive(folderId) ? 600 : 400 }, noWrap: true } }}
-			/>
-			{unread != null && unread > 0 && (
-				<Chip size="small" label={unread} sx={{ height: 20, fontSize: 11 }} />
-			)}
-		</ListItemButton>
+		<SidebarItem key={folderId} icon={icon} label={label} selected={isActive(folderId)} onClick={() => go(folderId)} count={unread} />
 	);
 
 	return (
-		<Box
-			component="aside"
-			sx={{
-				height: "100%",
-				width: 256,
-				bgcolor: "background.default",
-				display: "flex",
-				flexDirection: "column",
-				flexShrink: 0,
-				borderRight: 1,
-				borderColor: "divider",
-			}}
-		>
-			{/* Back + identity */}
-			<Box sx={{ px: 2, pt: 2, pb: 0.5 }}>
-				<Button
-					size="small"
-					startIcon={<ArrowBackIcon sx={{ fontSize: 14 }} />}
-					onClick={() => {
-						navigate("/");
-						closeSidebar();
-					}}
-					sx={{ color: "text.secondary", px: 0.5, mb: 1 }}
-				>
-					Mailboxes
-				</Button>
-				<Box sx={{ px: 0.5 }}>
-					<Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>
-						{displayName}
-					</Typography>
-					<Typography variant="body2" color="text.secondary" noWrap sx={{ mt: 0.25 }}>
-						{currentMailbox?.email || mailboxId}
-					</Typography>
-				</Box>
-			</Box>
+		<SidebarFrame open={isSidebarOpen} onClose={closeSidebar}>
+			<SidebarPrimaryButton
+				icon={<EditOutlinedIcon />}
+				label="Compose"
+				onClick={() => {
+					startCompose();
+					closeSidebar();
+				}}
+			/>
 
-			{/* Compose */}
-			<Box sx={{ px: 1.5, py: 1.5 }}>
-				<Button
-					variant="contained"
-					fullWidth
-					startIcon={<EditOutlinedIcon />}
-					onClick={() => startCompose()}
-				>
-					Compose
-				</Button>
-			</Box>
-
-			{/* Navigation */}
-			<Box component="nav" sx={{ flex: 1, overflowY: "auto", px: 1 }}>
-				<List dense disablePadding>
+			<Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+				<List aria-label="Mail folders" disablePadding>
 					{SYSTEM_FOLDER_LINKS.map((folder) =>
 						folderRow(folder.id, folder.label, FOLDER_ICONS[folder.id], getUnreadCount(folder.id)),
 					)}
 				</List>
-
-				<Box sx={{ pt: 2.5 }}>
-					<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 1.5, mb: 0.5 }}>
-						<Typography
-							variant="caption"
-							sx={{ textTransform: "uppercase", letterSpacing: 0.8, fontWeight: 600, color: "text.secondary" }}
-						>
-							Folders
-						</Typography>
+				<SidebarSection
+					title="Folders"
+					action={
 						<Tooltip title="New folder">
 							<IconButton size="small" onClick={() => setIsCreateFolderOpen(true)} aria-label="Create new folder">
 								<AddIcon fontSize="small" />
 							</IconButton>
 						</Tooltip>
-					</Box>
-					<List dense disablePadding>
-						{customFolders.map((folder) =>
-							folderRow(folder.id, folder.name, <FolderOutlinedIcon fontSize="small" />, folder.unreadCount),
-						)}
-					</List>
-				</Box>
+					}
+				/>
+				<List aria-label="Your folders" disablePadding>
+					{customFolders.map((folder) => folderRow(folder.id, folder.name, <FolderOutlinedIcon />, folder.unreadCount))}
+				</List>
 			</Box>
+
+			{/* Which mailbox this is, where Drive shows its storage meter. */}
+			<SidebarFooter>
+				<Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
+					{displayName}
+				</Typography>
+				<Typography variant="caption" sx={{ color: "text.secondary", display: "block" }} noWrap>
+					{currentMailbox?.email || mailboxId}
+				</Typography>
+				<Link component={RouterLink} to="/" underline="hover" variant="caption" onClick={closeSidebar} sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, mt: 0.5 }}>
+					<SwapHorizIcon sx={{ fontSize: 14 }} /> Switch mailbox
+				</Link>
+			</SidebarFooter>
 
 			{/* Create folder dialog */}
 			<Dialog open={isCreateFolderOpen} onClose={() => setIsCreateFolderOpen(false)} fullWidth maxWidth="xs">
@@ -228,6 +178,6 @@ export default function Sidebar() {
 					</DialogActions>
 				</form>
 			</Dialog>
-		</Box>
+		</SidebarFrame>
 	);
 }
