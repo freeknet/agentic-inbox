@@ -249,6 +249,10 @@ th { background: ${c.tableHeader}; text-align: left; }
 			sx={{
 				display: "flex",
 				flexDirection: "column",
+				// Grow to the pane: as a flex child it would otherwise shrink to its content.
+				flex: autoSize ? "0 0 auto" : "1 1 auto",
+				width: "100%",
+				minWidth: 0,
 				minHeight: 0,
 				height: autoSize ? "auto" : "100%",
 				borderRadius: "12px",
