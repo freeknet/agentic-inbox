@@ -7,6 +7,7 @@ import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import DOMPurify from "dompurify";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { plainTextToHtml } from "~/lib/plainText";
 
 interface EmailIframeProps {
 	body: string;
@@ -59,7 +60,9 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 	const [height, setHeight] = useState(autoSize ? 100 : 0);
 	// Remote images (and CSS url()) are blocked until the user asks; they leak opens and IPs.
 	const [showRemote, setShowRemote] = useState(false);
-	const hasRemote = REMOTE_CONTENT.test(body || "");
+	// Text-only messages become paragraphs, breaks and links first.
+	const htmlBody = plainTextToHtml(body);
+	const hasRemote = REMOTE_CONTENT.test(htmlBody);
 
 	// Listen for height reports from the sandboxed iframe
 	const handleMessage = useCallback(
@@ -87,13 +90,13 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 
 	useEffect(() => {
 		const iframe = iframeRef.current;
-		if (!iframe || !body) return;
+		if (!iframe || !htmlBody) return;
 		let cancelled = false;
 		installLinkHook();
 
 		// <style> is allowed (B8): newsletters depend on it, and the CSP below
 		// (no remote loads unless opted in, no fonts) stops CSS exfiltration.
-		const cleanBody = DOMPurify.sanitize(body, {
+		const cleanBody = DOMPurify.sanitize(htmlBody, {
 			USE_PROFILES: { html: true },
 			ADD_TAGS: ["style"],
 			ADD_ATTR: ["target"],
@@ -123,40 +126,63 @@ html {
 	color-scheme: light;
 }
 body {
-	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-	font-size: 14px;
-	line-height: 1.6;
-	color: #1a1a1a;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	font-size: 15px;
+	line-height: 1.65;
+	color: #1f2328;
 	background: #ffffff;
 	padding: ${padding};
 	margin: 0;
 	word-wrap: break-word;
 	overflow-wrap: break-word;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 	${autoSize ? "overflow: hidden;" : ""}
+}
+@media (min-width: 900px) {
+	body { padding: ${autoSize ? "0" : "28px 32px"}; }
 }
 [style*="position: fixed"], [style*="position:fixed"], [style*="position: absolute"], [style*="position:absolute"] {
 	position: relative !important;
 }
-a { color: #2563eb; }
-img { max-width: 100%; height: auto; }
-blockquote {
-	border-left: 3px solid #d1d5db;
-	padding-left: 1em;
-	margin-left: 0;
-	color: #6b7280;
+p { margin: 0 0 0.9em; }
+p:last-child { margin-bottom: 0; }
+a {
+	color: #1a5fd6;
+	text-decoration: none;
+	border-bottom: 1px solid rgba(26, 95, 214, 0.3);
 }
+a:hover { border-bottom-color: currentColor; }
+h1, h2, h3, h4 {
+	line-height: 1.3;
+	margin: 1.2em 0 0.5em;
+}
+h1:first-child, h2:first-child, h3:first-child, h4:first-child { margin-top: 0; }
+ul, ol { padding-left: 22px; margin: 0 0 0.9em; }
+li { margin: 0.2em 0; }
+blockquote {
+	border-left: 3px solid #d8dee4;
+	padding: 0 0 0 1em;
+	margin: 0 0 0.9em;
+	color: #59636e;
+}
+blockquote p { margin-bottom: 0.4em; }
 pre {
-	background: #f3f4f6;
-	padding: 12px;
-	border-radius: 6px;
+	background: #f6f8fa;
+	padding: 12px 14px;
+	border-radius: 8px;
 	overflow-x: auto;
 	font-size: 13px;
+	line-height: 1.5;
 }
+code, pre {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+hr { border: 0; border-top: 1px solid #d8dee4; margin: 1.4em 0; }
+img { max-width: 100%; height: auto; }
 table { border-collapse: collapse; max-width: 100%; }
-td, th { padding: 4px 8px; }
-p { margin: 4px 0; }
-h1, h2, h3 { margin: 8px 0 4px; }
-ul, ol { padding-left: 20px; margin: 4px 0; }
+td, th { padding: 6px 10px; border: 1px solid #e5e9ee; }
+th { background: #f6f8fa; text-align: left; }
 </style>
 </head>
 <body>${cleanBody}${heightScript}</body>
@@ -165,7 +191,7 @@ ul, ol { padding-left: 20px; margin: 4px 0; }
 		return () => {
 			cancelled = true;
 		};
-	}, [body, autoSize, showRemote]);
+	}, [htmlBody, autoSize, showRemote]);
 
 	const frame = (
 		<iframe
