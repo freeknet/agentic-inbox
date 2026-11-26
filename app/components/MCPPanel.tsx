@@ -2,15 +2,16 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Button, Tooltip } from "@cloudflare/kumo";
-import {
-	CheckIcon,
-	CopyIcon,
-	PlugsIcon,
-	WrenchIcon,
-} from "@phosphor-icons/react";
+import BuildOutlinedIcon from "@mui/icons-material/BuildOutlined";
+import CheckIcon from "@mui/icons-material/Check";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import ExtensionOutlinedIcon from "@mui/icons-material/ExtensionOutlined";
+import Box from "@mui/material/Box";
+import IconButton from "@mui/material/IconButton";
+import Paper from "@mui/material/Paper";
+import Tooltip from "@mui/material/Tooltip";
+import Typography from "@mui/material/Typography";
 import { useState } from "react";
-import { useParams } from "react-router";
 
 function CopyButton({ text }: { text: string }) {
 	const [copied, setCopied] = useState(false);
@@ -26,20 +27,15 @@ function CopyButton({ text }: { text: string }) {
 	};
 
 	return (
-		<Tooltip content={copied ? "Copied!" : "Copy"} render={<Button
-				variant="ghost"
-				shape="square"
-				size="sm"
-				icon={
-					copied ? (
-						<CheckIcon size={12} weight="bold" className="text-kumo-success" />
-					) : (
-						<CopyIcon size={12} />
-					)
-				}
-				onClick={handleCopy}
-				aria-label="Copy to clipboard"
-			/>} />
+		<Tooltip title={copied ? "Copied!" : "Copy"}>
+			<IconButton size="small" onClick={handleCopy} aria-label="Copy to clipboard">
+				{copied ? (
+					<CheckIcon sx={{ fontSize: 14, color: "success.main" }} />
+				) : (
+					<ContentCopyIcon sx={{ fontSize: 14 }} />
+				)}
+			</IconButton>
+		</Tooltip>
 	);
 }
 
@@ -57,86 +53,102 @@ const TOOLS = [
 ];
 
 export default function MCPPanel() {
-	const { mailboxId } = useParams<{ mailboxId: string }>();
-	const baseUrl =
-		typeof window !== "undefined" ? window.location.origin : "https://your-app.workers.dev";
+	const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://your-app.workers.dev";
 	const mcpUrl = `${baseUrl}/mcp`;
 
 	return (
-		<div className="flex flex-col h-full">
-			{/* Content */}
-			<div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-				{/* Intro */}
-				<div className="space-y-2">
-					<div className="flex items-center gap-2">
-						<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-kumo-brand/10">
-							<PlugsIcon
-								size={20}
-								weight="duotone"
-								className="text-kumo-brand"
-							/>
-						</div>
-						<div>
-							<h3 className="text-sm font-semibold text-kumo-default">
+		<Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+			<Box sx={{ flex: 1, overflowY: "auto", px: 2, py: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+				<Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+					<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+						<Box
+							sx={{
+								display: "flex",
+								height: 40,
+								width: 40,
+								alignItems: "center",
+								justifyContent: "center",
+								borderRadius: 3,
+								bgcolor: "action.selected",
+							}}
+						>
+							<ExtensionOutlinedIcon sx={{ fontSize: 20, color: "primary.main" }} />
+						</Box>
+						<Box>
+							<Typography variant="body2" sx={{ fontWeight: 600 }}>
 								Connect via MCP
-							</h3>
-							<p className="text-xs text-kumo-subtle">
+							</Typography>
+							<Typography variant="caption" color="text.secondary">
 								Model Context Protocol
-							</p>
-						</div>
-					</div>
-					<p className="text-xs text-kumo-subtle leading-relaxed">
-						This email agent exposes an MCP server so AI coding
-						assistants can manage your inbox directly — read emails,
-						search, draft replies, and send messages using natural
-						language.
-					</p>
-				</div>
+							</Typography>
+						</Box>
+					</Box>
+					<Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.6 }}>
+						This email agent exposes an MCP server so AI coding assistants can manage your inbox
+						directly — read emails, search, draft replies, and send messages using natural language.
+					</Typography>
+				</Box>
 
-				{/* MCP URL */}
-				<div className="space-y-1.5">
-					<label className="text-xs font-medium text-kumo-strong block">
+				<Box>
+					<Typography variant="caption" sx={{ fontWeight: 500, color: "text.primary", display: "block", mb: 0.5 }}>
 						Server URL
-					</label>
-					<div className="relative group">
-						<div className="absolute right-1.5 top-1/2 -translate-y-1/2">
+					</Typography>
+					<Box sx={{ position: "relative" }}>
+						<Box sx={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}>
 							<CopyButton text={mcpUrl} />
-						</div>
-						<div className="bg-kumo-recessed text-kumo-default font-mono text-[11px] px-3 py-2.5 pr-10 rounded-lg border border-kumo-line break-all leading-relaxed">
+						</Box>
+						<Paper
+							variant="outlined"
+							sx={{
+								bgcolor: "action.hover",
+								fontFamily: "monospace",
+								fontSize: 11,
+								px: 1.5,
+								py: 1.25,
+								pr: 5,
+								borderRadius: 2,
+								wordBreak: "break-all",
+								lineHeight: 1.6,
+							}}
+						>
 							{mcpUrl}
-						</div>
-					</div>
-				</div>
+						</Paper>
+					</Box>
+				</Box>
 
-				{/* Available tools */}
-				<div className="space-y-2">
-					<h4 className="text-xs uppercase tracking-wider font-semibold text-kumo-subtle px-0.5">
+				<Box>
+					<Typography
+						variant="caption"
+						sx={{ textTransform: "uppercase", letterSpacing: 0.8, fontWeight: 600, color: "text.secondary", display: "block", mb: 0.75 }}
+					>
 						Available Tools
-					</h4>
-					<div className="border border-kumo-line rounded-lg divide-y divide-kumo-line">
-						{TOOLS.map((tool) => (
-							<div
+					</Typography>
+					<Paper variant="outlined" sx={{ borderRadius: 2 }}>
+						{TOOLS.map((tool, idx) => (
+							<Box
 								key={tool.name}
-								className="flex items-center gap-2.5 px-3 py-2"
+								sx={{
+									display: "flex",
+									alignItems: "center",
+									gap: 1,
+									px: 1.5,
+									py: 1,
+									borderTop: idx === 0 ? 0 : 1,
+									borderColor: "divider",
+								}}
 							>
-								<WrenchIcon
-									size={12}
-									weight="bold"
-									className="text-kumo-brand shrink-0"
-								/>
-								<div className="min-w-0 flex-1">
-									<span className="text-xs font-mono font-medium text-kumo-default">
-										{tool.name}
-									</span>
-								</div>
-								<span className="text-[11px] text-kumo-subtle shrink-0">
+								<BuildOutlinedIcon sx={{ fontSize: 14, color: "primary.main", flexShrink: 0 }} />
+								<Typography variant="caption" sx={{ fontFamily: "monospace", fontWeight: 500, flex: 1, minWidth: 0 }} noWrap>
+									{tool.name}
+								</Typography>
+								<Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, fontSize: 10 }}>
 									{tool.desc}
-								</span>
-							</div>
+								</Typography>
+							</Box>
 						))}
-					</div>
-				</div>
-			</div>
-		</div>
+					</Paper>
+				</Box>
+			</Box>
+		</Box>
 	);
 }

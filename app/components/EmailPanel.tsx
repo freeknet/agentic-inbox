@@ -2,7 +2,9 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { useKumoToastManager } from "@cloudflare/kumo";
+import Avatar from "@mui/material/Avatar";
+import Box from "@mui/material/Box";
+import Skeleton from "@mui/material/Skeleton";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
 import { Folders } from "shared/folders";
@@ -19,15 +21,27 @@ import { useFolders } from "~/queries/folders";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
 import { useSendFeedback } from "~/hooks/useSendFeedback";
+import { useToast } from "~/lib/toast";
 import type { Email, Folder, Mailbox } from "~/types";
 
 function EmailPanelSkeleton() {
 	return (
-		<div className="animate-pulse p-5 space-y-4">
-			<div className="h-5 w-2/3 rounded bg-kumo-fill" />
-			<div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-kumo-fill" /><div className="space-y-2 flex-1"><div className="h-3 w-40 rounded bg-kumo-fill" /><div className="h-2.5 w-24 rounded bg-kumo-fill" /></div></div>
-			<div className="space-y-2 pt-4"><div className="h-2.5 w-full rounded bg-kumo-fill" /><div className="h-2.5 w-5/6 rounded bg-kumo-fill" /><div className="h-2.5 w-4/6 rounded bg-kumo-fill" /><div className="h-2.5 w-3/4 rounded bg-kumo-fill" /></div>
-		</div>
+		<Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 2 }}>
+			<Skeleton variant="text" width="66%" height={24} />
+			<Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+				<Skeleton variant="circular" width={40} height={40} />
+				<Box sx={{ flex: 1 }}>
+					<Skeleton variant="text" width={160} />
+					<Skeleton variant="text" width={96} />
+				</Box>
+			</Box>
+			<Box sx={{ pt: 2 }}>
+				<Skeleton variant="text" width="100%" />
+				<Skeleton variant="text" width="83%" />
+				<Skeleton variant="text" width="66%" />
+				<Skeleton variant="text" width="75%" />
+			</Box>
+		</Box>
 	);
 }
 
@@ -47,7 +61,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		data?: Mailbox;
 	};
 	const { closePanel, startCompose } = useUIStore();
-	const toastManager = useKumoToastManager();
+	const toast = useToast();
 	const { confirmSuppressed, notifyQueued } = useSendFeedback();
 	const [isSending, setIsSending] = useState(false);
 	const [sourceViewEmail, setSourceViewEmail] = useState<Email | null>(null);
@@ -105,7 +119,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		if (!mailboxId) return;
 		if (!window.confirm("Discard this draft?")) return;
 		deleteEmailMut.mutate({ mailboxId, id: target.id });
-		toastManager.add({ title: "Draft discarded" });
+		toast.add({ title: "Draft discarded" });
 		if (target.id === emailId) closePanel();
 	};
 
@@ -115,9 +129,9 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		setIsSending(true);
 		try {
 			if (!target.recipient || !target.subject) { try { const fresh = await api.getEmail(mailboxId, target.id) as Email; if (fresh) target = fresh; } catch {} }
-			if (!target.recipient) { toastManager.add({ title: "Cannot send: no recipient set on this draft.", variant: "error" }); return; }
+			if (!target.recipient) { toast.add({ title: "Cannot send: no recipient set on this draft.", variant: "error" }); return; }
 			const toRecipients = splitEmailList(target.recipient);
-			if (toRecipients.length === 0) { toastManager.add({ title: "Cannot send: no valid recipient set on this draft.", variant: "error" }); return; }
+			if (toRecipients.length === 0) { toast.add({ title: "Cannot send: no valid recipient set on this draft.", variant: "error" }); return; }
 			const fromName = currentMailbox.settings?.fromName || currentMailbox.name;
 			const from = fromName && fromName !== currentMailbox.email ? { email: currentMailbox.email, name: fromName } : currentMailbox.email;
 			const originalEmail = target.in_reply_to ? allMessages.find((msg) => msg.id === target.in_reply_to) : undefined;
@@ -140,14 +154,14 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 			if (isDraftFolder) closePanel();
 		} catch (err) {
 			const message = (err instanceof Error ? err.message : null) || "Failed to send email.";
-			toastManager.add({ title: message, variant: "error" });
+			toast.add({ title: message, variant: "error" });
 		} finally { setIsSending(false); }
 	};
 
 	const hasThread = allMessages.length > 1;
 
 	return (
-		<div className="flex flex-col h-full">
+		<Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
 			<EmailPanelToolbar
 				email={email}
 				mailboxId={mailboxId}
@@ -192,7 +206,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 				<ScheduledBanner key={m.id} mailboxId={mailboxId} emailId={m.id} />
 			))}
 
-			<div className="flex-1 overflow-y-auto">
+			<Box sx={{ flex: 1, overflowY: "auto" }}>
 				{hasThread ? (
 					allMessages.map((msg, idx) => {
 						const isDraft = draftMessageIds.has(msg.id);
@@ -211,9 +225,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 								onEditDraft={isDraft ? () => handleEditDraft(msg) : undefined}
 								onDeleteDraft={isDraft ? () => handleDeleteDraft(msg) : undefined}
 								onViewSource={() => setSourceViewEmail(msg)}
-								onPreviewImage={(url, filename) =>
-									setPreviewImage({ url, filename })
-								}
+								onPreviewImage={(url, filename) => setPreviewImage({ url, filename })}
 							/>
 						);
 					})
@@ -221,12 +233,10 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 					<SingleMessageView
 						email={email}
 						mailboxId={mailboxId}
-						onPreviewImage={(url, filename) =>
-							setPreviewImage({ url, filename })
-						}
+						onPreviewImage={(url, filename) => setPreviewImage({ url, filename })}
 					/>
 				)}
-			</div>
+			</Box>
 
 			<EmailPanelDialogs
 				sourceViewEmail={sourceViewEmail}
@@ -234,6 +244,6 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 				onCloseSource={() => setSourceViewEmail(null)}
 				onClosePreview={() => setPreviewImage(null)}
 			/>
-		</div>
+		</Box>
 	);
 }

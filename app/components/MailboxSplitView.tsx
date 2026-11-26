@@ -2,6 +2,8 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
+import Box from "@mui/material/Box";
+import Divider from "@mui/material/Divider";
 import type { ReactNode } from "react";
 import ComposePanel from "~/components/ComposePanel";
 import EmailPanel from "~/components/EmailPanel";
@@ -20,32 +22,35 @@ export default function MailboxSplitView({
 	const isPanelOpen = selectedEmailId !== null || isComposing;
 
 	return (
-		<div className="flex h-full">
-			<div
-				className={`flex flex-col min-w-0 shrink-0 ${
-					isPanelOpen
-						? "hidden md:flex md:w-[380px] md:border-r md:border-kumo-line"
-						: "w-full"
-				}`}
+		<Box sx={{ display: "flex", height: "100%" }}>
+			<Box
+				sx={{
+					display: isPanelOpen ? { xs: "none", md: "flex" } : "flex",
+					flexDirection: "column",
+					minWidth: 0,
+					flexShrink: 0,
+					width: isPanelOpen ? { md: 380 } : "100%",
+					borderRight: isPanelOpen ? { md: 1 } : 0,
+					borderColor: "divider",
+				}}
 			>
 				{children}
-			</div>
+			</Box>
 			{isPanelOpen && (
-				<div className="flex-1 flex flex-col min-w-0 overflow-hidden w-full md:w-auto">
+				<Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
 					{isComposing && !selectedEmailId ? (
 						<ComposePanel />
 					) : isComposing && selectedEmailId ? (
-						<div className="flex flex-col h-full overflow-y-auto">
+						<Box sx={{ display: "flex", flexDirection: "column", height: "100%", overflowY: "auto" }}>
 							<ComposePanel />
-							<div className="border-t border-kumo-line">
-								<EmailPanel emailId={selectedEmailId} />
-							</div>
-						</div>
+							<Divider />
+							<EmailPanel emailId={selectedEmailId} />
+						</Box>
 					) : selectedEmailId ? (
 						<EmailPanel emailId={selectedEmailId} />
 					) : null}
-				</div>
+				</Box>
 			)}
-		</div>
+		</Box>
 	);
 }

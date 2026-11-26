@@ -1,5 +1,7 @@
-import { Button } from "@cloudflare/kumo";
-import { ClockIcon } from "@phosphor-icons/react";
+import Alert from "@mui/material/Alert";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import CircularProgress from "@mui/material/CircularProgress";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import api from "~/services/api";
@@ -16,7 +18,13 @@ export default function ScheduledBanner({ mailboxId, emailId }: { mailboxId: str
 	});
 	if (!data || data.status !== "queued" || data.send_at - Date.now() < 15_000) return null;
 
-	const when = new Date(data.send_at).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+	const when = new Date(data.send_at).toLocaleString(undefined, {
+		weekday: "short",
+		month: "short",
+		day: "numeric",
+		hour: "numeric",
+		minute: "2-digit",
+	});
 	const cancel = async () => {
 		setBusy(true);
 		setError(null);
@@ -35,15 +43,22 @@ export default function ScheduledBanner({ mailboxId, emailId }: { mailboxId: str
 	};
 
 	return (
-		<div className="mx-4 mt-3 flex items-center gap-3 rounded-md border border-kumo-line bg-kumo-elevated px-3 py-2 text-sm md:mx-6">
-			<ClockIcon size={16} className="shrink-0 text-kumo-subtle" />
-			<span className="flex-1 text-kumo-default">
-				Scheduled to send {when}
-				{error && <span className="ml-2 text-kumo-danger">{error}</span>}
-			</span>
-			<Button size="xs" variant="secondary" loading={busy} onClick={cancel}>
-				Cancel send
-			</Button>
-		</div>
+		<Alert
+			severity="info"
+			icon={false}
+			sx={{ mx: { xs: 2, md: 3 }, mt: 1.5 }}
+			action={
+				<Button color="inherit" size="small" disabled={busy} onClick={cancel}>
+					{busy ? <CircularProgress size={14} color="inherit" /> : "Cancel send"}
+				</Button>
+			}
+		>
+			Scheduled to send {when}
+			{error && (
+				<Box component="span" sx={{ ml: 1, color: "error.main" }}>
+					{error}
+				</Box>
+			)}
+		</Alert>
 	);
 }

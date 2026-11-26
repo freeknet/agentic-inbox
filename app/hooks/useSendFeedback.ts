@@ -1,5 +1,5 @@
-import { useKumoToastManager } from "@cloudflare/kumo";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "~/lib/toast";
 import api from "~/services/api";
 import type { QueuedSend } from "~/types";
 
@@ -8,7 +8,7 @@ import type { QueuedSend } from "~/types";
  * "Sending… Undo" toast that cancels a queued message within its window.
  */
 export function useSendFeedback() {
-	const toastManager = useKumoToastManager();
+	const toast = useToast();
 	const qc = useQueryClient();
 
 	const refresh = (mailboxId: string) => {
@@ -35,25 +35,24 @@ export function useSendFeedback() {
 	function notifyQueued(mailboxId: string, result: QueuedSend | undefined) {
 		refresh(mailboxId);
 		if (!result?.id || !result.send_at) {
-			toastManager.add({ title: "Email queued" });
+			toast.add({ title: "Email queued" });
 			return;
 		}
 		const windowMs = Math.max(result.send_at - Date.now(), 0);
 		if (windowMs > 60_000) {
 			// Scheduled: it waits in the outbox and can be cancelled from here until it goes out.
 			const when = new Date(result.send_at).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-			const toastId = toastManager.add({
+			toast.add({
 				title: `Scheduled for ${when}`,
 				actions: [
 					{
 						children: "Cancel",
 						onClick: async () => {
-							toastManager.close(toastId);
 							try {
 								await api.cancelSend(mailboxId, result.id);
-								toastManager.add({ title: "Schedule cancelled. Message moved to Drafts." });
+								toast.add({ title: "Schedule cancelled. Message moved to Drafts." });
 							} catch (err) {
-								toastManager.add({ title: err instanceof Error ? err.message : "Could not cancel", variant: "error" });
+								toast.add({ title: err instanceof Error ? err.message : "Could not cancel", variant: "error" });
 							} finally {
 								refresh(mailboxId);
 							}
@@ -64,23 +63,22 @@ export function useSendFeedback() {
 			return;
 		}
 		if (windowMs < 1000) {
-			toastManager.add({ title: "Sending…" });
+			toast.add({ title: "Sending…" });
 			return;
 		}
-		const toastId = toastManager.add({
+		toast.add({
 			title: "Sending…",
 			timeout: windowMs,
 			actions: [
 				{
 					children: "Undo",
 					onClick: async () => {
-						toastManager.close(toastId);
 						try {
 							await api.cancelSend(mailboxId, result.id);
-							toastManager.add({ title: "Send cancelled. Message moved to Drafts." });
+							toast.add({ title: "Send cancelled. Message moved to Drafts." });
 						} catch (err) {
 							const msg = err instanceof Error ? err.message : "";
-							toastManager.add({ title: msg ? `Too late to undo: ${msg}` : "Too late to undo", variant: "error" });
+							toast.add({ title: msg ? `Too late to undo: ${msg}` : "Too late to undo", variant: "error" });
 						} finally {
 							refresh(mailboxId);
 						}

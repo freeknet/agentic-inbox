@@ -2,7 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { useKumoToastManager } from "@cloudflare/kumo";
+import { useToast } from "~/lib/toast";
 import { type SubmitEvent, useEffect, useMemo, useRef, useState } from "react";
 import { formatQuotedDate } from "shared/dates";
 import {
@@ -168,7 +168,7 @@ function buildInitialComposeFields(
 }
 
 export function useComposeForm(mailboxId?: string, _folder?: string) {
-	const toastManager = useKumoToastManager();
+	const toastManager = useToast();
 	const { composeOptions, closePanel, closeCompose } = useUIStore();
 	const { data: currentMailbox } = useMailbox(mailboxId);
 	const sendEmailMutation = useSendEmail();

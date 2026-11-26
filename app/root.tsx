@@ -2,29 +2,29 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import {
-	Button,
-	Empty,
-	LinkProvider,
-	Loader,
-	Toasty,
-	TooltipProvider,
-} from "@cloudflare/kumo";
-import { WarningIcon } from "@phosphor-icons/react";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import CircularProgress from "@mui/material/CircularProgress";
+import CssBaseline from "@mui/material/CssBaseline";
+import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
+import Stack from "@mui/material/Stack";
+import { ThemeProvider } from "@mui/material/styles";
+import Typography from "@mui/material/Typography";
+import CloudOffIcon from "@mui/icons-material/CloudOffOutlined";
 import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { forwardRef, useState } from "react";
+import { useState } from "react";
 import {
 	isRouteErrorResponse,
 	Links,
 	Meta,
 	Outlet,
-	Link as RouterLink,
 	Scripts,
 	ScrollRestoration,
 } from "react-router";
 import { ApiError } from "~/services/api";
+import { Toaster } from "~/lib/toast";
+import { theme } from "~/theme";
 import "./index.css";
-import { THEME_BOOTSTRAP } from "~/hooks/useTheme";
 
 function makeQueryClient() {
 	return new QueryClient({
@@ -44,7 +44,6 @@ function makeQueryClient() {
 		mutationCache: new MutationCache({
 			onError: (error) => {
 				// Global fallback for mutations that don't handle errors themselves.
-				// Consumers using mutateAsync + try/catch handle their own errors.
 				console.error("Mutation failed:", error);
 			},
 		}),
@@ -64,21 +63,9 @@ function getQueryClient() {
 	return browserQueryClient;
 }
 
-const KumoLink = forwardRef<
-	HTMLAnchorElement,
-	React.AnchorHTMLAttributes<HTMLAnchorElement> & { href?: string }
->(function KumoLink({ href, ...props }, ref) {
-	if (href && !href.startsWith("http")) {
-		return (
-			<RouterLink to={href} ref={ref} {...(props as Record<string, unknown>)} />
-		);
-	}
-	return <a href={href} ref={ref} {...props} />;
-});
-
 export function Layout({ children }: { children: React.ReactNode }) {
 	return (
-		<html lang="en" data-theme="kumo" data-mode="light" suppressHydrationWarning>
+		<html lang="en" suppressHydrationWarning>
 			<head>
 				<meta charSet="UTF-8" />
 				<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -90,14 +77,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
 				/>
 				<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 				<meta name="color-scheme" content="light dark" />
-				{/* biome-ignore lint/security/noDangerouslySetInnerHtml: static theme bootstrap, no user input */}
-				<script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
 				<title>Agentic Inbox</title>
 				<Meta />
 				<Links />
 			</head>
-			<body className="bg-kumo-recessed text-kumo-default antialiased">
-				{children}
+			<body>
+				<InitColorSchemeScript attribute="class" defaultMode="system" />
+				<ThemeProvider theme={theme} defaultMode="system">
+					<CssBaseline enableColorScheme />
+					{children}
+					<Toaster />
+				</ThemeProvider>
 				<ScrollRestoration />
 				<Scripts />
 			</body>
@@ -107,9 +97,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export function HydrateFallback() {
 	return (
-		<div className="flex items-center justify-center h-screen">
-			<Loader size="lg" />
-		</div>
+		<Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh" }}>
+			<CircularProgress />
+		</Box>
 	);
 }
 
@@ -119,13 +109,7 @@ export default function App() {
 	const [queryClient] = useState(getQueryClient);
 	return (
 		<QueryClientProvider client={queryClient}>
-			<LinkProvider component={KumoLink}>
-				<TooltipProvider>
-					<Toasty>
-						<Outlet />
-					</Toasty>
-				</TooltipProvider>
-			</LinkProvider>
+			<Outlet />
 		</QueryClientProvider>
 	);
 }
@@ -139,8 +123,7 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 		status = error.status;
 		if (error.status === 404) {
 			title = "Page not found";
-			description =
-				"The page you're looking for doesn't exist or has been moved.";
+			description = "The page you're looking for doesn't exist or has been moved.";
 		} else {
 			title = `Error ${error.status}`;
 			description = error.statusText || description;
@@ -150,22 +133,27 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 	}
 
 	return (
-		<div className="flex items-center justify-center min-h-screen p-8">
-			<Empty
-				icon={<WarningIcon size={48} className="text-kumo-inactive" />}
-				title={status === 404 ? "404 — Page not found" : title}
-				description={description}
-				contents={
-					<Button
-						variant="primary"
-						onClick={() => {
-							window.location.href = "/";
-						}}
-					>
-						Go Home
-					</Button>
-				}
-			/>
-		</div>
+		<Stack
+			spacing={2}
+			sx={{
+				minHeight: "100dvh",
+				alignItems: "center",
+				justifyContent: "center",
+				p: 4,
+				textAlign: "center",
+			}}
+		>
+			<CloudOffIcon sx={{ fontSize: 64, color: "text.secondary" }} />
+			<Typography variant="h6">{status === 404 ? "404 — Page not found" : title}</Typography>
+			<Typography color="text.secondary">{description}</Typography>
+			<Button
+				variant="contained"
+				onClick={() => {
+					window.location.href = "/";
+				}}
+			>
+				Go Home
+			</Button>
+		</Stack>
 	);
 }

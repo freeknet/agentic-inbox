@@ -2,21 +2,30 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Banner, Button, Dialog, Input, Text } from "@cloudflare/kumo";
-import { FloppyDiskIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react";
+import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
+import SendIcon from "@mui/icons-material/Send";
+import Alert from "@mui/material/Alert";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import CircularProgress from "@mui/material/CircularProgress";
+import Dialog from "@mui/material/Dialog";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
+import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
+import { useUIStore } from "~/hooks/useUIStore";
 import RichTextEditor from "./RichTextEditor";
 import { AttachButton, AttachmentChips, FromDriveButton, useFileDrop } from "./ComposeAttachments";
 import ScheduleSendButton from "./ScheduleSendButton";
-import { useUIStore } from "~/hooks/useUIStore";
 
 export default function ComposeEmail() {
 	const { mailboxId, folder } = useParams<{
 		mailboxId: string;
 		folder: string;
 	}>();
-	
+
 	const { isComposeModalOpen, closeComposeModal } = useUIStore();
 
 	const {
@@ -47,117 +56,115 @@ export default function ComposeEmail() {
 	};
 
 	return (
-		<Dialog.Root
+		<Dialog
 			open={isComposeModalOpen}
-			onOpenChange={(open) => !open && !isSending && discard()}
+			onClose={() => !isSending && discard()}
+			fullWidth
+			maxWidth="md"
 		>
-			<Dialog size="lg" className="p-6 max-h-[85vh] overflow-y-auto">
-				<Dialog.Title className="text-lg font-semibold mb-5">
-					{formTitle}
-				</Dialog.Title>
-				<form
+			<DialogTitle sx={{ fontWeight: 600 }}>{formTitle}</DialogTitle>
+			<DialogContent dividers>
+				<Box
+					component="form"
 					onSubmit={(e) => handleSend(e, closeComposeModal)}
-					className={`space-y-4 rounded-md ${dragging ? "outline-2 outline-dashed outline-kumo-brand" : ""}`}
+					sx={{
+						display: "flex",
+						flexDirection: "column",
+						gap: 2,
+						outline: dragging ? "2px dashed" : "none",
+						outlineColor: "primary.main",
+					}}
 					{...dropProps}
 				>
-					{error && <Banner variant="error" description={error} />}
-					<div className="flex items-center gap-2">
-						<div className="flex-1">
-							<Input
+					{error && <Alert severity="error">{error}</Alert>}
+					<Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+						<Box sx={{ flex: 1 }}>
+							<TextField
+								fullWidth
 								label="To"
-								type="text"
+								size="small"
 								placeholder="recipient@example.com, another@example.com"
-								size="sm"
 								value={to}
 								onChange={(e) => setTo(e.target.value)}
 								required
 							/>
-						</div>
+						</Box>
 						{!showCcBcc && (
-							<button
-								type="button"
-								onClick={() => setShowCcBcc(true)}
-								className="shrink-0 text-xs text-kumo-link hover:text-kumo-link-hover font-medium mt-5"
-							>
+							<Button size="small" onClick={() => setShowCcBcc(true)} sx={{ mt: 0.5, fontSize: 12 }}>
 								CC / BCC
-							</button>
+							</Button>
 						)}
-					</div>
+					</Box>
 					{showCcBcc && (
-						<Input
+						<TextField
+							fullWidth
 							label="CC"
-							type="text"
-							size="sm"
+							size="small"
 							value={cc}
 							onChange={(e) => setCc(e.target.value)}
 							placeholder="Separate multiple addresses with commas"
 						/>
 					)}
 					{showCcBcc && (
-						<Input
+						<TextField
+							fullWidth
 							label="BCC"
-							type="text"
-							size="sm"
+							size="small"
 							value={bcc}
 							onChange={(e) => setBcc(e.target.value)}
 							placeholder="Separate multiple addresses with commas"
 						/>
 					)}
-					<Input
+					<TextField
+						fullWidth
 						label="Subject"
-						type="text"
+						size="small"
 						placeholder="Email subject"
-						size="sm"
 						value={subject}
 						onChange={(e) => setSubject(e.target.value)}
 						required
 					/>
-					<div>
-						<Text size="sm" DANGEROUS_className="font-medium mb-1.5 block">
+					<Box>
+						<Typography variant="body2" sx={{ fontWeight: 500, mb: 0.75 }}>
 							Message
-						</Text>
+						</Typography>
 						<RichTextEditor value={body} onChange={setBody} />
-					</div>
+					</Box>
 					<AttachmentChips attachments={attachments} />
-					<div className="flex justify-between items-center pt-2">
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							onClick={discard}
-							disabled={isSending}
-						>
+					<Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1, pt: 1 }}>
+						<Button type="button" size="small" onClick={discard} disabled={isSending}>
 							Discard
 						</Button>
-						<div className="flex flex-wrap items-center justify-end gap-2">
+						<Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end", gap: 1 }}>
 							<AttachButton attachments={attachments} disabled={isSending} />
 							<FromDriveButton attachments={attachments} disabled={isSending} />
 							<Button
 								type="button"
-								variant="secondary"
-								size="sm"
-								loading={isSavingDraft}
-								disabled={isSending}
-								icon={<FloppyDiskIcon size={14} />}
+								variant="outlined"
+								size="small"
+								disabled={isSending || isSavingDraft}
+								startIcon={isSavingDraft ? <CircularProgress size={14} /> : <SaveOutlinedIcon />}
 								onClick={handleSaveDraft}
 							>
 								{isSavingDraft ? "Saving..." : "Save as Draft"}
 							</Button>
-							<ScheduleSendButton disabled={isSavingDraft || isSending} onSchedule={(at) => handleSend(null, closeComposeModal, at)} />
+							<ScheduleSendButton
+								disabled={isSavingDraft || isSending}
+								onSchedule={(at) => handleSend(null, closeComposeModal, at)}
+							/>
 							<Button
 								type="submit"
-								variant="primary"
-								size="sm"
-								loading={isSending}
+								variant="contained"
+								size="small"
 								disabled={isSavingDraft || isSending}
-								icon={<PaperPlaneTiltIcon size={14} />}
+								startIcon={isSending ? <CircularProgress size={14} color="inherit" /> : <SendIcon />}
 							>
 								{isSending ? "Sending..." : "Send"}
 							</Button>
-						</div>
-					</div>
-				</form>
-			</Dialog>
-		</Dialog.Root>
+						</Box>
+					</Box>
+				</Box>
+			</DialogContent>
+		</Dialog>
 	);
 }

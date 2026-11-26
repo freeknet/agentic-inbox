@@ -2,23 +2,32 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Button, Tooltip } from "@cloudflare/kumo";
-import { useEffect, useRef, useState } from "react";
-import {
-	ArrowBendUpLeftIcon,
-	ArrowBendUpRightIcon,
-	ArrowLeftIcon,
-	ChatCircleIcon,
-	CodeIcon,
-	EnvelopeOpenIcon,
-	EnvelopeSimpleIcon,
-	FolderSimpleIcon,
-	PaperPlaneTiltIcon,
-	PencilSimpleIcon,
-	StarIcon,
-	TrashIcon,
-	XIcon,
-} from "@phosphor-icons/react";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ChatBubbleOutlinedIcon from "@mui/icons-material/ChatBubbleOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import CodeIcon from "@mui/icons-material/Code";
+import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import DriveFileMoveOutlinedIcon from "@mui/icons-material/DriveFileMoveOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import MailOutlinedIcon from "@mui/icons-material/MailOutlined";
+import MarkEmailReadOutlinedIcon from "@mui/icons-material/MarkEmailReadOutlined";
+import MarkEmailUnreadOutlinedIcon from "@mui/icons-material/MarkEmailUnreadOutlined";
+import ReplyAllIcon from "@mui/icons-material/ReplyAll";
+import ReplyIcon from "@mui/icons-material/Reply";
+import ForwardIcon from "@mui/icons-material/Forward";
+import SendIcon from "@mui/icons-material/Send";
+import StarIcon from "@mui/icons-material/Star";
+import StarBorderIcon from "@mui/icons-material/StarBorder";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import CircularProgress from "@mui/material/CircularProgress";
+import Divider from "@mui/material/Divider";
+import IconButton from "@mui/material/IconButton";
+import ListItemText from "@mui/material/ListItemText";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import Tooltip from "@mui/material/Tooltip";
+import { useState } from "react";
 import type { Folder, Email } from "~/types";
 
 interface EmailPanelToolbarProps {
@@ -43,7 +52,6 @@ interface EmailPanelToolbarProps {
 
 export default function EmailPanelToolbar({
 	email,
-	mailboxId,
 	isDraftFolder,
 	isSending,
 	moveToFolders,
@@ -59,165 +67,127 @@ export default function EmailPanelToolbar({
 	onViewSource,
 	onDelete,
 }: EmailPanelToolbarProps) {
+	const iconButton = (title: string, icon: React.ReactNode, onClick: () => void) => (
+		<Tooltip title={title}>
+			<IconButton size="small" onClick={onClick} aria-label={title}>
+				{icon}
+			</IconButton>
+		</Tooltip>
+	);
+
 	return (
-		<div className="flex items-center gap-1 px-3 py-2 border-b border-kumo-line shrink-0 md:px-4">
-			<Button
-				variant="ghost"
-				shape="square"
-				size="sm"
-				icon={<ArrowLeftIcon size={18} />}
+		<Box
+			sx={{
+				display: "flex",
+				alignItems: "center",
+				gap: 0.5,
+				px: { xs: 1.5, md: 2 },
+				py: 1,
+				borderBottom: 1,
+				borderColor: "divider",
+				flexShrink: 0,
+			}}
+		>
+			<IconButton
+				size="small"
 				onClick={onBack}
 				aria-label="Back to list"
-				className="md:hidden shrink-0"
-			/>
+				sx={{ display: { xs: "inline-flex", md: "none" }, flexShrink: 0 }}
+			>
+				<ArrowBackIcon />
+			</IconButton>
 
 			{isDraftFolder ? (
 				<>
 					<Button
-						variant="primary"
-						size="sm"
-						icon={<PaperPlaneTiltIcon size={16} />}
+						variant="contained"
+						size="small"
+						startIcon={isSending ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
 						onClick={onSendDraft}
-						loading={isSending}
+						disabled={isSending}
 					>
 						{isSending ? "Sending..." : "Send"}
 					</Button>
-					<Button
-						variant="secondary"
-						size="sm"
-						icon={<PencilSimpleIcon size={16} />}
-						onClick={onEditDraft}
-					>
+					<Button variant="outlined" size="small" startIcon={<EditOutlinedIcon />} onClick={onEditDraft}>
 						Edit
 					</Button>
 				</>
 			) : (
 				<>
-					<Tooltip content="Reply" side="bottom" render={<Button
-							variant="ghost"
-							shape="square"
-							size="sm"
-							icon={<ArrowBendUpLeftIcon size={18} />}
-							onClick={onReply}
-							aria-label="Reply"
-						/>} />
-					<Tooltip content="Reply All" side="bottom" render={<Button
-							variant="ghost"
-							shape="square"
-							size="sm"
-							icon={<ChatCircleIcon size={18} />}
-							onClick={onReplyAll}
-							aria-label="Reply All"
-						/>} />
-					<Tooltip content="Forward" side="bottom" render={<Button
-							variant="ghost"
-							shape="square"
-							size="sm"
-							icon={<ArrowBendUpRightIcon size={18} />}
-							onClick={onForward}
-							aria-label="Forward"
-						/>} />
+					{iconButton("Reply", <ReplyIcon />, onReply)}
+					{iconButton("Reply All", <ReplyAllIcon />, onReplyAll)}
+					{iconButton("Forward", <ForwardIcon />, onForward)}
 				</>
 			)}
 
-			<div className="h-5 w-px bg-kumo-fill mx-0.5" />
+			<Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 1 }} />
 
-			<Tooltip content={email.starred ? "Unstar" : "Star"} side="bottom" render={<Button
-					variant="ghost"
-					shape="square"
-					size="sm"
-					icon={
-						<StarIcon
-							size={18}
-							weight={email.starred ? "fill" : "regular"}
-							className={email.starred ? "text-kumo-warning" : ""}
-						/>
-					}
-					onClick={onToggleStar}
-					aria-label={email.starred ? "Unstar" : "Star"}
-				/>} />
+			{iconButton(
+				email.starred ? "Unstar" : "Star",
+				<Box component="span" sx={{ display: "flex", color: email.starred ? "warning.main" : "inherit" }}>
+					{email.starred ? <StarIcon /> : <StarBorderIcon />}
+				</Box>,
+				onToggleStar,
+			)}
 
-			<Tooltip content={email.read ? "Mark as unread" : "Mark as read"} side="bottom" render={<Button
-					variant="ghost"
-					shape="square"
-					size="sm"
-					icon={email.read ? <EnvelopeSimpleIcon size={18} /> : <EnvelopeOpenIcon size={18} />}
-					onClick={onToggleRead}
-					aria-label={email.read ? "Mark as unread" : "Mark as read"}
-				/>} />
+			{iconButton(
+				email.read ? "Mark as unread" : "Mark as read",
+				email.read ? <MailOutlinedIcon /> : <MarkEmailReadOutlinedIcon />,
+				onToggleRead,
+			)}
 
 			<MoveToFolderMenu folders={moveToFolders} onMove={onMove} />
 
-			<div className="ml-auto flex items-center gap-0.5">
-				<Tooltip content="View source" side="bottom" render={<Button
-						variant="ghost"
-						shape="square"
-						size="sm"
-						icon={<CodeIcon size={18} />}
-						onClick={onViewSource}
-						aria-label="View source"
-					/>} />
-				<Tooltip content="Delete" side="bottom" render={<Button
-						variant="ghost"
-						shape="square"
-						size="sm"
-						icon={<TrashIcon size={18} />}
-						onClick={onDelete}
-						aria-label="Delete"
-					/>} />
-				<Tooltip content="Close" side="bottom" render={<Button
-						variant="ghost"
-						shape="square"
-						size="sm"
-						icon={<XIcon size={18} />}
+			<Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 0.25 }}>
+				{iconButton("View source", <CodeIcon />, onViewSource)}
+				{iconButton("Delete", <DeleteOutlinedIcon />, onDelete)}
+				<Tooltip title="Close">
+					<IconButton
+						size="small"
 						onClick={onBack}
 						aria-label="Close"
-						className="hidden md:inline-flex"
-					/>} />
-			</div>
-		</div>
+						sx={{ display: { xs: "none", md: "inline-flex" } }}
+					>
+						<CloseIcon />
+					</IconButton>
+				</Tooltip>
+			</Box>
+		</Box>
 	);
 }
 
 function MoveToFolderMenu({ folders, onMove }: { folders: Folder[]; onMove: (id: string) => void }) {
-	const [open, setOpen] = useState(false);
-	const ref = useRef<HTMLDivElement>(null);
-
-	useEffect(() => {
-		if (!open) return;
-		const handler = (e: MouseEvent) => {
-			if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-		};
-		document.addEventListener("mousedown", handler);
-		return () => document.removeEventListener("mousedown", handler);
-	}, [open]);
+	const [anchor, setAnchor] = useState<HTMLElement | null>(null);
 
 	return (
-		<div ref={ref} className="relative">
-			<Tooltip content="Move to folder" side="bottom" render={<Button
-					variant="ghost"
-					shape="square"
-					size="sm"
-					icon={<FolderSimpleIcon size={18} />}
-					onClick={() => setOpen((o) => !o)}
+		<>
+			<Tooltip title="Move to folder">
+				<IconButton
+					size="small"
+					onClick={(e) => setAnchor(e.currentTarget)}
 					aria-label="Move to folder"
-				/>} />
-			{open && (
-				<div className="absolute top-full left-0 z-50 mt-1 min-w-[160px] rounded-lg border border-kumo-line bg-kumo-elevated shadow-lg py-1">
-					<div className="px-3 py-1.5 text-xs font-medium text-kumo-subtle">Move to</div>
-					<div className="h-px bg-kumo-line my-1" />
-					{folders.map((f) => (
-						<button
-							key={f.id}
-							type="button"
-							className="w-full text-left px-3 py-1.5 text-sm text-kumo-default hover:bg-kumo-overlay transition-colors"
-							onClick={() => { onMove(f.id); setOpen(false); }}
-						>
-							{f.name}
-						</button>
-					))}
-				</div>
-			)}
-		</div>
+					aria-expanded={!!anchor}
+				>
+					<DriveFileMoveOutlinedIcon />
+				</IconButton>
+			</Tooltip>
+			<Menu anchorEl={anchor} open={!!anchor} onClose={() => setAnchor(null)}>
+				<MenuItem disabled sx={{ minHeight: 32, fontSize: 12 }}>
+					Move to
+				</MenuItem>
+				<Divider />
+				{folders.map((f) => (
+					<MenuItem
+						key={f.id}
+						onClick={() => {
+							onMove(f.id);
+							setAnchor(null);
+						}}
+					>
+						<ListItemText primary={f.name} slotProps={{ primary: { sx: { fontSize: 14 } } }} />
+					</MenuItem>
+				))}
+			</Menu>
+		</>
 	);
 }

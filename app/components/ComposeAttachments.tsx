@@ -1,5 +1,21 @@
-import { Button, Dialog, Input, Loader } from "@cloudflare/kumo";
-import { CaretRightIcon, CloudIcon, FileIcon, FolderSimpleIcon, PaperclipIcon, SpinnerGapIcon, WarningCircleIcon, XIcon } from "@phosphor-icons/react";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined";
+import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined";
+import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Chip from "@mui/material/Chip";
+import CircularProgress from "@mui/material/CircularProgress";
+import Dialog from "@mui/material/Dialog";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
+import List from "@mui/material/List";
+import ListItemButton from "@mui/material/ListItemButton";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
+import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
 import { useQuery } from "@tanstack/react-query";
 import { type DragEvent, type ReactNode, useRef, useState } from "react";
 import type { useComposeAttachments } from "~/hooks/useComposeAttachments";
@@ -25,9 +41,8 @@ export function AttachButton({ attachments, disabled }: { attachments: Attachmen
 			/>
 			<Button
 				type="button"
-				variant="ghost"
-				size="sm"
-				icon={<PaperclipIcon size={14} />}
+				size="small"
+				startIcon={<AttachFileIcon />}
 				disabled={disabled}
 				onClick={() => input.current?.click()}
 			>
@@ -37,28 +52,44 @@ export function AttachButton({ attachments, disabled }: { attachments: Attachmen
 	);
 }
 
-function Chip({
+function AttachmentChip({
 	name,
 	detail,
 	state,
 	icon,
 	onRemove,
-}: { name: string; detail: string; state?: "uploading" | "error"; icon?: ReactNode; onRemove: () => void }) {
+}: {
+	name: string;
+	detail: string;
+	state?: "uploading" | "error";
+	icon?: ReactNode;
+	onRemove: () => void;
+}) {
 	return (
-		<li
-			className={`flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
-				state === "error" ? "border-kumo-danger text-kumo-danger" : "border-kumo-line text-kumo-default"
-			}`}
-		>
-			{state === "uploading" && <SpinnerGapIcon size={12} className="shrink-0 animate-spin" />}
-			{state === "error" && <WarningCircleIcon size={12} className="shrink-0" />}
-			{!state && icon}
-			<span className="min-w-12 truncate" title={name}>{name}</span>
-			<span className="shrink-0 text-kumo-subtle">{detail}</span>
-			<button type="button" onClick={onRemove} aria-label={`Remove ${name}`} className="shrink-0 rounded p-0.5 hover:bg-kumo-fill">
-				<XIcon size={12} />
-			</button>
-		</li>
+		<Chip
+			size="small"
+			onDelete={onRemove}
+			color={state === "error" ? "error" : "default"}
+			variant={state === "error" ? "filled" : "outlined"}
+			icon={
+				state === "uploading" ? (
+					<CircularProgress size={12} sx={{ ml: 1 }} />
+				) : state === "error" ? undefined : (
+					(icon as React.ReactElement)
+				)
+			}
+			label={
+				<Box component="span" sx={{ display: "inline-flex", gap: 0.75, alignItems: "baseline", minWidth: 0 }}>
+					<Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 140 }}>
+						{name}
+					</Box>
+					<Box component="span" sx={{ color: "text.secondary", fontSize: 11 }}>
+						{detail}
+					</Box>
+				</Box>
+			}
+			sx={{ maxWidth: "100%" }}
+		/>
 	);
 }
 
@@ -66,13 +97,22 @@ export function AttachmentChips({ attachments }: { attachments: Attachments }) {
 	const { files, forwarded, driveLinks } = attachments;
 	if (files.length === 0 && forwarded.length === 0 && driveLinks.length === 0) return null;
 	return (
-		<div className="space-y-1">
-			<ul className="flex flex-wrap gap-1.5" aria-label="Attachments">
+		<Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+			<Box
+				component="ul"
+				aria-label="Attachments"
+				sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, listStyle: "none", p: 0, m: 0 }}
+			>
 				{forwarded.map((a) => (
-					<Chip key={a.id} name={a.filename} detail={formatBytes(a.size)} onRemove={() => attachments.removeForwarded(a.id)} />
+					<AttachmentChip
+						key={a.id}
+						name={a.filename}
+						detail={formatBytes(a.size)}
+						onRemove={() => attachments.removeForwarded(a.id)}
+					/>
 				))}
 				{files.map((f) => (
-					<Chip
+					<AttachmentChip
 						key={f.key}
 						name={f.filename}
 						detail={f.status === "error" ? f.error || "Failed" : formatBytes(f.size)}
@@ -81,7 +121,7 @@ export function AttachmentChips({ attachments }: { attachments: Attachments }) {
 					/>
 				))}
 				{driveLinks.map((l) => (
-					<Chip
+					<AttachmentChip
 						key={l.key}
 						name={l.filename}
 						detail={
@@ -92,16 +132,16 @@ export function AttachmentChips({ attachments }: { attachments: Attachments }) {
 									: `Drive · ${formatBytes(l.size)}`
 						}
 						state={l.status === "done" ? undefined : l.status}
-						icon={<CloudIcon size={12} className="shrink-0 text-kumo-brand" />}
+						icon={<CloudOutlinedIcon sx={{ fontSize: 14, color: "primary.main" }} />}
 						onRemove={() => attachments.removeDriveLink(l.key)}
 					/>
 				))}
-			</ul>
-			<p className="text-xs text-kumo-subtle">
+			</Box>
+			<Typography variant="caption" color="text.secondary">
 				{formatBytes(attachments.totalBytes)} of {formatBytes(MAX_MESSAGE_ATTACHMENT_BYTES, 0)} attached
 				{attachments.driveAvailable ? ". Bigger files go out as Drive links." : ""}
-			</p>
-		</div>
+			</Typography>
+		</Box>
 	);
 }
 
@@ -111,7 +151,13 @@ export function FromDriveButton({ attachments, disabled }: { attachments: Attach
 	if (!attachments.driveAvailable) return null;
 	return (
 		<>
-			<Button type="button" variant="ghost" size="sm" icon={<CloudIcon size={14} />} disabled={disabled} onClick={() => setOpen(true)}>
+			<Button
+				type="button"
+				size="small"
+				startIcon={<CloudOutlinedIcon />}
+				disabled={disabled}
+				onClick={() => setOpen(true)}
+			>
 				Drive
 			</Button>
 			{open && (
@@ -131,65 +177,99 @@ function DrivePicker({ onClose, onPick }: { onClose: () => void; onPick: (item: 
 	const [at, setAt] = useState<{ id: string; name: string }[]>([]);
 	const [q, setQ] = useState("");
 	const parent = at.length ? at[at.length - 1].id : null;
-	const listing = useQuery({ queryKey: ["drive-files", parent], queryFn: () => api.listDrive(parent), enabled: !q.trim() });
-	const search = useQuery({ queryKey: ["drive-search", q.trim()], queryFn: () => api.searchDrive(q.trim()), enabled: !!q.trim() });
+	const listing = useQuery({
+		queryKey: ["drive-files", parent],
+		queryFn: () => api.listDrive(parent),
+		enabled: !q.trim(),
+	});
+	const search = useQuery({
+		queryKey: ["drive-search", q.trim()],
+		queryFn: () => api.searchDrive(q.trim()),
+		enabled: !!q.trim(),
+	});
 	const items = (q.trim() ? search.data?.items : listing.data?.items) ?? [];
 	const loading = q.trim() ? search.isLoading : listing.isLoading;
 
 	return (
-		<Dialog.Root open onOpenChange={(o) => !o && onClose()}>
-			<Dialog size="base" className="p-6">
-				<Dialog.Title className="mb-3 text-lg font-semibold">Add from Drive</Dialog.Title>
-				<Input aria-label="Search Drive" placeholder="Search Drive" value={q} onChange={(e) => setQ(e.target.value)} className="mb-2 w-full" />
+		<Dialog open onClose={onClose} fullWidth maxWidth="sm">
+			<DialogTitle>Add from Drive</DialogTitle>
+			<DialogContent>
+				<TextField
+					fullWidth
+					size="small"
+					placeholder="Search Drive"
+					value={q}
+					onChange={(e) => setQ(e.target.value)}
+					slotProps={{ htmlInput: { "aria-label": "Search Drive" } }}
+					sx={{ mb: 1 }}
+				/>
 				{!q.trim() && (
-					<nav className="mb-2 flex flex-wrap items-center gap-1 text-sm text-kumo-subtle" aria-label="Drive folder">
-						<button type="button" className="hover:text-kumo-default" onClick={() => setAt([])}>
+					<Box
+						component="nav"
+						aria-label="Drive folder"
+						sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 0.5, mb: 1 }}
+					>
+						<Button size="small" onClick={() => setAt([])}>
 							My Drive
-						</button>
+						</Button>
 						{at.map((f, i) => (
-							<span key={f.id} className="flex items-center gap-1">
-								<CaretRightIcon size={12} />
-								<button type="button" className="hover:text-kumo-default" onClick={() => setAt(at.slice(0, i + 1))}>
+							<Box key={f.id} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+								<ChevronRightIcon sx={{ fontSize: 14, color: "text.disabled" }} />
+								<Button size="small" onClick={() => setAt(at.slice(0, i + 1))}>
 									{f.name}
-								</button>
-							</span>
+								</Button>
+							</Box>
 						))}
-					</nav>
+					</Box>
 				)}
-				<div className="h-72 overflow-y-auto rounded-lg border border-kumo-line">
+				<Box sx={{ height: 288, overflowY: "auto", border: 1, borderColor: "divider", borderRadius: 2 }}>
 					{loading ? (
-						<div className="flex h-full items-center justify-center">
-							<Loader />
-						</div>
+						<Box sx={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center" }}>
+							<CircularProgress />
+						</Box>
 					) : items.length === 0 ? (
-						<p className="p-4 text-sm text-kumo-subtle">{q.trim() ? "No matches." : "This folder is empty."}</p>
+						<Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+							{q.trim() ? "No matches." : "This folder is empty."}
+						</Typography>
 					) : (
-						items.map((item) => (
-							<button
-								key={item.id}
-								type="button"
-								onClick={() => (item.kind === "folder" ? setAt([...at, { id: item.id, name: item.name }]) : onPick(item))}
-								className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-kumo-tint"
-							>
-								{item.kind === "folder" ? (
-									<FolderSimpleIcon size={18} weight="fill" className="shrink-0 text-kumo-subtle" />
-								) : (
-									<FileIcon size={18} className="shrink-0 text-kumo-subtle" />
-								)}
-								<span className="min-w-0 flex-1 truncate">{item.name}</span>
-								{item.kind === "file" ? <span className="shrink-0 text-xs text-kumo-subtle">{formatBytes(item.size)}</span> : <CaretRightIcon size={14} />}
-							</button>
-						))
+						<List dense disablePadding>
+							{items.map((item) => (
+								<ListItemButton
+									key={item.id}
+									onClick={() =>
+										item.kind === "folder" ? setAt([...at, { id: item.id, name: item.name }]) : onPick(item)
+									}
+								>
+									<ListItemIcon sx={{ minWidth: 36 }}>
+										{item.kind === "folder" ? (
+											<FolderOutlinedIcon fontSize="small" />
+										) : (
+											<InsertDriveFileOutlinedIcon fontSize="small" />
+										)}
+									</ListItemIcon>
+									<ListItemText primary={item.name} slotProps={{ primary: { noWrap: true } }} />
+									{item.kind === "file" ? (
+										<Typography variant="caption" color="text.secondary">
+											{formatBytes(item.size)}
+										</Typography>
+									) : (
+										<ChevronRightIcon sx={{ fontSize: 16 }} />
+									)}
+								</ListItemButton>
+							))}
+						</List>
 					)}
-				</div>
-				<p className="mt-2 text-xs text-kumo-subtle">The file goes out as a download link that works for 30 days.</p>
-				<div className="mt-4 flex justify-end">
-					<Button variant="secondary" onClick={onClose}>
+				</Box>
+				<Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+					The file goes out as a download link that works for 30 days.
+				</Typography>
+				<Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+					<Button variant="outlined" onClick={onClose}>
 						Cancel
 					</Button>
-				</div>
-			</Dialog>
-		</Dialog.Root>
+				</Box>
+			</DialogContent>
+		</Dialog>
 	);
 }
 

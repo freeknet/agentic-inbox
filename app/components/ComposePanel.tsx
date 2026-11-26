@@ -2,8 +2,16 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Banner, Button, Input } from "@cloudflare/kumo";
-import { FloppyDiskIcon, PaperPlaneTiltIcon, XIcon } from "@phosphor-icons/react";
+import CloseIcon from "@mui/icons-material/Close";
+import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
+import SendIcon from "@mui/icons-material/Send";
+import Alert from "@mui/material/Alert";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import CircularProgress from "@mui/material/CircularProgress";
+import IconButton from "@mui/material/IconButton";
+import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor from "./RichTextEditor";
@@ -41,158 +49,165 @@ export default function ComposePanel() {
 	} = useComposeForm(mailboxId, folder);
 	const { dragging, dropProps } = useFileDrop(attachments);
 
-	return (
-		<div className="flex flex-col h-full bg-kumo-base">
-			<div className="flex items-center justify-between px-4 py-3 border-b border-kumo-line shrink-0 md:px-6">
-				<h2 className="text-base font-semibold text-kumo-default">
-					{formTitle}
-				</h2>
-				<div className="flex items-center gap-1">
-					<Button
-						variant="ghost"
-						shape="square"
-						size="sm"
-						icon={<XIcon size={18} />}
-						onClick={discardCompose}
-						disabled={isSending}
-						aria-label="Close compose"
-					/>
-				</div>
-			</div>
+	const fieldRow = (label: string, node: React.ReactNode) => (
+		<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+			<Typography variant="body2" sx={{ width: 56, flexShrink: 0, fontWeight: 500, color: "text.secondary" }}>
+				{label}
+			</Typography>
+			<Box sx={{ flex: 1, minWidth: 0 }}>{node}</Box>
+		</Box>
+	);
 
-			<form
+	return (
+		<Box sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.paper" }}>
+			<Box
+				sx={{
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "space-between",
+					px: { xs: 2, md: 3 },
+					py: 1.5,
+					borderBottom: 1,
+					borderColor: "divider",
+					flexShrink: 0,
+				}}
+			>
+				<Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+					{formTitle}
+				</Typography>
+				<IconButton size="small" onClick={discardCompose} disabled={isSending} aria-label="Close compose">
+					<CloseIcon fontSize="small" />
+				</IconButton>
+			</Box>
+
+			<Box
+				component="form"
 				onSubmit={(e) => handleSend(e, closePanel)}
-				className={`flex flex-col flex-1 min-h-0 overflow-y-auto ${dragging ? "outline-2 -outline-offset-4 outline-dashed outline-kumo-brand" : ""}`}
+				sx={{
+					display: "flex",
+					flexDirection: "column",
+					flex: 1,
+					minHeight: 0,
+					overflowY: "auto",
+					outline: dragging ? "2px dashed" : "none",
+					outlineColor: "primary.main",
+					outlineOffset: -4,
+				}}
 				{...dropProps}
 			>
-				<div className="p-4 md:p-6 space-y-4">
-					{error && <Banner variant="error" description={error} />}
+				<Box sx={{ p: { xs: 2, md: 3 }, display: "flex", flexDirection: "column", gap: 2 }}>
+					{error && <Alert severity="error">{error}</Alert>}
 
-					<div className="space-y-3">
-						<div className="flex items-center gap-2">
-							<label className="text-sm font-medium text-kumo-subtle w-14 shrink-0">
-								To
-							</label>
-							<div className="flex-1 flex items-center gap-2 min-w-0">
-								<Input
+					<Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+						{fieldRow(
+							"To",
+							<Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+								<TextField
+									fullWidth
+									size="small"
 									type="text"
-									className="w-full"
 									placeholder="recipient@example.com"
-									size="sm"
 									value={to}
 									onChange={(e) => setTo(e.target.value)}
 									required
 								/>
 								{!showCcBcc && (
-									<button
-										type="button"
-										onClick={() => setShowCcBcc(true)}
-										className="shrink-0 text-xs text-kumo-link hover:text-kumo-link-hover font-medium"
-									>
+									<Button size="small" onClick={() => setShowCcBcc(true)} sx={{ flexShrink: 0, fontSize: 12 }}>
 										CC / BCC
-									</button>
+									</Button>
 								)}
-							</div>
-						</div>
-
-						{showCcBcc && (
-							<div className="flex items-center gap-2">
-								<label className="text-sm font-medium text-kumo-subtle w-14 shrink-0">
-									CC
-								</label>
-								<div className="flex-1">
-									<Input
-										type="text"
-										className="w-full"
-										size="sm"
-										value={cc}
-										onChange={(e) => setCc(e.target.value)}
-										placeholder="Separate multiple addresses with commas"
-									/>
-								</div>
-							</div>
+							</Box>,
 						)}
 
-						{showCcBcc && (
-							<div className="flex items-center gap-2">
-								<label className="text-sm font-medium text-kumo-subtle w-14 shrink-0">
-									BCC
-								</label>
-								<div className="flex-1">
-									<Input
-										type="text"
-										className="w-full"
-										size="sm"
-										value={bcc}
-										onChange={(e) => setBcc(e.target.value)}
-										placeholder="Separate multiple addresses with commas"
-									/>
-								</div>
-							</div>
+						{showCcBcc &&
+							fieldRow(
+								"CC",
+								<TextField
+									fullWidth
+									size="small"
+									value={cc}
+									onChange={(e) => setCc(e.target.value)}
+									placeholder="Separate multiple addresses with commas"
+								/>,
+							)}
+
+						{showCcBcc &&
+							fieldRow(
+								"BCC",
+								<TextField
+									fullWidth
+									size="small"
+									value={bcc}
+									onChange={(e) => setBcc(e.target.value)}
+									placeholder="Separate multiple addresses with commas"
+								/>,
+							)}
+
+						{fieldRow(
+							"Subject",
+							<TextField
+								fullWidth
+								size="small"
+								placeholder="Email subject"
+								value={subject}
+								onChange={(e) => setSubject(e.target.value)}
+								required
+							/>,
 						)}
+					</Box>
 
-						<div className="flex items-center gap-2">
-							<label className="text-sm font-medium text-kumo-subtle w-14 shrink-0">
-								Subject
-							</label>
-							<div className="flex-1">
-								<Input
-									type="text"
-									className="w-full"
-									placeholder="Email subject"
-									size="sm"
-									value={subject}
-									onChange={(e) => setSubject(e.target.value)}
-									required
-								/>
-							</div>
-						</div>
-					</div>
-
-					<div className="border border-kumo-line rounded-md overflow-hidden bg-kumo-base">
-						<RichTextEditor
-							value={body}
-							onChange={setBody}
-						/>
-					</div>
+					<Box sx={{ border: 1, borderColor: "divider", borderRadius: 2, overflow: "hidden" }}>
+						<RichTextEditor value={body} onChange={setBody} />
+					</Box>
 					<AttachmentChips attachments={attachments} />
-				</div>
+				</Box>
 
 				{/* Footer actions */}
-				<div className="mt-auto px-4 py-3 border-t border-kumo-line bg-kumo-fill/30 shrink-0 md:px-6">
-					<div className="flex flex-wrap items-center justify-between gap-2">
-						<Button type="button" variant="ghost" size="sm" onClick={discardCompose} disabled={isSending}>
+				<Box
+					sx={{
+						mt: "auto",
+						px: { xs: 2, md: 3 },
+						py: 1.5,
+						borderTop: 1,
+						borderColor: "divider",
+						bgcolor: "action.hover",
+						flexShrink: 0,
+					}}
+				>
+					<Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+						<Button type="button" size="small" onClick={discardCompose} disabled={isSending}>
 							Discard
 						</Button>
-						<div className="flex flex-wrap items-center justify-end gap-2">
+						<Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end", gap: 1 }}>
 							<AttachButton attachments={attachments} disabled={isSending} />
 							<FromDriveButton attachments={attachments} disabled={isSending} />
 							<Button
 								type="button"
-								variant="secondary"
-								size="sm"
-								loading={isSavingDraft}
-								disabled={isSending}
-								icon={<FloppyDiskIcon size={14} />}
+								variant="outlined"
+								size="small"
+								disabled={isSending || isSavingDraft}
+								startIcon={isSavingDraft ? <CircularProgress size={14} /> : <SaveOutlinedIcon />}
 								onClick={handleSaveDraft}
 							>
 								{isSavingDraft ? "Saving..." : "Save as Draft"}
 							</Button>
-							<ScheduleSendButton disabled={isSavingDraft || isSending} onSchedule={(at) => handleSend(null, closePanel, at)} />
+							<ScheduleSendButton
+								disabled={isSavingDraft || isSending}
+								onSchedule={(at) => handleSend(null, closePanel, at)}
+							/>
 							<Button
 								type="submit"
-								variant="primary"
-								size="sm"
-								loading={isSending}
+								variant="contained"
+								size="small"
 								disabled={isSavingDraft || isSending}
-								icon={<PaperPlaneTiltIcon size={14} />}
+								startIcon={isSending ? <CircularProgress size={14} color="inherit" /> : <SendIcon />}
 							>
 								{isSending ? "Sending..." : "Send"}
 							</Button>
-						</div>
-					</div>
-				</div>
-			</form>
-		</div>
+						</Box>
+					</Box>
+				</Box>
+			</Box>
+		</Box>
 	);
 }

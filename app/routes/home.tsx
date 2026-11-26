@@ -2,34 +2,42 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import {
-	Button,
-	Dialog,
-	Empty,
-	Input,
-	Loader,
-	Select,
-	Text,
-	useKumoToastManager,
-} from "@cloudflare/kumo";
-import { EnvelopeIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import MailOutlinedIcon from "@mui/icons-material/MailOutlined";
+import Avatar from "@mui/material/Avatar";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import CircularProgress from "@mui/material/CircularProgress";
+import Container from "@mui/material/Container";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogTitle from "@mui/material/DialogTitle";
+import IconButton from "@mui/material/IconButton";
+import List from "@mui/material/List";
+import ListItemButton from "@mui/material/ListItemButton";
+import ListItemText from "@mui/material/ListItemText";
+import MenuItem from "@mui/material/MenuItem";
+import Paper from "@mui/material/Paper";
+import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
 import { useQuery } from "@tanstack/react-query";
-import { type SubmitEvent, useEffect, useRef, useState } from "react";
-import { Link as RouterLink } from "react-router";
+import { type FormEvent, useEffect, useRef, useState } from "react";
+import { Link as RouterLink, useNavigate } from "react-router";
 import api from "~/services/api";
-import {
-	useCreateMailbox,
-	useDeleteMailbox,
-	useMailboxes,
-} from "~/queries/mailboxes";
+import { useCreateMailbox, useDeleteMailbox, useMailboxes } from "~/queries/mailboxes";
 import { queryKeys } from "~/queries/keys";
+import { useToast } from "~/lib/toast";
 
 export function meta() {
 	return [{ title: "Agentic Inbox" }];
 }
 
 export default function HomeRoute() {
-	const toastManager = useKumoToastManager();
+	const toast = useToast();
+	const navigate = useNavigate();
 	const { data: mailboxes = [], refetch: refetchMailboxes, isFetched: mailboxesFetched } = useMailboxes();
 	const createMailbox = useCreateMailbox();
 	const deleteMailbox = useDeleteMailbox();
@@ -68,12 +76,8 @@ export default function HomeRoute() {
 	useEffect(() => {
 		if (autoCreateDone.current) return;
 		if (emailAddresses.length === 0 || !mailboxesFetched) return;
-		const existingEmails = new Set(
-			mailboxes.map((m) => m.email.toLowerCase()),
-		);
-		const toCreate = emailAddresses.filter(
-			(addr) => !existingEmails.has(addr.toLowerCase()),
-		);
+		const existingEmails = new Set(mailboxes.map((m) => m.email.toLowerCase()));
+		const toCreate = emailAddresses.filter((addr) => !existingEmails.has(addr.toLowerCase()));
 		if (toCreate.length === 0) {
 			autoCreateDone.current = true;
 			return;
@@ -85,11 +89,15 @@ export default function HomeRoute() {
 				const localPart = addr.split("@")[0] || addr;
 				return api.createMailbox(addr, localPart).catch(() => {});
 			}),
-		).then(() => { if (!cancelled) refetchMailboxes(); });
-		return () => { cancelled = true; };
+		).then(() => {
+			if (!cancelled) refetchMailboxes();
+		});
+		return () => {
+			cancelled = true;
+		};
 	}, [emailAddresses, mailboxes, refetchMailboxes]);
 
-	const handleCreate = async (e: SubmitEvent) => {
+	const handleCreate = async (e: FormEvent) => {
 		e.preventDefault();
 		setCreateError(null);
 		if (!newPrefix || !selectedDomain) {
@@ -101,7 +109,7 @@ export default function HomeRoute() {
 		setIsCreating(true);
 		try {
 			await createMailbox.mutateAsync({ email, name });
-			toastManager.add({ title: "Mailbox created successfully!" });
+			toast.add({ title: "Mailbox created successfully!" });
 			setIsCreateOpen(false);
 			setNewPrefix("");
 			setNewName("");
@@ -118,11 +126,11 @@ export default function HomeRoute() {
 		setIsDeleting(true);
 		try {
 			await deleteMailbox.mutateAsync(mailboxToDelete.id);
-			toastManager.add({ title: "Mailbox deleted" });
+			toast.add({ title: "Mailbox deleted" });
 			setIsDeleteOpen(false);
 			setMailboxToDelete(null);
 		} catch {
-			toastManager.add({ title: "Failed to delete mailbox", variant: "error" });
+			toast.add({ title: "Failed to delete mailbox", variant: "error" });
 		} finally {
 			setIsDeleting(false);
 		}
@@ -140,224 +148,204 @@ export default function HomeRoute() {
 	const isLoading = !configData;
 
 	return (
-		<div className="min-h-screen bg-kumo-recessed">
-			<div className="mx-auto max-w-2xl px-4 py-8 md:px-6 md:py-16">
-				<div className="mb-8">
-					<div className="flex items-center justify-between">
-						<h1 className="text-2xl font-bold text-kumo-default">Mailboxes</h1>
+		<Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
+			<Container maxWidth="sm" sx={{ py: { xs: 4, md: 8 } }}>
+				<Box sx={{ mb: 4 }}>
+					<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+						<Typography variant="h5" sx={{ fontWeight: 700 }}>
+							Mailboxes
+						</Typography>
 						{!isConfigured && (
-							<Button
-								variant="primary"
-								icon={<PlusIcon size={16} />}
-								onClick={() => setIsCreateOpen(true)}
-							>
+							<Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsCreateOpen(true)}>
 								New Mailbox
 							</Button>
 						)}
-					</div>
+					</Box>
 					{domains.length > 0 && (
-						<p className="text-sm text-kumo-subtle mt-1">
+						<Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
 							{domains.join(", ")}
-						</p>
+						</Typography>
 					)}
-				</div>
+				</Box>
 
 				{isLoading ? (
-					<div className="flex justify-center py-20">
-						<Loader size="lg" />
-					</div>
+					<Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
+						<CircularProgress />
+					</Box>
 				) : accounts.length > 0 ? (
-					<div className="rounded-xl border border-kumo-line bg-kumo-base overflow-hidden">
-						{accounts.map((account, idx) => (
-							<RouterLink
-								key={account.id}
-								to={`/mailbox/${account.id}`}
-								className={`group flex items-center gap-4 px-5 py-4 no-underline transition-colors hover:bg-kumo-tint ${
-									idx > 0 ? "border-t border-kumo-line" : ""
-								}`}
-							>
-								<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-sm font-bold text-kumo-default">
-									{account.name.charAt(0).toUpperCase()}
-								</div>
-								<div className="min-w-0 flex-1">
-									<div className="text-sm font-medium text-kumo-default truncate">
-										{account.name}
-									</div>
-									<div className="text-sm text-kumo-subtle">
-										{account.email}
-									</div>
-								</div>
-								{!isConfigured && (
-									<Button
-										variant="ghost"
-										size="sm"
-										shape="square"
-										icon={<TrashIcon size={16} />}
-										aria-label={`Delete mailbox ${account.email}`}
-										onClick={(e) => {
-											e.preventDefault();
-											e.stopPropagation();
-											setMailboxToDelete({
-												id: account.id,
-												email: account.email,
-											});
-											setIsDeleteOpen(true);
-										}}
+					<Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden" }}>
+						<List disablePadding>
+							{accounts.map((account, idx) => (
+								<ListItemButton
+									key={account.id}
+									onClick={() => navigate(`/mailbox/${account.id}`)}
+									sx={{
+										gap: 2,
+										px: 2.5,
+										py: 1.5,
+										borderTop: idx > 0 ? 1 : 0,
+										borderColor: "divider",
+									}}
+								>
+									<Avatar sx={{ width: 40, height: 40, bgcolor: "action.selected", color: "text.primary", fontWeight: 700 }}>
+										{account.name.charAt(0).toUpperCase()}
+									</Avatar>
+									<ListItemText
+										primary={account.name}
+										secondary={account.email}
+										slotProps={{ primary: { variant: "body2", sx: { fontWeight: 500 } }, secondary: { variant: "body2" } }}
+										sx={{ minWidth: 0 }}
 									/>
-								)}
-							</RouterLink>
-						))}
-					</div>
+									{!isConfigured && (
+										<IconButton
+											aria-label={`Delete mailbox ${account.email}`}
+											onClick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												setMailboxToDelete({ id: account.id, email: account.email });
+												setIsDeleteOpen(true);
+											}}
+										>
+											<DeleteOutlinedIcon />
+										</IconButton>
+									)}
+								</ListItemButton>
+							))}
+						</List>
+					</Paper>
 				) : (
-					<div className="rounded-xl border border-kumo-line bg-kumo-base py-16 px-6">
-						<div className="flex flex-col items-center text-center">
-							<div className="mb-4">
-								<EnvelopeIcon
-									size={48}
-									weight="thin"
-									className="text-kumo-subtle"
-								/>
-							</div>
-							<h3 className="text-base font-semibold text-kumo-default mb-1.5">
+					<Paper variant="outlined" sx={{ borderRadius: 3, py: 8, px: 3 }}>
+						<Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+							<MailOutlinedIcon sx={{ fontSize: 48, color: "text.disabled", mb: 2 }} />
+							<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
 								No mailboxes yet
-							</h3>
-							<p className="text-sm text-kumo-subtle max-w-sm mb-5">
+							</Typography>
+							<Typography variant="body2" color="text.secondary" sx={{ maxWidth: 360, mb: 2.5 }}>
 								{isConfigured
 									? "Your email routing is configured but no mailboxes have been created yet. They will appear here automatically."
 									: "Create a mailbox to start sending and receiving emails with your domain."}
-							</p>
+							</Typography>
 							{!isConfigured && (
-								<Button
-									variant="primary"
-									icon={<PlusIcon size={16} />}
-									onClick={() => setIsCreateOpen(true)}
-								>
+								<Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsCreateOpen(true)}>
 									Create Mailbox
 								</Button>
 							)}
-						</div>
-					</div>
+						</Box>
+					</Paper>
 				)}
-			</div>
+			</Container>
 
 			{/* Create Dialog */}
-			<Dialog.Root open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-				<Dialog size="sm" className="p-6">
-					<Dialog.Title className="text-base font-semibold mb-5">
-						Create New Mailbox
-					</Dialog.Title>
-					<form onSubmit={handleCreate} className="space-y-4">
-						{createError && (
-							<Text variant="error" size="sm">
-								{createError}
-							</Text>
-						)}
-						<div>
-							<span className="text-sm font-medium text-kumo-default mb-1.5 block">
-								Email Address
-							</span>
-							<div className="flex items-center gap-2">
-								<div className="flex-1">
-									<Input
-										aria-label="Address prefix"
+			<Dialog open={isCreateOpen} onClose={() => setIsCreateOpen(false)} fullWidth maxWidth="xs">
+				<form onSubmit={handleCreate}>
+					<DialogTitle>Create New Mailbox</DialogTitle>
+					<DialogContent>
+						<Box sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+							{createError && (
+								<Typography variant="body2" color="error">
+									{createError}
+								</Typography>
+							)}
+							<Box>
+								<Typography variant="body2" sx={{ fontWeight: 500, mb: 0.75 }}>
+									Email Address
+								</Typography>
+								<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+									<TextField
+										size="small"
 										placeholder="info"
-										size="sm"
 										value={newPrefix}
 										onChange={(e) => setNewPrefix(e.target.value)}
 										required
+										sx={{ flex: 1 }}
+										slotProps={{ htmlInput: { "aria-label": "Address prefix" } }}
 									/>
-								</div>
-								<span className="text-sm text-kumo-subtle">@</span>
-								{domains.length > 1 ? (
-									<div className="flex-1">
-							<Select
-								aria-label="Domain"
-								value={selectedDomain}
-								onValueChange={(value) => {
-									if (value) setSelectedDomain(value);
-								}}
-							>
+									<Typography variant="body2" color="text.secondary">
+										@
+									</Typography>
+									{domains.length > 1 ? (
+										<TextField
+											select
+											size="small"
+											value={selectedDomain}
+											onChange={(e) => setSelectedDomain(e.target.value)}
+											sx={{ flex: 1 }}
+											slotProps={{ select: { displayEmpty: true }, htmlInput: { "aria-label": "Domain" } }}
+										>
 											{domains.map((d) => (
-												<Select.Option key={d} value={d}>
+												<MenuItem key={d} value={d}>
 													{d}
-												</Select.Option>
+												</MenuItem>
 											))}
-										</Select>
-									</div>
-								) : (
-									<span className="text-sm text-kumo-subtle">
-										{selectedDomain || "no domain"}
-									</span>
-								)}
-							</div>
-						</div>
-						<Input
-							label="Display Name (optional)"
-							placeholder="Info"
-							size="sm"
-							value={newName}
-							onChange={(e) => setNewName(e.target.value)}
-						/>
-						<div className="flex justify-end gap-2 pt-2">
-							<Dialog.Close
-								render={(props) => (
-									<Button {...props} variant="secondary" size="sm">
-										Cancel
-									</Button>
-								)}
+										</TextField>
+									) : (
+										<Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+											{selectedDomain || "no domain"}
+										</Typography>
+									)}
+								</Box>
+							</Box>
+							<TextField
+								fullWidth
+								size="small"
+								label="Display Name (optional)"
+								placeholder="Info"
+								value={newName}
+								onChange={(e) => setNewName(e.target.value)}
 							/>
-							<Button
-								type="submit"
-								variant="primary"
-								size="sm"
-								loading={isCreating}
-								disabled={!selectedDomain}
-							>
-								Create
-							</Button>
-						</div>
-					</form>
-				</Dialog>
-			</Dialog.Root>
+						</Box>
+					</DialogContent>
+					<DialogActions>
+						<Button onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+						<Button
+							type="submit"
+							variant="contained"
+							disabled={!selectedDomain || isCreating}
+							startIcon={isCreating ? <CircularProgress size={14} color="inherit" /> : undefined}
+						>
+							Create
+						</Button>
+					</DialogActions>
+				</form>
+			</Dialog>
 
 			{/* Delete Dialog */}
-			<Dialog.Root
+			<Dialog
 				open={isDeleteOpen}
-				onOpenChange={(open) => {
-					setIsDeleteOpen(open);
-					if (!open) setMailboxToDelete(null);
+				onClose={() => {
+					setIsDeleteOpen(false);
+					setMailboxToDelete(null);
 				}}
+				fullWidth
+				maxWidth="xs"
 			>
-				<Dialog size="sm" className="p-6">
-					<Dialog.Title className="text-base font-semibold mb-2">
-						Delete Mailbox
-					</Dialog.Title>
-					<Dialog.Description className="text-kumo-subtle text-sm mb-5">
-						Are you sure you want to delete{" "}
-						<strong className="text-kumo-default">
-							{mailboxToDelete?.email}
-						</strong>
-						? This action cannot be undone.
-					</Dialog.Description>
-					<div className="flex justify-end gap-2">
-						<Dialog.Close
-							render={(props) => (
-								<Button {...props} variant="secondary" size="sm">
-									Cancel
-								</Button>
-							)}
-						/>
-						<Button
-							variant="destructive"
-							size="sm"
-							loading={isDeleting}
-							onClick={handleDelete}
-						>
-							Delete
-						</Button>
-					</div>
-				</Dialog>
-			</Dialog.Root>
-		</div>
+				<DialogTitle>Delete Mailbox</DialogTitle>
+				<DialogContent>
+					<DialogContentText>
+						Are you sure you want to delete <strong>{mailboxToDelete?.email}</strong>? This action cannot be
+						undone.
+					</DialogContentText>
+				</DialogContent>
+				<DialogActions>
+					<Button
+						onClick={() => {
+							setIsDeleteOpen(false);
+							setMailboxToDelete(null);
+						}}
+					>
+						Cancel
+					</Button>
+					<Button
+						variant="contained"
+						color="error"
+						disabled={isDeleting}
+						startIcon={isDeleting ? <CircularProgress size={14} color="inherit" /> : undefined}
+						onClick={handleDelete}
+					>
+						Delete
+					</Button>
+				</DialogActions>
+			</Dialog>
+		</Box>
 	);
 }

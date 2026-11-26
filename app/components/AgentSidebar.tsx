@@ -2,15 +2,18 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Loader } from "@cloudflare/kumo";
-import { PlugsIcon, RobotIcon } from "@phosphor-icons/react";
+import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
+import ExtensionOutlinedIcon from "@mui/icons-material/ExtensionOutlined";
+import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
+import Tab from "@mui/material/Tab";
+import Tabs from "@mui/material/Tabs";
+import Typography from "@mui/material/Typography";
 import { useEffect, useState } from "react";
 import MCPPanel from "./MCPPanel";
 
 function LazyAgentPanel() {
-	const [AgentChat, setAgentChat] = useState<React.ComponentType | null>(
-		null,
-	);
+	const [AgentChat, setAgentChat] = useState<React.ComponentType | null>(null);
 	const [loadError, setLoadError] = useState<string | null>(null);
 
 	useEffect(() => {
@@ -24,17 +27,21 @@ function LazyAgentPanel() {
 
 	if (loadError) {
 		return (
-			<div className="flex items-center justify-center h-full">
-				<span className="text-xs text-kumo-error">{loadError}</span>
-			</div>
+			<Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
+				<Typography variant="caption" color="error">
+					{loadError}
+				</Typography>
+			</Box>
 		);
 	}
 	if (!AgentChat) {
 		return (
-			<div className="flex flex-col items-center justify-center h-full gap-2">
-				<Loader size="base" />
-				<span className="text-xs text-kumo-subtle">Loading agent...</span>
-			</div>
+			<Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 1 }}>
+				<CircularProgress size={20} />
+				<Typography variant="caption" color="text.secondary">
+					Loading agent...
+				</Typography>
+			</Box>
 		);
 	}
 	return <AgentChat />;
@@ -44,42 +51,36 @@ export default function AgentSidebar() {
 	const [activeTab, setActiveTab] = useState<"agent" | "mcp">("agent");
 
 	return (
-		<div className="flex flex-col h-full">
-			{/* Tab bar */}
-			<div className="flex items-center border-b border-kumo-line shrink-0">
-				<button
-					type="button"
-					onClick={() => setActiveTab("agent")}
-					className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 bg-transparent cursor-pointer ${
-						activeTab === "agent"
-							? "border-kumo-brand text-kumo-default"
-							: "border-transparent text-kumo-subtle hover:text-kumo-default"
-					}`}
-				>
-					<RobotIcon size={14} weight={activeTab === "agent" ? "fill" : "regular"} />
-					Agent
-				</button>
-				<button
-					type="button"
-					onClick={() => setActiveTab("mcp")}
-					className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 bg-transparent cursor-pointer ${
-						activeTab === "mcp"
-							? "border-kumo-brand text-kumo-default"
-							: "border-transparent text-kumo-subtle hover:text-kumo-default"
-					}`}
-				>
-					<PlugsIcon size={14} weight={activeTab === "mcp" ? "fill" : "regular"} />
-					MCP
-				</button>
-			</div>
+		<Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+			<Tabs
+				value={activeTab}
+				onChange={(_, value: "agent" | "mcp") => setActiveTab(value)}
+				aria-label="Side panel"
+				sx={{ minHeight: 40, borderBottom: 1, borderColor: "divider", flexShrink: 0 }}
+			>
+				<Tab
+					value="agent"
+					icon={<SmartToyOutlinedIcon sx={{ fontSize: 16 }} />}
+					iconPosition="start"
+					label="Agent"
+					sx={{ minHeight: 40, minWidth: 0, px: 2, fontSize: 14 }}
+				/>
+				<Tab
+					value="mcp"
+					icon={<ExtensionOutlinedIcon sx={{ fontSize: 16 }} />}
+					iconPosition="start"
+					label="MCP"
+					sx={{ minHeight: 40, minWidth: 0, px: 2, fontSize: 14 }}
+				/>
+			</Tabs>
 
 			{/* Tab content — keep agent mounted so chat isn't lost */}
-			<div className="flex-1 min-h-0 overflow-hidden">
-				<div className={activeTab === "agent" ? "h-full" : "hidden"}>
+			<Box sx={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+				<Box sx={{ height: "100%", display: activeTab === "agent" ? "block" : "none" }}>
 					<LazyAgentPanel />
-				</div>
+				</Box>
 				{activeTab === "mcp" && <MCPPanel />}
-			</div>
-		</div>
+			</Box>
+		</Box>
 	);
 }

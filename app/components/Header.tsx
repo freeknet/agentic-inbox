@@ -2,13 +2,24 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Button, Input, Tooltip } from "@cloudflare/kumo";
-import { CircleHalfIcon, GearSixIcon, ListIcon, MagnifyingGlassIcon, MoonIcon, RobotIcon, SunIcon, XIcon } from "@phosphor-icons/react";
+import AutoModeIcon from "@mui/icons-material/AutoMode";
+import CloseIcon from "@mui/icons-material/Close";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
+import LightModeIcon from "@mui/icons-material/LightMode";
+import MenuIcon from "@mui/icons-material/Menu";
+import SearchIcon from "@mui/icons-material/Search";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
+import Box from "@mui/material/Box";
+import IconButton from "@mui/material/IconButton";
+import InputAdornment from "@mui/material/InputAdornment";
+import TextField from "@mui/material/TextField";
+import Tooltip from "@mui/material/Tooltip";
 import { type KeyboardEvent, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
-import { useUIStore } from "~/hooks/useUIStore";
-import { useTheme } from "~/hooks/useTheme";
 import { AppSwitcher } from "~/components/AppSwitcher";
+import { useTheme } from "~/hooks/useTheme";
+import { useUIStore } from "~/hooks/useUIStore";
 
 export default function Header() {
 	const [searchQuery, setSearchQuery] = useState("");
@@ -60,87 +71,108 @@ export default function Header() {
 	const isSettingsActive = location.pathname.includes("/settings");
 
 	return (
-		<header className="flex items-center gap-2 px-3 py-2.5 bg-kumo-base border-b border-kumo-line sticky top-0 z-10 md:px-5 md:gap-4">
+		<Box
+			component="header"
+			sx={{
+				display: "flex",
+				alignItems: "center",
+				gap: { xs: 1, md: 2 },
+				px: { xs: 1.5, md: 2.5 },
+				py: 1,
+				bgcolor: "background.paper",
+				borderBottom: 1,
+				borderColor: "divider",
+				position: "sticky",
+				top: 0,
+				zIndex: 10,
+			}}
+		>
 			{/* Hamburger menu - mobile only */}
-			<Button
-				variant="ghost"
-				shape="square"
-				size="sm"
-				icon={<ListIcon size={20} />}
+			<IconButton
 				onClick={toggleSidebar}
 				aria-label="Toggle sidebar"
-				className="md:hidden shrink-0"
-			/>
+				sx={{ display: { xs: "inline-flex", md: "none" }, flexShrink: 0 }}
+			>
+				<MenuIcon />
+			</IconButton>
 
 			{/* Search - full on desktop, collapsible on mobile */}
-			<div
-				className={`flex-1 max-w-lg transition-all flex items-center gap-1 ${
-					isSearchExpanded ? "flex" : "hidden md:flex"
-				}`}
+			<Box
+				sx={{
+					flex: 1,
+					maxWidth: 560,
+					display: isSearchExpanded ? "flex" : { xs: "none", md: "flex" },
+					alignItems: "center",
+					gap: 1,
+				}}
 			>
-				<div className="flex-1 relative flex items-center">
-					<Input
-						className="w-full"
-						aria-label="Search emails"
-						placeholder="Search emails... (try from:name, is:unread, has:attachment)"
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-						onKeyDown={handleKeyDown}
-					/>
-					{searchQuery && (
-						<button
-							type="button"
-							onClick={clearSearch}
-							className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-kumo-subtle hover:text-kumo-default hover:bg-kumo-tint transition-colors"
-							aria-label="Clear search"
-						>
-							<XIcon size={14} />
-						</button>
-					)}
-				</div>
-				<Tooltip content="Search" side="bottom" render={<Button
-						variant="ghost"
-						shape="square"
-						icon={<MagnifyingGlassIcon size={20} />}
-						onClick={performSearch}
-						aria-label="Search"
-					/>} />
-			</div>
+				<TextField
+					fullWidth
+					size="small"
+					value={searchQuery}
+					onChange={(e) => setSearchQuery(e.target.value)}
+					onKeyDown={handleKeyDown}
+					placeholder="Search emails... (try from:name, is:unread, has:attachment)"
+					slotProps={{
+						input: {
+							startAdornment: (
+								<InputAdornment position="start">
+									<SearchIcon fontSize="small" />
+								</InputAdornment>
+							),
+							endAdornment: searchQuery ? (
+								<InputAdornment position="end">
+									<IconButton size="small" onClick={clearSearch} aria-label="Clear search">
+										<CloseIcon fontSize="small" />
+									</IconButton>
+								</InputAdornment>
+							) : undefined,
+						},
+						htmlInput: { "aria-label": "Search emails" },
+					}}
+				/>
+				<Tooltip title="Search">
+					<IconButton onClick={performSearch} aria-label="Search">
+						<SearchIcon />
+					</IconButton>
+				</Tooltip>
+			</Box>
 
 			{/* Search toggle button - mobile only, hidden when search is expanded */}
 			{!isSearchExpanded && (
-				<Button
-					variant="ghost"
-					shape="square"
-					size="sm"
-					icon={<MagnifyingGlassIcon size={20} />}
+				<IconButton
 					onClick={() => setIsSearchExpanded(true)}
 					aria-label="Search"
-					className="md:hidden shrink-0"
-				/>
+					sx={{ display: { xs: "inline-flex", md: "none" }, flexShrink: 0 }}
+				>
+					<SearchIcon />
+				</IconButton>
 			)}
 
-			<div className="flex items-center gap-1 ml-auto shrink-0">
+			<Box sx={{ display: "flex", alignItems: "center", gap: 0.5, ml: "auto", flexShrink: 0 }}>
 				<AppSwitcher />
-				<Tooltip content={isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"} side="bottom" render={<Button
-						variant={isAgentPanelOpen ? "secondary" : "ghost"}
-						shape="square"
-						icon={<RobotIcon size={20} />}
+				<Tooltip title={isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"}>
+					<IconButton
 						onClick={toggleAgentPanel}
 						aria-label="Toggle agent panel"
-						className="hidden lg:inline-flex"
-					/>} />
-				<Tooltip content={themeLabel} side="bottom" render={<Button
-						variant="ghost"
-						shape="square"
-						icon={theme === "dark" ? <MoonIcon size={20} /> : theme === "light" ? <SunIcon size={20} /> : <CircleHalfIcon size={20} />}
-						onClick={cycleTheme}
-						aria-label={`${themeLabel} (click to change)`}
-					/>} />
-				<Tooltip content="Settings" side="bottom" render={<Button
-						variant={isSettingsActive ? "secondary" : "ghost"}
-						shape="square"
-						icon={<GearSixIcon size={20} />}
+						sx={{ display: { xs: "none", lg: "inline-flex" } }}
+					>
+						<SmartToyOutlinedIcon />
+					</IconButton>
+				</Tooltip>
+				<Tooltip title={`${themeLabel} (click to change)`}>
+					<IconButton onClick={cycleTheme} aria-label={`${themeLabel} (click to change)`}>
+						{theme === "dark" ? (
+							<DarkModeIcon />
+						) : theme === "light" ? (
+							<LightModeIcon />
+						) : (
+							<AutoModeIcon />
+						)}
+					</IconButton>
+				</Tooltip>
+				<Tooltip title="Settings">
+					<IconButton
 						onClick={() =>
 							navigate(
 								isSettingsActive
@@ -149,8 +181,12 @@ export default function Header() {
 							)
 						}
 						aria-label="Settings"
-					/>} />
-			</div>
-		</header>
+						color={isSettingsActive ? "primary" : "default"}
+					>
+						<SettingsOutlinedIcon />
+					</IconButton>
+				</Tooltip>
+			</Box>
+		</Box>
 	);
 }

@@ -2,21 +2,22 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Button, Tooltip } from "@cloudflare/kumo";
-import {
-	ArrowClockwiseIcon,
-	ArrowCounterClockwiseIcon,
-	LinkBreakIcon,
-	LinkSimpleIcon,
-	ListBulletsIcon,
-	ListNumbersIcon,
-	MinusIcon,
-	QuotesIcon,
-	TextBIcon,
-	TextItalicIcon,
-	TextStrikethroughIcon,
-	TextUnderlineIcon,
-} from "@phosphor-icons/react";
+import FormatBoldIcon from "@mui/icons-material/FormatBold";
+import FormatItalicIcon from "@mui/icons-material/FormatItalic";
+import FormatListBulletedIcon from "@mui/icons-material/FormatListBulleted";
+import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
+import FormatQuoteIcon from "@mui/icons-material/FormatQuote";
+import FormatUnderlinedIcon from "@mui/icons-material/FormatUnderlined";
+import HorizontalRuleIcon from "@mui/icons-material/HorizontalRule";
+import LinkIcon from "@mui/icons-material/Link";
+import LinkOffIcon from "@mui/icons-material/LinkOff";
+import RedoIcon from "@mui/icons-material/Redo";
+import StrikethroughSIcon from "@mui/icons-material/StrikethroughS";
+import UndoIcon from "@mui/icons-material/Undo";
+import Box from "@mui/material/Box";
+import Divider from "@mui/material/Divider";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
 import { Color } from "@tiptap/extension-color";
 import Highlight from "@tiptap/extension-highlight";
 import TiptapImage from "@tiptap/extension-image";
@@ -33,10 +34,7 @@ interface RichTextEditorProps {
 	onChange: (value: string) => void;
 }
 
-export default function RichTextEditor({
-	value,
-	onChange,
-}: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange }: RichTextEditorProps) {
 	const editor = useEditor({
 		extensions: [
 			StarterKit,
@@ -50,10 +48,7 @@ export default function RichTextEditor({
 		],
 		content: value,
 		editorProps: {
-			attributes: {
-				class:
-					"prose prose-sm max-w-none focus:outline-none min-h-[180px] p-3 text-sm [&_blockquote]:border-l-2 [&_blockquote]:border-kumo-line [&_blockquote]:pl-3 [&_blockquote]:text-kumo-subtle [&_blockquote]:bg-kumo-tint [&_blockquote]:py-1 [&_blockquote]:my-2 [&_blockquote]:text-xs [&_blockquote]:rounded-r-sm",
-			},
+			attributes: { class: "rte-content" },
 		},
 		onUpdate: ({ editor }) => {
 			onChange(editor.getHTML());
@@ -66,7 +61,7 @@ export default function RichTextEditor({
 			// Place cursor at the start of the document (above quoted text)
 			const rafId = requestAnimationFrame(() => {
 				if (!editor.isDestroyed) {
-					editor.commands.focus('start');
+					editor.commands.focus("start");
 				}
 			});
 			return () => cancelAnimationFrame(rafId);
@@ -87,129 +82,146 @@ export default function RichTextEditor({
 
 	if (!editor) return null;
 
+	const tools: Array<{
+		title: string;
+		icon: React.ReactNode;
+		active?: boolean;
+		disabled?: boolean;
+		onClick: () => void;
+	}> = [
+		{
+			title: "Bold",
+			icon: <FormatBoldIcon fontSize="small" />,
+			active: editor.isActive("bold"),
+			onClick: () => editor.chain().focus().toggleBold().run(),
+		},
+		{
+			title: "Italic",
+			icon: <FormatItalicIcon fontSize="small" />,
+			active: editor.isActive("italic"),
+			onClick: () => editor.chain().focus().toggleItalic().run(),
+		},
+		{
+			title: "Underline",
+			icon: <FormatUnderlinedIcon fontSize="small" />,
+			active: editor.isActive("underline"),
+			onClick: () => editor.chain().focus().toggleUnderline().run(),
+		},
+		{
+			title: "Strikethrough",
+			icon: <StrikethroughSIcon fontSize="small" />,
+			active: editor.isActive("strike"),
+			onClick: () => editor.chain().focus().toggleStrike().run(),
+		},
+	];
+
+	const blockTools: typeof tools = [
+		{
+			title: "Bullet list",
+			icon: <FormatListBulletedIcon fontSize="small" />,
+			active: editor.isActive("bulletList"),
+			onClick: () => editor.chain().focus().toggleBulletList().run(),
+		},
+		{
+			title: "Numbered list",
+			icon: <FormatListNumberedIcon fontSize="small" />,
+			active: editor.isActive("orderedList"),
+			onClick: () => editor.chain().focus().toggleOrderedList().run(),
+		},
+	];
+
+	const insertTools: typeof tools = [
+		{
+			title: "Blockquote",
+			icon: <FormatQuoteIcon fontSize="small" />,
+			active: editor.isActive("blockquote"),
+			onClick: () => editor.chain().focus().toggleBlockquote().run(),
+		},
+		{
+			title: "Link",
+			icon: <LinkIcon fontSize="small" />,
+			active: editor.isActive("link"),
+			onClick: setLink,
+		},
+		...(editor.isActive("link")
+			? [
+					{
+						title: "Remove link",
+						icon: <LinkOffIcon fontSize="small" />,
+						onClick: () => editor.chain().focus().unsetLink().run(),
+					},
+				]
+			: []),
+		{
+			title: "Horizontal rule",
+			icon: <HorizontalRuleIcon fontSize="small" />,
+			onClick: () => editor.chain().focus().setHorizontalRule().run(),
+		},
+	];
+
+	const historyTools: typeof tools = [
+		{
+			title: "Undo",
+			icon: <UndoIcon fontSize="small" />,
+			disabled: !editor.can().undo(),
+			onClick: () => editor.chain().focus().undo().run(),
+		},
+		{
+			title: "Redo",
+			icon: <RedoIcon fontSize="small" />,
+			disabled: !editor.can().redo(),
+			onClick: () => editor.chain().focus().redo().run(),
+		},
+	];
+
+	const group = (items: typeof tools) =>
+		items.map((tool) => (
+			<Tooltip key={tool.title} title={tool.title}>
+				<span>
+					<IconButton
+						size="small"
+						color={tool.active ? "primary" : "default"}
+						onClick={tool.onClick}
+						disabled={tool.disabled}
+						aria-label={tool.title}
+						sx={{
+							borderRadius: 1.5,
+							bgcolor: tool.active ? "action.selected" : "transparent",
+						}}
+					>
+						{tool.icon}
+					</IconButton>
+				</span>
+			</Tooltip>
+		));
+
 	return (
-		<div className="rounded-lg border border-kumo-line overflow-hidden flex flex-col h-full">
-			{/* Toolbar */}
-			<div className="flex flex-wrap items-center gap-0.5 bg-kumo-recessed px-2 py-1.5 border-b border-kumo-line shrink-0">
-				{/* Text formatting */}
-				<Tooltip content="Bold" side="bottom" render={<Button
-						variant={editor.isActive("bold") ? "secondary" : "ghost"}
-						shape="square"
-						size="sm"
-						icon={<TextBIcon size={16} />}
-						onClick={() => editor.chain().focus().toggleBold().run()}
-						aria-label="Bold"
-					/>} />
-				<Tooltip content="Italic" side="bottom" render={<Button
-						variant={editor.isActive("italic") ? "secondary" : "ghost"}
-						shape="square"
-						size="sm"
-						icon={<TextItalicIcon size={16} />}
-						onClick={() => editor.chain().focus().toggleItalic().run()}
-						aria-label="Italic"
-					/>} />
-				<Tooltip content="Underline" side="bottom" render={<Button
-						variant={editor.isActive("underline") ? "secondary" : "ghost"}
-						shape="square"
-						size="sm"
-						icon={<TextUnderlineIcon size={16} />}
-						onClick={() => editor.chain().focus().toggleUnderline().run()}
-						aria-label="Underline"
-					/>} />
-				<Tooltip content="Strikethrough" side="bottom" render={<Button
-						variant={editor.isActive("strike") ? "secondary" : "ghost"}
-						shape="square"
-						size="sm"
-						icon={<TextStrikethroughIcon size={16} />}
-						onClick={() => editor.chain().focus().toggleStrike().run()}
-						aria-label="Strikethrough"
-					/>} />
-
-				<div className="mx-1 h-5 w-px bg-kumo-fill" />
-
-				{/* Lists */}
-				<Tooltip content="Bullet list" side="bottom" render={<Button
-						variant={editor.isActive("bulletList") ? "secondary" : "ghost"}
-						shape="square"
-						size="sm"
-						icon={<ListBulletsIcon size={16} />}
-						onClick={() => editor.chain().focus().toggleBulletList().run()}
-						aria-label="Bullet list"
-					/>} />
-				<Tooltip content="Numbered list" side="bottom" render={<Button
-						variant={editor.isActive("orderedList") ? "secondary" : "ghost"}
-						shape="square"
-						size="sm"
-						icon={<ListNumbersIcon size={16} />}
-						onClick={() => editor.chain().focus().toggleOrderedList().run()}
-						aria-label="Numbered list"
-					/>} />
-
-				<div className="mx-1 h-5 w-px bg-kumo-fill" />
-
-				{/* Block formatting */}
-				<Tooltip content="Blockquote" side="bottom" render={<Button
-						variant={editor.isActive("blockquote") ? "secondary" : "ghost"}
-						shape="square"
-						size="sm"
-						icon={<QuotesIcon size={16} />}
-						onClick={() => editor.chain().focus().toggleBlockquote().run()}
-						aria-label="Blockquote"
-					/>} />
-				<Tooltip content="Link" side="bottom" render={<Button
-						variant={editor.isActive("link") ? "secondary" : "ghost"}
-						shape="square"
-						size="sm"
-						icon={<LinkSimpleIcon size={16} />}
-						onClick={setLink}
-						aria-label="Link"
-					/>} />
-				{editor.isActive("link") && (
-					<Tooltip content="Remove link" side="bottom" render={<Button
-							variant="ghost"
-							shape="square"
-							size="sm"
-							icon={<LinkBreakIcon size={16} />}
-							onClick={() => editor.chain().focus().unsetLink().run()}
-							aria-label="Remove link"
-						/>} />
-				)}
-				<Tooltip content="Horizontal rule" side="bottom" render={<Button
-						variant="ghost"
-						shape="square"
-						size="sm"
-						icon={<MinusIcon size={16} />}
-						onClick={() => editor.chain().focus().setHorizontalRule().run()}
-						aria-label="Horizontal rule"
-					/>} />
-
-				<div className="mx-1 h-5 w-px bg-kumo-fill" />
-
-				{/* Undo/Redo */}
-				<Tooltip content="Undo" side="bottom" render={<Button
-						variant="ghost"
-						shape="square"
-						size="sm"
-						icon={<ArrowCounterClockwiseIcon size={16} />}
-						onClick={() => editor.chain().focus().undo().run()}
-						disabled={!editor.can().undo()}
-						aria-label="Undo"
-					/>} />
-				<Tooltip content="Redo" side="bottom" render={<Button
-						variant="ghost"
-						shape="square"
-						size="sm"
-						icon={<ArrowClockwiseIcon size={16} />}
-						onClick={() => editor.chain().focus().redo().run()}
-						disabled={!editor.can().redo()}
-						aria-label="Redo"
-					/>} />
-			</div>
-
-			{/* Editor content */}
-			<div className="flex-1 overflow-y-auto">
+		<Box sx={{ borderRadius: 2, border: 1, borderColor: "divider", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+			<Box
+				sx={{
+					display: "flex",
+					flexWrap: "wrap",
+					alignItems: "center",
+					gap: 0.25,
+					bgcolor: "background.default",
+					px: 1,
+					py: 0.5,
+					borderBottom: 1,
+					borderColor: "divider",
+					flexShrink: 0,
+				}}
+			>
+				{group(tools)}
+				<Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 0.5 }} />
+				{group(blockTools)}
+				<Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 0.5 }} />
+				{group(insertTools)}
+				<Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 0.5 }} />
+				{group(historyTools)}
+			</Box>
+			<Box sx={{ flex: 1, overflowY: "auto" }}>
 				<EditorContent editor={editor} />
-			</div>
-		</div>
+			</Box>
+		</Box>
 	);
 }

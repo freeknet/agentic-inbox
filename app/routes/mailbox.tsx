@@ -2,6 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
+import Box from "@mui/material/Box";
 import { useEffect, useRef } from "react";
 import { Outlet, useParams } from "react-router";
 import AgentSidebar from "~/components/AgentSidebar";
@@ -16,20 +17,10 @@ export default function MailboxRoute() {
 	// Prefetch mailbox data for child components
 	useMailbox(mailboxId);
 	const prevMailboxIdRef = useRef<string | undefined>(undefined);
-	const {
-		isSidebarOpen,
-		closeSidebar,
-		isAgentPanelOpen,
-		closePanel,
-		closeComposeModal,
-	} = useUIStore();
+	const { isSidebarOpen, closeSidebar, isAgentPanelOpen, closePanel, closeComposeModal } = useUIStore();
 
 	useEffect(() => {
-		if (
-			prevMailboxIdRef.current &&
-			mailboxId &&
-			prevMailboxIdRef.current !== mailboxId
-		) {
+		if (prevMailboxIdRef.current && mailboxId && prevMailboxIdRef.current !== mailboxId) {
 			closePanel();
 			closeComposeModal();
 			closeSidebar();
@@ -39,44 +30,66 @@ export default function MailboxRoute() {
 	}, [mailboxId, closeComposeModal, closePanel, closeSidebar]);
 
 	return (
-		<div className="flex h-screen overflow-hidden">
+		<Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
 			{/* Mobile sidebar overlay backdrop */}
 			{isSidebarOpen && (
-				<div
-					className="fixed inset-0 z-30 bg-black/30 md:hidden"
+				<Box
 					onClick={closeSidebar}
-					onKeyDown={(e) => e.key === "Escape" && closeSidebar()}
-					role="button"
-					tabIndex={-1}
-					aria-label="Close sidebar"
+					role="presentation"
+					sx={{
+						position: "fixed",
+						inset: 0,
+						zIndex: 30,
+						bgcolor: "rgba(0,0,0,0.3)",
+						display: { xs: "block", md: "none" },
+					}}
 				/>
 			)}
 
 			{/* Sidebar: hidden on mobile by default, shown as overlay when open */}
-			<div
-				className={`fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 md:z-0 ${
-					isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-				}`}
+			<Box
+				sx={{
+					position: { xs: "fixed", md: "relative" },
+					inset: { xs: "0 auto 0 0", md: "auto" },
+					zIndex: { xs: 40, md: 0 },
+					width: { xs: 256, md: "auto" },
+					transform: {
+						xs: isSidebarOpen ? "translateX(0)" : "translateX(-100%)",
+						md: "none",
+					},
+					transition: "transform 200ms ease-in-out",
+				}}
 			>
 				<Sidebar />
-			</div>
+			</Box>
 
 			{/* Main content */}
-			<div className="flex-1 flex flex-col min-w-0 bg-kumo-base">
+			<Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, bgcolor: "background.paper" }}>
 				<Header />
-				<main className="flex-1 overflow-hidden">
+				<Box component="main" sx={{ flex: 1, overflow: "hidden" }}>
 					<Outlet />
-				</main>
-			</div>
+				</Box>
+			</Box>
 
 			{/* Agent + MCP sidebar -- togglable on desktop */}
 			{isAgentPanelOpen && (
-				<div className="hidden lg:flex w-[380px] shrink-0 border-l border-kumo-line flex-col bg-kumo-base overflow-hidden">
+				<Box
+					sx={{
+						display: { xs: "none", lg: "flex" },
+						width: 380,
+						flexShrink: 0,
+						borderLeft: 1,
+						borderColor: "divider",
+						flexDirection: "column",
+						bgcolor: "background.paper",
+						overflow: "hidden",
+					}}
+				>
 					<AgentSidebar />
-				</div>
+				</Box>
 			)}
 
 			<ComposeEmail />
-		</div>
+		</Box>
 	);
 }

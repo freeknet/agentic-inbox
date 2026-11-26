@@ -2,8 +2,15 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Badge, Button, Loader, Pagination, Tooltip } from "@cloudflare/kumo";
-import { ArrowLeftIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import SearchIcon from "@mui/icons-material/Search";
+import Box from "@mui/material/Box";
+import Chip from "@mui/material/Chip";
+import CircularProgress from "@mui/material/CircularProgress";
+import IconButton from "@mui/material/IconButton";
+import Pagination from "@mui/material/Pagination";
+import Tooltip from "@mui/material/Tooltip";
+import Typography from "@mui/material/Typography";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import MailboxSplitView from "~/components/MailboxSplitView";
@@ -15,7 +22,10 @@ import type { Email } from "~/types";
 
 function highlightTerms(text: string, query: string): React.ReactNode {
 	if (!query || !text) return text;
-	const freeText = query.replace(/\b(?:from|to|subject|in|is|has|before|after):"[^"]*"/gi, "").replace(/\b(?:from|to|subject|in|is|has|before|after):\S+/gi, "").trim();
+	const freeText = query
+		.replace(/\b(?:from|to|subject|in|is|has|before|after):"[^"]*"/gi, "")
+		.replace(/\b(?:from|to|subject|in|is|has|before|after):\S+/gi, "")
+		.trim();
 	if (!freeText) return text;
 	try {
 		const escaped = freeText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -25,8 +35,22 @@ function highlightTerms(text: string, query: string): React.ReactNode {
 		// Use case-insensitive string comparison instead of regex.test() with g flag,
 		// which has stateful lastIndex causing alternating true/false results.
 		const lowerEscaped = escaped.toLowerCase();
-		return parts.map((part, i) => part.toLowerCase() === lowerEscaped ? <mark key={i} className="bg-kumo-warning-muted text-kumo-default rounded-sm px-0.5">{part}</mark> : part);
-	} catch { return text; }
+		return parts.map((part, i) =>
+			part.toLowerCase() === lowerEscaped ? (
+				<Box
+					key={i}
+					component="mark"
+					sx={{ bgcolor: "warning.main", color: "warning.contrastText", borderRadius: 0.5, px: 0.25 }}
+				>
+					{part}
+				</Box>
+			) : (
+				part
+			),
+		);
+	} catch {
+		return text;
+	}
 }
 
 export default function SearchResultsRoute() {
@@ -37,10 +61,7 @@ export default function SearchResultsRoute() {
 	const updateEmail = useUpdateEmail();
 	const urlQuery = searchParams.get("q") || "";
 	const [page, setPage] = useState(1);
-	const searchKey = useMemo(
-		() => `${mailboxId ?? ""}::${urlQuery}`,
-		[mailboxId, urlQuery],
-	);
+	const searchKey = useMemo(() => `${mailboxId ?? ""}::${urlQuery}`, [mailboxId, urlQuery]);
 	const prevSearchKeyRef = useRef(searchKey);
 	const searchChanged = prevSearchKeyRef.current !== searchKey;
 	const currentPage = searchChanged ? 1 : page;
@@ -55,55 +76,166 @@ export default function SearchResultsRoute() {
 		closePanel();
 	}, [closePanel, searchChanged, searchKey]);
 
-	const { data: searchData, isLoading } = useSearchEmails(
-		mailboxId,
-		urlQuery,
-		currentPage,
-	);
+	const { data: searchData, isLoading } = useSearchEmails(mailboxId, urlQuery, currentPage);
 	const results = searchData?.results ?? [];
 	const totalCount = searchData?.totalCount ?? 0;
 	const isPanelOpen = selectedEmailId !== null || isComposing;
 
-	const handleRowClick = (email: Email) => { selectEmail(email.id); if (!email.read && mailboxId) updateEmail.mutate({ mailboxId, id: email.id, data: { read: true } }); };
-	const folderDisplayName = (name: string | null | undefined): string => { if (!name) return ""; const map: Record<string, string> = { inbox: "Inbox", sent: "Sent", draft: "Drafts", archive: "Archive", trash: "Trash" }; return map[name.toLowerCase()] || name; };
+	const handleRowClick = (email: Email) => {
+		selectEmail(email.id);
+		if (!email.read && mailboxId) updateEmail.mutate({ mailboxId, id: email.id, data: { read: true } });
+	};
+	const folderDisplayName = (name: string | null | undefined): string => {
+		if (!name) return "";
+		const map: Record<string, string> = { inbox: "Inbox", sent: "Sent", draft: "Drafts", archive: "Archive", trash: "Trash" };
+		return map[name.toLowerCase()] || name;
+	};
 
 	return (
-		<MailboxSplitView
-			selectedEmailId={selectedEmailId}
-			isComposing={isComposing}
-		>
+		<MailboxSplitView selectedEmailId={selectedEmailId} isComposing={isComposing}>
 			<>
-				<div className="flex items-center gap-2 px-4 py-3.5 border-b border-kumo-line shrink-0 md:px-5">
-					<Tooltip content="Back to inbox" side="bottom" render={<Button variant="ghost" shape="square" size="sm" icon={<ArrowLeftIcon size={18} />} onClick={() => navigate(`/mailbox/${mailboxId}/emails/inbox`)} aria-label="Back to inbox" />} />
-					<div className="min-w-0 flex-1"><h1 className="text-lg font-semibold text-kumo-default truncate">Search Results</h1>{!isLoading && <span className="text-sm text-kumo-subtle">{totalCount} result{totalCount !== 1 ? "s" : ""}{urlQuery ? ` for "${urlQuery}"` : ""}</span>}</div>
-				</div>
-				<div className="flex-1 overflow-y-auto">
-					{isLoading ? <div className="flex justify-center py-16"><Loader size="lg" /></div> : results.length === 0 ? (
-						<div className="flex flex-col items-center justify-center py-24 px-6 text-center">
-							<div className="mb-4"><MagnifyingGlassIcon size={48} weight="thin" className="text-kumo-subtle" /></div>
-							<h3 className="text-base font-semibold text-kumo-default mb-1.5">No results found</h3>
-							<p className="text-sm text-kumo-subtle max-w-xs">{urlQuery ? `Nothing matched "${urlQuery}". Try different keywords or check your spelling.` : "Enter a search term to find emails by subject, sender, or content."}</p>
-							{urlQuery && <p className="text-xs text-kumo-subtle mt-3 max-w-sm">Tip: Use operators like <code className="bg-kumo-tint px-1 rounded">from:name</code>, <code className="bg-kumo-tint px-1 rounded">is:unread</code>, <code className="bg-kumo-tint px-1 rounded">has:attachment</code>, <code className="bg-kumo-tint px-1 rounded">before:2025-01-01</code></p>}
-						</div>
+				<Box
+					sx={{
+						display: "flex",
+						alignItems: "center",
+						gap: 1,
+						px: { xs: 2, md: 2.5 },
+						py: 1.5,
+						borderBottom: 1,
+						borderColor: "divider",
+						flexShrink: 0,
+					}}
+				>
+					<IconButton
+						size="small"
+						onClick={() => navigate(`/mailbox/${mailboxId}/emails/inbox`)}
+						aria-label="Back to inbox"
+					>
+						<ArrowBackIcon fontSize="small" />
+					</IconButton>
+					<Box sx={{ minWidth: 0, flex: 1 }}>
+						<Typography variant="h6" sx={{ fontSize: 18, fontWeight: 600 }} noWrap>
+							Search Results
+						</Typography>
+						{!isLoading && (
+							<Typography variant="body2" color="text.secondary">
+								{totalCount} result{totalCount !== 1 ? "s" : ""}
+								{urlQuery ? ` for "${urlQuery}"` : ""}
+							</Typography>
+						)}
+					</Box>
+				</Box>
+				<Box sx={{ flex: 1, overflowY: "auto" }}>
+					{isLoading ? (
+						<Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+							<CircularProgress />
+						</Box>
+					) : results.length === 0 ? (
+						<Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", py: 12, px: 3, textAlign: "center" }}>
+							<SearchIcon sx={{ fontSize: 48, color: "text.disabled", mb: 2 }} />
+							<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+								No results found
+							</Typography>
+							<Typography variant="body2" color="text.secondary" sx={{ maxWidth: 320 }}>
+								{urlQuery
+									? `Nothing matched "${urlQuery}". Try different keywords or check your spelling.`
+									: "Enter a search term to find emails by subject, sender, or content."}
+							</Typography>
+							{urlQuery && (
+								<Typography variant="caption" color="text.secondary" sx={{ mt: 1.5, maxWidth: 360 }}>
+									Tip: Use operators like <Box component="code" sx={{ bgcolor: "action.hover", px: 0.5, borderRadius: 1 }}>from:name</Box>,{" "}
+									<Box component="code" sx={{ bgcolor: "action.hover", px: 0.5, borderRadius: 1 }}>is:unread</Box>,{" "}
+									<Box component="code" sx={{ bgcolor: "action.hover", px: 0.5, borderRadius: 1 }}>has:attachment</Box>,{" "}
+									<Box component="code" sx={{ bgcolor: "action.hover", px: 0.5, borderRadius: 1 }}>before:2025-01-01</Box>
+								</Typography>
+							)}
+						</Box>
 					) : (
-						<div>{results.map((email) => {
-							const isSelected = selectedEmailId === email.id;
-							const snippet = getSnippetText(email.snippet, 120);
-							const folderName = (email as Email & { folder_name?: string }).folder_name;
-							return (
-								<div key={email.id} role="button" tabIndex={0} onClick={() => handleRowClick(email)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleRowClick(email); } }} className={`group flex items-center gap-3 w-full text-left cursor-pointer transition-colors border-b border-kumo-line px-4 py-2.5 md:px-5 md:py-3 ${isPanelOpen ? "md:px-4 md:py-2.5" : ""} ${isSelected ? "bg-kumo-tint" : "hover:bg-kumo-tint"}`}>
-									<div className="w-2.5 shrink-0 flex justify-center">{!email.read && <div className="h-2 w-2 rounded-full bg-kumo-brand" />}</div>
-									<div className="min-w-0 flex-1">
-										<div className="flex items-center gap-2"><span className={`truncate text-sm ${!email.read ? "font-semibold text-kumo-default" : "text-kumo-strong"}`}>{highlightTerms(email.sender.split("@")[0], urlQuery)}</span>{folderName && <Badge variant="outline">{folderDisplayName(folderName)}</Badge>}<span className="text-sm text-kumo-subtle shrink-0 ml-auto">{formatListDate(email.date)}</span></div>
-										<div className={`truncate text-sm mt-0.5 ${!email.read ? "font-medium text-kumo-default" : "text-kumo-subtle"}`}>{highlightTerms(email.subject, urlQuery)}</div>
-										{snippet && <div className="truncate text-xs text-kumo-subtle mt-0.5">{highlightTerms(snippet, urlQuery)}</div>}
-									</div>
-								</div>
-							);
-						})}</div>
+						<Box>
+							{results.map((email) => {
+								const isSelected = selectedEmailId === email.id;
+								const snippet = getSnippetText(email.snippet, 120);
+								const folderName = (email as Email & { folder_name?: string }).folder_name;
+								return (
+									<Box
+										key={email.id}
+										role="button"
+										tabIndex={0}
+										onClick={() => handleRowClick(email)}
+										onKeyDown={(e) => {
+											if (e.key === "Enter" || e.key === " ") {
+												e.preventDefault();
+												handleRowClick(email);
+											}
+										}}
+										sx={{
+											display: "flex",
+											alignItems: "center",
+											gap: 1.5,
+											width: "100%",
+											textAlign: "left",
+											cursor: "pointer",
+											borderBottom: 1,
+											borderColor: "divider",
+											px: { xs: 2, md: isPanelOpen ? 2 : 2.5 },
+											py: { xs: 1.25, md: isPanelOpen ? 1.25 : 1.5 },
+											bgcolor: isSelected ? "action.selected" : "transparent",
+											"&:hover": { bgcolor: isSelected ? "action.selected" : "action.hover" },
+										}}
+									>
+										<Box sx={{ width: 10, flexShrink: 0, display: "flex", justifyContent: "center" }}>
+											{!email.read && <Box sx={{ height: 8, width: 8, borderRadius: "50%", bgcolor: "primary.main" }} />}
+										</Box>
+										<Box sx={{ minWidth: 0, flex: 1 }}>
+											<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+												<Typography
+													variant="body2"
+													noWrap
+													sx={{ fontWeight: !email.read ? 700 : 400, color: !email.read ? "text.primary" : "text.secondary" }}
+												>
+													{highlightTerms(email.sender.split("@")[0], urlQuery)}
+												</Typography>
+												{folderName && (
+													<Chip
+														size="small"
+														variant="outlined"
+														label={folderDisplayName(folderName)}
+														sx={{ height: 18, fontSize: 11 }}
+													/>
+												)}
+												<Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, ml: "auto" }}>
+													{formatListDate(email.date)}
+												</Typography>
+											</Box>
+											<Typography
+												variant="body2"
+												noWrap
+												sx={{ mt: 0.25, fontWeight: !email.read ? 500 : 400, color: !email.read ? "text.primary" : "text.secondary" }}
+											>
+												{highlightTerms(email.subject, urlQuery)}
+											</Typography>
+											{snippet && (
+												<Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block", mt: 0.25 }}>
+													{highlightTerms(snippet, urlQuery)}
+												</Typography>
+											)}
+										</Box>
+									</Box>
+								);
+							})}
+						</Box>
 					)}
-				</div>
-				{totalCount > SEARCH_PAGE_SIZE && <div className="flex justify-center py-3 border-t border-kumo-line shrink-0"><Pagination page={currentPage} setPage={setPage} perPage={SEARCH_PAGE_SIZE} totalCount={totalCount} /></div>}
+				</Box>
+				{totalCount > SEARCH_PAGE_SIZE && (
+					<Box sx={{ display: "flex", justifyContent: "center", py: 1.5, borderTop: 1, borderColor: "divider", flexShrink: 0 }}>
+						<Pagination
+							size="small"
+							page={currentPage}
+							count={Math.max(1, Math.ceil(totalCount / SEARCH_PAGE_SIZE))}
+							onChange={(_, p) => setPage(p)}
+						/>
+					</Box>
+				)}
 			</>
 		</MailboxSplitView>
 	);

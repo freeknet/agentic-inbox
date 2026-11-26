@@ -2,6 +2,9 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Typography from "@mui/material/Typography";
 import DOMPurify from "dompurify";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -101,13 +104,13 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 		const imgSrc = showRemote ? "data: cid: https:" : "data: cid:";
 
 		void (async () => {
-		const scriptSrc = autoSize ? `'sha256-${await sha256Base64(HEIGHT_SCRIPT)}'` : "'none'";
-		const heightScript = autoSize ? `<script>${HEIGHT_SCRIPT}<\/script>` : "";
-		if (cancelled) return;
+			const scriptSrc = autoSize ? `'sha256-${await sha256Base64(HEIGHT_SCRIPT)}'` : "'none'";
+			const heightScript = autoSize ? `<script>${HEIGHT_SCRIPT}<\/script>` : "";
+			if (cancelled) return;
 
-		// Use srcdoc so the iframe is truly sandboxed (no same-origin access).
-		// We can't use doc.write() because that requires allow-same-origin.
-		iframe.srcdoc = `<!DOCTYPE html>
+			// Use srcdoc so the iframe is truly sandboxed (no same-origin access).
+			// We can't use doc.write() because that requires allow-same-origin.
+			iframe.srcdoc = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -167,8 +170,12 @@ ul, ol { padding-left: 20px; margin: 4px 0; }
 	const frame = (
 		<iframe
 			ref={iframeRef}
-			className="block w-full border-0"
-			style={autoSize ? { height: `${height}px` } : { height: "100%" }}
+			style={{
+				display: "block",
+				width: "100%",
+				border: 0,
+				...(autoSize ? { height: `${height}px` } : { height: "100%" }),
+			}}
 			// No allow-top-navigation: links can only open new tabs (B6).
 			sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
 			title="Email content"
@@ -176,14 +183,27 @@ ul, ol { padding-left: 20px; margin: 4px 0; }
 	);
 	if (!hasRemote || showRemote) return frame;
 	return (
-		<div className={autoSize ? "" : "flex h-full flex-col"}>
-			<div className="flex items-center gap-2 border-b border-kumo-line bg-kumo-elevated px-3 py-1.5 text-xs text-kumo-subtle">
-				<span>Remote images are hidden.</span>
-				<button type="button" className="font-medium text-kumo-brand hover:underline" onClick={() => setShowRemote(true)}>
+		<Box sx={{ display: "flex", flexDirection: autoSize ? "column" : "column", height: autoSize ? "auto" : "100%" }}>
+			<Box
+				sx={{
+					display: "flex",
+					alignItems: "center",
+					gap: 1,
+					borderBottom: 1,
+					borderColor: "divider",
+					bgcolor: "action.hover",
+					px: 1.5,
+					py: 0.75,
+				}}
+			>
+				<Typography variant="caption" color="text.secondary">
+					Remote images are hidden.
+				</Typography>
+				<Button size="small" onClick={() => setShowRemote(true)} sx={{ minWidth: 0, fontSize: 12 }}>
 					Show images
-				</button>
-			</div>
-			<div className={autoSize ? "" : "min-h-0 flex-1"}>{frame}</div>
-		</div>
+				</Button>
+			</Box>
+			<Box sx={{ minHeight: 0, flex: autoSize ? undefined : 1 }}>{frame}</Box>
+		</Box>
 	);
 }

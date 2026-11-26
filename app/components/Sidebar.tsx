@@ -2,31 +2,43 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Badge, Button, Dialog, Input, Tooltip } from "@cloudflare/kumo";
-import {
-	ArchiveIcon,
-	CaretLeftIcon,
-	FileIcon,
-	FolderIcon,
-	PaperPlaneTiltIcon,
-	PencilSimpleIcon,
-	PlusIcon,
-	TrashIcon,
-	TrayIcon,
-} from "@phosphor-icons/react";
-import { useMemo, useState } from "react";
-import { NavLink, useNavigate, useParams } from "react-router";
+import AddIcon from "@mui/icons-material/Add";
+import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import DraftsOutlinedIcon from "@mui/icons-material/DraftsOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined";
+import InboxIcon from "@mui/icons-material/Inbox";
+import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Chip from "@mui/material/Chip";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
+import IconButton from "@mui/material/IconButton";
+import List from "@mui/material/List";
+import ListItemButton from "@mui/material/ListItemButton";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
+import TextField from "@mui/material/TextField";
+import Tooltip from "@mui/material/Tooltip";
+import Typography from "@mui/material/Typography";
+import { type FormEvent, useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { Folders, SYSTEM_FOLDER_IDS } from "shared/folders";
 import { useCreateFolder, useFolders } from "~/queries/folders";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
 
 const FOLDER_ICONS: Record<string, React.ReactNode> = {
-	[Folders.INBOX]: <TrayIcon size={18} weight="regular" />,
-	[Folders.SENT]: <PaperPlaneTiltIcon size={18} weight="regular" />,
-	[Folders.DRAFT]: <FileIcon size={18} weight="regular" />,
-	[Folders.ARCHIVE]: <ArchiveIcon size={18} weight="regular" />,
-	[Folders.TRASH]: <TrashIcon size={18} weight="regular" />,
+	[Folders.INBOX]: <InboxIcon fontSize="small" />,
+	[Folders.SENT]: <SendOutlinedIcon fontSize="small" />,
+	[Folders.DRAFT]: <DraftsOutlinedIcon fontSize="small" />,
+	[Folders.ARCHIVE]: <ArchiveOutlinedIcon fontSize="small" />,
+	[Folders.TRASH]: <DeleteOutlinedIcon fontSize="small" />,
 };
 
 const SYSTEM_FOLDER_LINKS = [
@@ -37,45 +49,10 @@ const SYSTEM_FOLDER_LINKS = [
 	{ id: Folders.TRASH, label: "Trash" },
 ];
 
-interface FolderLinkProps {
-	to: string;
-	icon: React.ReactNode;
-	label: string;
-	unreadCount?: number;
-	onClick?: () => void;
-}
-
-function FolderLink({
-	to,
-	icon,
-	label,
-	unreadCount,
-	onClick,
-}: FolderLinkProps) {
-	return (
-		<NavLink
-			to={to}
-			onClick={onClick}
-			className={({ isActive }) =>
-				`flex items-center gap-3 py-2 px-3 rounded-md text-sm transition-colors ${
-					isActive
-						? "bg-kumo-fill font-semibold text-kumo-default"
-						: "text-kumo-strong hover:bg-kumo-tint"
-				}`
-			}
-		>
-			<span className="shrink-0">{icon}</span>
-			<span className="truncate flex-1">{label}</span>
-			{unreadCount != null && unreadCount > 0 && (
-				<Badge variant="secondary">{unreadCount}</Badge>
-			)}
-		</NavLink>
-	);
-}
-
 export default function Sidebar() {
 	const { mailboxId } = useParams<{ mailboxId: string }>();
 	const navigate = useNavigate();
+	const { pathname } = useLocation();
 	const { data: folders = [] } = useFolders(mailboxId);
 	const createFolderMutation = useCreateFolder();
 	const { startCompose, closeSidebar } = useUIStore();
@@ -84,8 +61,7 @@ export default function Sidebar() {
 	const [newFolderName, setNewFolderName] = useState("");
 
 	const customFolders = useMemo(
-		() =>
-			folders.filter((f) => !(SYSTEM_FOLDER_IDS as readonly string[]).includes(f.id)),
+		() => folders.filter((f) => !(SYSTEM_FOLDER_IDS as readonly string[]).includes(f.id)),
 		[folders],
 	);
 
@@ -94,7 +70,7 @@ export default function Sidebar() {
 		return found?.unreadCount || 0;
 	};
 
-	const handleCreateFolder = (e: React.SubmitEvent) => {
+	const handleCreateFolder = (e: FormEvent) => {
 		e.preventDefault();
 		if (newFolderName.trim() && mailboxId) {
 			createFolderMutation.mutate({ mailboxId, name: newFolderName.trim() });
@@ -115,146 +91,135 @@ export default function Sidebar() {
 		return currentMailbox.email.split("@")[0] || currentMailbox.name;
 	}, [currentMailbox, mailboxId]);
 
-	const handleNavClick = () => {
-		// Close mobile sidebar on navigation
+	const go = (folderId: string) => {
+		navigate(`/mailbox/${mailboxId}/emails/${folderId}`);
 		closeSidebar();
 	};
 
+	const isActive = (folderId: string) =>
+		pathname === `/mailbox/${mailboxId}/emails/${folderId}`;
+
+	const folderRow = (folderId: string, label: string, icon: React.ReactNode, unread?: number) => (
+		<ListItemButton
+			key={folderId}
+			selected={isActive(folderId)}
+			onClick={() => go(folderId)}
+			sx={{ borderRadius: 999, py: 0.75, gap: 1 }}
+		>
+			<ListItemIcon sx={{ minWidth: 0, color: "inherit" }}>{icon}</ListItemIcon>
+			<ListItemText
+				primary={label}
+				slotProps={{ primary: { sx: { fontSize: 14, fontWeight: isActive(folderId) ? 600 : 400 }, noWrap: true } }}
+			/>
+			{unread != null && unread > 0 && (
+				<Chip size="small" label={unread} sx={{ height: 20, fontSize: 11 }} />
+			)}
+		</ListItemButton>
+	);
+
 	return (
-		<aside className="h-full w-64 bg-kumo-recessed flex flex-col shrink-0 border-r border-kumo-line">
+		<Box
+			component="aside"
+			sx={{
+				height: "100%",
+				width: 256,
+				bgcolor: "background.default",
+				display: "flex",
+				flexDirection: "column",
+				flexShrink: 0,
+				borderRight: 1,
+				borderColor: "divider",
+			}}
+		>
 			{/* Back + identity */}
-			<div className="px-4 pt-4 pb-1">
-				<button
-					type="button"
+			<Box sx={{ px: 2, pt: 2, pb: 0.5 }}>
+				<Button
+					size="small"
+					startIcon={<ArrowBackIcon sx={{ fontSize: 14 }} />}
 					onClick={() => {
 						navigate("/");
 						closeSidebar();
 					}}
-					className="flex items-center gap-1.5 text-kumo-subtle text-sm hover:text-kumo-default transition-colors mb-2.5 cursor-pointer bg-transparent border-0 p-0"
+					sx={{ color: "text.secondary", px: 0.5, mb: 1 }}
 				>
-					<CaretLeftIcon size={14} />
-					<span>Mailboxes</span>
-				</button>
-				<div className="px-1">
-					<div className="text-base font-semibold text-kumo-default truncate">
+					Mailboxes
+				</Button>
+				<Box sx={{ px: 0.5 }}>
+					<Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>
 						{displayName}
-					</div>
-					<div className="text-sm text-kumo-subtle truncate mt-0.5">
+					</Typography>
+					<Typography variant="body2" color="text.secondary" noWrap sx={{ mt: 0.25 }}>
 						{currentMailbox?.email || mailboxId}
-					</div>
-				</div>
-			</div>
+					</Typography>
+				</Box>
+			</Box>
 
 			{/* Compose */}
-			<div className="px-3 py-3">
+			<Box sx={{ px: 1.5, py: 1.5 }}>
 				<Button
-					variant="primary"
-					icon={<PencilSimpleIcon size={16} />}
+					variant="contained"
+					fullWidth
+					startIcon={<EditOutlinedIcon />}
 					onClick={() => startCompose()}
-					className="w-full"
 				>
 					Compose
 				</Button>
-			</div>
+			</Box>
 
 			{/* Navigation */}
-			<nav className="flex-1 overflow-y-auto px-2 space-y-0.5">
-				{SYSTEM_FOLDER_LINKS.map((folder) => (
-					<FolderLink
-						key={folder.id}
-						to={`/mailbox/${mailboxId}/emails/${folder.id}`}
-						icon={FOLDER_ICONS[folder.id]}
-						label={folder.label}
-						unreadCount={getUnreadCount(folder.id)}
-						onClick={handleNavClick}
-					/>
-				))}
+			<Box component="nav" sx={{ flex: 1, overflowY: "auto", px: 1 }}>
+				<List dense disablePadding>
+					{SYSTEM_FOLDER_LINKS.map((folder) =>
+						folderRow(folder.id, folder.label, FOLDER_ICONS[folder.id], getUnreadCount(folder.id)),
+					)}
+				</List>
 
-				{/* Custom folders */}
-				{customFolders.length > 0 && (
-					<div className="pt-5">
-						<div className="flex items-center justify-between px-3 mb-1.5">
-							<span className="text-xs uppercase tracking-wider font-semibold text-kumo-subtle">
-								Folders
-							</span>
-							<Tooltip content="New folder" render={<Button
-									variant="ghost"
-									shape="square"
-									size="sm"
-									icon={<PlusIcon size={16} />}
-									onClick={() => setIsCreateFolderOpen(true)}
-									aria-label="Create new folder"
-								/>} />
-						</div>
-						{customFolders.map((folder) => (
-							<FolderLink
-								key={folder.id}
-								to={`/mailbox/${mailboxId}/emails/${folder.id}`}
-								icon={<FolderIcon size={18} />}
-								label={folder.name}
-								unreadCount={folder.unreadCount}
-								onClick={handleNavClick}
-							/>
-						))}
-					</div>
-				)}
-
-				{/* Add folder button when no custom folders */}
-				{customFolders.length === 0 && (
-					<div className="pt-5">
-						<div className="flex items-center justify-between px-3 mb-1.5">
-							<span className="text-xs uppercase tracking-wider font-semibold text-kumo-subtle">
-								Folders
-							</span>
-							<Tooltip content="New folder" render={<Button
-									variant="ghost"
-									shape="square"
-									size="sm"
-									icon={<PlusIcon size={16} />}
-									onClick={() => setIsCreateFolderOpen(true)}
-									aria-label="Create new folder"
-								/>} />
-						</div>
-					</div>
-				)}
-			</nav>
+				<Box sx={{ pt: 2.5 }}>
+					<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 1.5, mb: 0.5 }}>
+						<Typography
+							variant="caption"
+							sx={{ textTransform: "uppercase", letterSpacing: 0.8, fontWeight: 600, color: "text.secondary" }}
+						>
+							Folders
+						</Typography>
+						<Tooltip title="New folder">
+							<IconButton size="small" onClick={() => setIsCreateFolderOpen(true)} aria-label="Create new folder">
+								<AddIcon fontSize="small" />
+							</IconButton>
+						</Tooltip>
+					</Box>
+					<List dense disablePadding>
+						{customFolders.map((folder) =>
+							folderRow(folder.id, folder.name, <FolderOutlinedIcon fontSize="small" />, folder.unreadCount),
+						)}
+					</List>
+				</Box>
+			</Box>
 
 			{/* Create folder dialog */}
-			<Dialog.Root
-				open={isCreateFolderOpen}
-				onOpenChange={setIsCreateFolderOpen}
-			>
-				<Dialog size="sm" className="p-6">
-					<Dialog.Title className="text-base font-semibold mb-4">
-						Create folder
-					</Dialog.Title>
-					<form onSubmit={handleCreateFolder} className="space-y-4">
-						<Input
+			<Dialog open={isCreateFolderOpen} onClose={() => setIsCreateFolderOpen(false)} fullWidth maxWidth="xs">
+				<form onSubmit={handleCreateFolder}>
+					<DialogTitle>Create folder</DialogTitle>
+					<DialogContent>
+						<TextField
+							autoFocus
+							fullWidth
 							label="Folder name"
 							placeholder="e.g. Projects"
 							value={newFolderName}
 							onChange={(e) => setNewFolderName(e.target.value)}
 							required
+							sx={{ mt: 1 }}
 						/>
-						<div className="flex justify-end gap-2">
-							<Dialog.Close
-								render={(props) => (
-									<Button {...props} variant="secondary">
-										Cancel
-									</Button>
-								)}
-							/>
-							<Button
-								type="submit"
-								variant="primary"
-								disabled={!newFolderName.trim()}
-							>
-								Create
-							</Button>
-						</div>
-					</form>
-				</Dialog>
-			</Dialog.Root>
-		</aside>
+					</DialogContent>
+					<DialogActions>
+						<Button onClick={() => setIsCreateFolderOpen(false)}>Cancel</Button>
+						<Button type="submit" variant="contained" disabled={!newFolderName.trim()}>
+							Create
+						</Button>
+					</DialogActions>
+				</form>
+			</Dialog>
+		</Box>
 	);
 }

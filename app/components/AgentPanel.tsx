@@ -2,22 +2,31 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Badge, Button, Loader, Tooltip } from "@cloudflare/kumo";
-import {
-	ArrowUpIcon,
-	RobotIcon,
-	TrashIcon,
-	UserIcon,
-	EnvelopeSimpleIcon,
-	MagnifyingGlassIcon,
-	PaperPlaneTiltIcon,
-	EyeIcon,
-	ArrowBendUpLeftIcon,
-	WrenchIcon,
-	CheckCircleIcon,
-	StopIcon,
-	PencilSimpleIcon,
-} from "@phosphor-icons/react";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import BuildOutlinedIcon from "@mui/icons-material/BuildOutlined";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import MailOutlinedIcon from "@mui/icons-material/MailOutlined";
+import MarkEmailReadOutlinedIcon from "@mui/icons-material/MarkEmailReadOutlined";
+import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
+import ReplyIcon from "@mui/icons-material/Reply";
+import SearchIcon from "@mui/icons-material/Search";
+import SendIcon from "@mui/icons-material/Send";
+import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
+import StopCircleOutlinedIcon from "@mui/icons-material/StopCircleOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import AutorenewIcon from "@mui/icons-material/Autorenew";
+import Avatar from "@mui/material/Avatar";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import ButtonBase from "@mui/material/ButtonBase";
+import Chip from "@mui/material/Chip";
+import CircularProgress from "@mui/material/CircularProgress";
+import IconButton from "@mui/material/IconButton";
+import TextField from "@mui/material/TextField";
+import Tooltip from "@mui/material/Tooltip";
+import Typography from "@mui/material/Typography";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 import Markdown from "react-markdown";
@@ -26,72 +35,46 @@ import { useUIStore } from "~/hooks/useUIStore";
 import type { UIMessage } from "ai";
 
 const TOOL_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
-	list_emails: {
-		label: "Fetching emails",
-		icon: <EnvelopeSimpleIcon size={14} weight="bold" />,
-	},
-	get_email: {
-		label: "Reading email",
-		icon: <EyeIcon size={14} weight="bold" />,
-	},
-	get_thread: {
-		label: "Loading thread",
-		icon: <ArrowBendUpLeftIcon size={14} weight="bold" />,
-	},
-	search_emails: {
-		label: "Searching",
-		icon: <MagnifyingGlassIcon size={14} weight="bold" />,
-	},
-	draft_email: {
-		label: "Drafting email",
-		icon: <PaperPlaneTiltIcon size={14} weight="bold" />,
-	},
-	draft_reply: {
-		label: "Drafting reply",
-		icon: <PaperPlaneTiltIcon size={14} weight="bold" />,
-	},
-	discard_draft: {
-		label: "Discarding draft",
-		icon: <TrashIcon size={14} weight="bold" />,
-	},
-	mark_email_read: {
-		label: "Updating status",
-		icon: <CheckCircleIcon size={14} weight="bold" />,
-	},
-	move_email: {
-		label: "Moving email",
-		icon: <EnvelopeSimpleIcon size={14} weight="bold" />,
-	},
+	list_emails: { label: "Fetching emails", icon: <MailOutlinedIcon sx={{ fontSize: 14 }} /> },
+	get_email: { label: "Reading email", icon: <VisibilityOutlinedIcon sx={{ fontSize: 14 }} /> },
+	get_thread: { label: "Loading thread", icon: <ReplyIcon sx={{ fontSize: 14 }} /> },
+	search_emails: { label: "Searching", icon: <SearchIcon sx={{ fontSize: 14 }} /> },
+	draft_email: { label: "Drafting email", icon: <SendIcon sx={{ fontSize: 14 }} /> },
+	draft_reply: { label: "Drafting reply", icon: <SendIcon sx={{ fontSize: 14 }} /> },
+	discard_draft: { label: "Discarding draft", icon: <DeleteOutlinedIcon sx={{ fontSize: 14 }} /> },
+	mark_email_read: { label: "Updating status", icon: <MarkEmailReadOutlinedIcon sx={{ fontSize: 14 }} /> },
+	move_email: { label: "Moving email", icon: <MailOutlinedIcon sx={{ fontSize: 14 }} /> },
 };
 
-function ToolCallBadge({
-	toolName,
-	state,
-}: {
-	toolName: string;
-	state: string;
-}) {
+function ToolCallBadge({ toolName, state }: { toolName: string; state: string }) {
 	const info = TOOL_LABELS[toolName] || {
 		label: toolName,
-		icon: <WrenchIcon size={14} weight="bold" />,
+		icon: <BuildOutlinedIcon sx={{ fontSize: 14 }} />,
 	};
-	const isDone =
-		state === "output-available" || state === "output-error";
+	const isDone = state === "output-available" || state === "output-error";
 
 	return (
-		<div className="flex items-center gap-1.5 py-1 px-2 rounded bg-kumo-fill/50 text-xs">
-			<span className="text-kumo-brand">{info.icon}</span>
-			<span className="text-kumo-strong">{info.label}</span>
+		<Box
+			sx={{
+				display: "flex",
+				alignItems: "center",
+				gap: 0.75,
+				py: 0.5,
+				px: 1,
+				borderRadius: 1,
+				bgcolor: "action.hover",
+			}}
+		>
+			<Box sx={{ display: "flex", color: "primary.main" }}>{info.icon}</Box>
+			<Typography variant="caption" sx={{ color: "text.primary" }}>
+				{info.label}
+			</Typography>
 			{isDone ? (
-				<CheckCircleIcon
-					size={12}
-					weight="fill"
-					className="text-kumo-success ml-auto"
-				/>
+				<CheckCircleIcon sx={{ fontSize: 12, color: "success.main", ml: "auto" }} />
 			) : (
-				<Loader size="sm" className="ml-auto" />
+				<CircularProgress size={12} sx={{ ml: "auto" }} />
 			)}
-		</div>
+		</Box>
 	);
 }
 
@@ -102,31 +85,16 @@ function getToolNameFromPart(part: UIMessage["parts"][number]): string | null {
 }
 
 function hasDraftReplyTool(message: UIMessage): boolean {
-	return message.parts.some((part) => {
-		const toolName = getToolNameFromPart(part);
-		return toolName === "draft_reply";
-	});
+	return message.parts.some((part) => getToolNameFromPart(part) === "draft_reply");
 }
 
-function DraftActions({
-	onEdit,
-	disabled,
-}: {
-	onEdit: () => void;
-	disabled: boolean;
-}) {
+function DraftActions({ onEdit, disabled }: { onEdit: () => void; disabled: boolean }) {
 	return (
-		<div className="flex gap-1.5 mt-1">
-			<Button
-				variant="primary"
-				size="sm"
-				icon={<PencilSimpleIcon size={14} />}
-				onClick={onEdit}
-				disabled={disabled}
-			>
-				Edit & send in composer
+		<Box sx={{ display: "flex", gap: 0.75, mt: 0.5 }}>
+			<Button variant="contained" size="small" startIcon={<EditOutlinedIcon />} onClick={onEdit} disabled={disabled}>
+				Edit &amp; send in composer
 			</Button>
-		</div>
+		</Box>
 	);
 }
 
@@ -142,38 +110,57 @@ function MessageBubble({
 	const isUser = message.role === "user";
 
 	return (
-		<div
-			className={`flex gap-2 ${isUser ? "flex-row-reverse" : "flex-row"}`}
-		>
-			<div
-				className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-					isUser
-						? "bg-kumo-brand text-kumo-inverse"
-						: "bg-kumo-fill text-kumo-default"
-				}`}
+		<Box sx={{ display: "flex", gap: 1, flexDirection: isUser ? "row-reverse" : "row" }}>
+			<Avatar
+				sx={{
+					width: 24,
+					height: 24,
+					flexShrink: 0,
+					bgcolor: isUser ? "primary.main" : "action.selected",
+					color: isUser ? "primary.contrastText" : "text.primary",
+				}}
 			>
-				{isUser ? (
-					<UserIcon size={12} weight="bold" />
-				) : (
-					<RobotIcon size={12} weight="bold" />
-				)}
-			</div>
-			<div
-				className={`flex flex-col gap-1 max-w-[85%] min-w-0 ${
-					isUser ? "items-end" : "items-start"
-				}`}
+				{isUser ? <PersonOutlinedIcon sx={{ fontSize: 14 }} /> : <SmartToyOutlinedIcon sx={{ fontSize: 14 }} />}
+			</Avatar>
+			<Box
+				sx={{
+					display: "flex",
+					flexDirection: "column",
+					gap: 0.5,
+					maxWidth: "85%",
+					minWidth: 0,
+					alignItems: isUser ? "flex-end" : "flex-start",
+				}}
 			>
 				{message.parts.map((part, i) => {
 					const key = `${message.id}-part-${i}`;
 					if (part.type === "text" && part.text.trim()) {
 						return (
-							<div
+							<Box
 								key={key}
-								className={`rounded-lg px-3 py-2 text-[13px] leading-relaxed break-words overflow-wrap-anywhere ${
-									isUser
-										? "bg-kumo-brand text-kumo-inverse rounded-br-sm"
-										: "bg-kumo-elevated text-kumo-default border border-kumo-line rounded-bl-sm overflow-hidden"
-								}`}
+								sx={{
+									borderRadius: 2,
+									px: 1.5,
+									py: 1,
+									fontSize: 13,
+									lineHeight: 1.6,
+									wordBreak: "break-word",
+									overflowWrap: "anywhere",
+									maxWidth: "100%",
+									...(isUser
+										? {
+												bgcolor: "primary.main",
+												color: "primary.contrastText",
+												borderBottomRightRadius: 2,
+											}
+										: {
+												bgcolor: "background.paper",
+												color: "text.primary",
+												border: 1,
+												borderColor: "divider",
+												overflow: "hidden",
+											}),
+								}}
 							>
 								{isUser ? (
 									part.text
@@ -182,112 +169,98 @@ function MessageBubble({
 										remarkPlugins={[remarkGfm]}
 										components={{
 											a: ({ href, children }) => (
-												<a
+												<Box
+													component="a"
 													href={href}
 													target="_blank"
 													rel="noopener noreferrer"
-													style={{
-														color: "var(--color-link)",
-														textDecoration: "underline",
-													}}
+													sx={{ color: "primary.main", textDecoration: "underline" }}
 												>
 													{children}
-												</a>
+												</Box>
 											),
 											p: ({ children }) => (
-												<p className="mb-2 last:mb-0">
+												<Typography variant="inherit" component="p" sx={{ mb: 1, "&:last-child": { mb: 0 } }}>
 													{children}
-												</p>
+												</Typography>
 											),
-											strong: ({ children }) => (
-												<strong className="font-semibold">
-													{children}
-												</strong>
-											),
+											strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
 											ul: ({ children }) => (
-												<ul className="list-disc pl-4 mb-2 last:mb-0 space-y-0.5">
+												<Box component="ul" sx={{ listStyle: "disc", pl: 2, mb: 1, "&:last-child": { mb: 0 } }}>
 													{children}
-												</ul>
+												</Box>
 											),
 											ol: ({ children }) => (
-												<ol className="list-decimal pl-4 mb-2 last:mb-0 space-y-0.5">
+												<Box component="ol" sx={{ listStyle: "decimal", pl: 2, mb: 1, "&:last-child": { mb: 0 } }}>
 													{children}
-												</ol>
+												</Box>
 											),
-											li: ({ children }) => (
-												<li>{children}</li>
-											),
+											li: ({ children }) => <li>{children}</li>,
 											h1: ({ children }) => (
-												<h3 className="font-semibold text-sm mb-1">
+												<Typography variant="subtitle2" component="h3" sx={{ fontWeight: 600, mb: 0.5 }}>
 													{children}
-												</h3>
+												</Typography>
 											),
 											h2: ({ children }) => (
-												<h4 className="font-semibold text-[13px] mb-1">
+												<Typography variant="subtitle2" component="h4" sx={{ fontWeight: 600, mb: 0.5 }}>
 													{children}
-												</h4>
+												</Typography>
 											),
 											h3: ({ children }) => (
-												<h5 className="font-semibold text-[13px] mb-0.5">
+												<Typography variant="subtitle2" component="h5" sx={{ fontWeight: 600, mb: 0.25 }}>
 													{children}
-												</h5>
+												</Typography>
 											),
 											code: ({ children }) => (
-												<code className="bg-kumo-fill px-1 py-0.5 rounded text-[12px]">
+												<Box
+													component="code"
+													sx={{ bgcolor: "action.hover", px: 0.5, py: 0.25, borderRadius: 1, fontSize: 12 }}
+												>
 													{children}
-												</code>
+												</Box>
 											),
 											table: ({ children }) => (
-												<div className="overflow-x-auto my-2">
-													<table className="w-full text-xs border-collapse">
+												<Box sx={{ overflowX: "auto", my: 1 }}>
+													<Box component="table" sx={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
 														{children}
-													</table>
-												</div>
+													</Box>
+												</Box>
 											),
 											thead: ({ children }) => (
-												<thead className="border-b border-kumo-line bg-kumo-fill/30">
+												<Box component="thead" sx={{ borderBottom: 1, borderColor: "divider", bgcolor: "action.hover" }}>
 													{children}
-												</thead>
+												</Box>
 											),
 											th: ({ children }) => (
-												<th className="text-left px-2 py-1 font-semibold text-kumo-strong">
+												<Box component="th" sx={{ textAlign: "left", px: 1, py: 0.5, fontWeight: 600 }}>
 													{children}
-												</th>
+												</Box>
 											),
 											td: ({ children }) => (
-												<td className="px-2 py-1 border-b border-kumo-line/50">
+												<Box component="td" sx={{ px: 1, py: 0.5, borderBottom: 1, borderColor: "divider" }}>
 													{children}
-												</td>
+												</Box>
 											),
 										}}
 									>
 										{part.text}
 									</Markdown>
 								)}
-							</div>
+							</Box>
 						);
 					}
 					const toolName = getToolNameFromPart(part);
 					if (toolName) {
-						return (
-							<ToolCallBadge
-								key={key}
-								toolName={toolName}
-								state={(part as any).state ?? "running"}
-							/>
-						);
+						return <ToolCallBadge key={key} toolName={toolName} state={(part as any).state ?? "running"} />;
 					}
 					return null;
 				})}
 				{/* Show action buttons for draft replies */}
 				{!isUser && hasDraftReplyTool(message) && onAction && (
-					<DraftActions
-						onEdit={() => onAction("edit")}
-						disabled={isStreaming}
-					/>
+					<DraftActions onEdit={() => onAction("edit")} disabled={isStreaming} />
 				)}
-			</div>
-		</div>
+			</Box>
+		</Box>
 	);
 }
 
@@ -306,8 +279,7 @@ function AgentChatConnected({
 	const { startCompose } = useUIStore();
 
 	const agent = useAgent({ agent: "EmailAgent", name: mailboxId });
-	const { messages, sendMessage, status, clearHistory, stop } =
-		useAgentChat({ agent });
+	const { messages, sendMessage, status, clearHistory, stop } = useAgentChat({ agent });
 	const isStreaming = status === "streaming" || status === "submitted";
 
 	useEffect(() => {
@@ -327,7 +299,7 @@ function AgentChatConnected({
 		if (inputRef.current) inputRef.current.style.height = "auto";
 	};
 
-	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+	const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
 		if (e.key === "Enter" && !e.shiftKey) {
 			e.preventDefault();
 			handleSend();
@@ -341,179 +313,199 @@ function AgentChatConnected({
 	];
 
 	return (
-		<div className="flex flex-col h-full">
+		<Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
 			{/* Header */}
-			<div className="flex items-center justify-between px-3 py-1.5 border-b border-kumo-line shrink-0">
-				<div className="flex items-center gap-2">
-					<Badge variant="beta">AI</Badge>
-					<span className="text-xs text-kumo-subtle">
+			<Box
+				sx={{
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "space-between",
+					px: 1.5,
+					py: 0.75,
+					borderBottom: 1,
+					borderColor: "divider",
+					flexShrink: 0,
+				}}
+			>
+				<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+					<Chip label="AI" size="small" color="primary" sx={{ height: 20, fontSize: 10, fontWeight: 700 }} />
+					<Typography variant="caption" color="text.secondary">
 						Email Agent
-					</span>
-				</div>
-				<div className="flex items-center gap-1">
-					{isStreaming && <Loader size="sm" />}
+					</Typography>
+				</Box>
+				<Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+					{isStreaming && <CircularProgress size={14} />}
 					{messages.length > 0 && (
-						<Tooltip content="Clear chat" render={<Button
-								variant="ghost"
-								shape="square"
-								size="sm"
-								icon={<TrashIcon size={14} />}
+						<Tooltip title="Clear chat">
+							<IconButton
+								size="small"
 								onClick={() => {
 									if (window.confirm("Clear chat history?")) {
 										clearHistory();
 									}
 								}}
 								aria-label="Clear chat"
-							/>} />
+							>
+								<DeleteOutlinedIcon sx={{ fontSize: 14 }} />
+							</IconButton>
+						</Tooltip>
 					)}
-				</div>
-			</div>
+				</Box>
+			</Box>
 
 			{/* Messages */}
-			<div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4">
+			<Box ref={scrollRef} sx={{ flex: 1, overflowY: "auto", px: 1.5, py: 2 }}>
 				{messages.length === 0 ? (
-					<div className="flex flex-col items-center justify-center h-full gap-4">
-						<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-kumo-brand/10">
-							<RobotIcon
-								size={24}
-								weight="duotone"
-								className="text-kumo-brand"
-							/>
-						</div>
-						<p className="text-xs text-kumo-subtle text-center leading-relaxed px-4">
-							I can read emails, search conversations, and draft
-							replies.
-						</p>
-						<div className="flex flex-col gap-1.5 w-full">
+					<Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 2 }}>
+						<Box
+							sx={{
+								display: "flex",
+								height: 48,
+								width: 48,
+								alignItems: "center",
+								justifyContent: "center",
+								borderRadius: 3,
+								bgcolor: "action.selected",
+							}}
+						>
+							<SmartToyOutlinedIcon sx={{ fontSize: 24, color: "primary.main" }} />
+						</Box>
+						<Typography variant="caption" color="text.secondary" sx={{ textAlign: "center", lineHeight: 1.6, px: 2 }}>
+							I can read emails, search conversations, and draft replies.
+						</Typography>
+						<Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, width: "100%" }}>
 							{suggestedPrompts.map((prompt) => (
-								<button
+								<ButtonBase
 									key={prompt}
-									type="button"
-									onClick={() =>
-										sendMessage({ text: prompt })
-									}
-									className="text-left px-3 py-2 rounded-lg border border-kumo-line text-xs text-kumo-strong hover:bg-kumo-tint hover:border-kumo-fill-hover transition-colors cursor-pointer bg-transparent"
+									onClick={() => sendMessage({ text: prompt })}
+									sx={{
+										textAlign: "left",
+										px: 1.5,
+										py: 1,
+										borderRadius: 2,
+										border: 1,
+										borderColor: "divider",
+										fontSize: 12,
+										color: "text.primary",
+										justifyContent: "flex-start",
+										"&:hover": { bgcolor: "action.hover" },
+									}}
 								>
 									{prompt}
-								</button>
+								</ButtonBase>
 							))}
-						</div>
-					</div>
+						</Box>
+					</Box>
 				) : (
-					<div className="flex flex-col gap-3">
+					<Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
 						{messages.map((msg) => (
 							<MessageBubble
 								key={msg.id}
 								message={msg}
 								isStreaming={isStreaming}
-							onAction={(action) => {
-								if (action === "edit") {
-										// Extract draft data from the draft_reply tool result
-										let draftData: {
-											to?: string;
-											subject?: string;
-											body?: string;
-											id?: string;
-										} | null = null;
-										for (const part of msg.parts) {
-											if (
-												(part as any).toolName === "draft_reply" &&
-												(part as any).result
-											) {
-												draftData = (part as any).result;
-												break;
-											}
+								onAction={(action) => {
+									if (action !== "edit") return;
+									// Extract draft data from the draft_reply tool result
+									let draftData: { to?: string; subject?: string; body?: string; id?: string } | null = null;
+									for (const part of msg.parts) {
+										if ((part as any).toolName === "draft_reply" && (part as any).result) {
+											draftData = (part as any).result;
+											break;
 										}
-										if (draftData) {
-											const draftEmail = {
-												id: draftData.id || "",
-												subject: draftData.subject || "",
-												sender: mailboxId,
-												recipient: draftData.to || "",
-												date: new Date().toISOString(),
-												read: true,
-												starred: false,
-												body: draftData.body || "",
-											};
-											startCompose({
-												mode: "reply",
-												originalEmail: null,
-												draftEmail,
-											});
-										} else {
-											sendMessage({
-												text: "Let me edit this draft first. Show me what you have so I can modify it.",
-											});
-										}
+									}
+									if (draftData) {
+										const draftEmail = {
+											id: draftData.id || "",
+											subject: draftData.subject || "",
+											sender: mailboxId,
+											recipient: draftData.to || "",
+											date: new Date().toISOString(),
+											read: true,
+											starred: false,
+											body: draftData.body || "",
+										};
+										startCompose({
+											mode: "reply",
+											originalEmail: null,
+											draftEmail,
+										});
+									} else {
+										sendMessage({
+											text: "Let me edit this draft first. Show me what you have so I can modify it.",
+										});
 									}
 								}}
 							/>
 						))}
 						{isStreaming && (
-							<div className="flex gap-2">
-								<div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-kumo-default">
-									<RobotIcon size={12} weight="bold" />
-								</div>
-								<div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-kumo-elevated border border-kumo-line rounded-bl-sm">
-									<Loader size="sm" />
-									<span className="text-xs text-kumo-subtle">
+							<Box sx={{ display: "flex", gap: 1 }}>
+								<Avatar sx={{ width: 24, height: 24, bgcolor: "action.selected", color: "text.primary" }}>
+									<SmartToyOutlinedIcon sx={{ fontSize: 14 }} />
+								</Avatar>
+								<Box
+									sx={{
+										display: "flex",
+										alignItems: "center",
+										gap: 0.75,
+										px: 1.5,
+										py: 1,
+										borderRadius: 2,
+										bgcolor: "background.paper",
+										border: 1,
+										borderColor: "divider",
+									}}
+								>
+									<CircularProgress size={14} />
+									<Typography variant="caption" color="text.secondary">
 										Thinking...
-									</span>
-								</div>
-							</div>
+									</Typography>
+								</Box>
+							</Box>
 						)}
-					</div>
+					</Box>
 				)}
-			</div>
+			</Box>
 
 			{/* Input */}
-			<div className="shrink-0 border-t border-kumo-line px-3 py-2">
+			<Box sx={{ flexShrink: 0, borderTop: 1, borderColor: "divider", px: 1.5, py: 1 }}>
 				{isStreaming ? (
-					<div className="flex justify-center">
-						<Button
-							variant="secondary"
-							size="sm"
-							icon={<StopIcon size={14} weight="fill" />}
-							onClick={() => stop()}
-						>
+					<Box sx={{ display: "flex", justifyContent: "center" }}>
+						<Button variant="outlined" size="small" startIcon={<StopCircleOutlinedIcon />} onClick={() => stop()}>
 							Stop generating
 						</Button>
-					</div>
+					</Box>
 				) : (
-					<div className="flex items-end gap-1.5">
-						<textarea
-							ref={inputRef}
+					<Box sx={{ display: "flex", alignItems: "flex-end", gap: 0.75 }}>
+						<TextField
+							inputRef={inputRef}
 							id="agent-chat-input"
 							name="agent-chat-input"
 							value={inputValue}
 							onChange={(e) => setInputValue(e.target.value)}
 							onKeyDown={handleKeyDown}
 							placeholder="Ask your email agent..."
-							rows={1}
-							aria-label="Chat message input"
-							className="flex-1 resize-none rounded-lg border border-kumo-line bg-kumo-control px-3 py-2 text-xs text-kumo-default placeholder:text-kumo-subtle focus:outline-none focus:ring-1 focus:ring-kumo-ring min-h-[36px] max-h-[100px]"
-							style={{ height: "auto", overflow: "hidden" }}
-							onInput={(e) => {
-								const t = e.target as HTMLTextAreaElement;
-								t.style.height = "auto";
-								t.style.height = `${Math.min(t.scrollHeight, 100)}px`;
-								t.style.overflow =
-									t.scrollHeight > 100 ? "auto" : "hidden";
+							multiline
+							minRows={1}
+							maxRows={4}
+							fullWidth
+							slotProps={{
+								input: { sx: { fontSize: 12, borderRadius: 2, py: 1 } },
+								htmlInput: { "aria-label": "Chat message input" },
 							}}
 						/>
-						<Button
-							variant="primary"
-							shape="square"
-							size="sm"
+						<IconButton
+							color="primary"
 							disabled={!inputValue.trim()}
-							icon={<ArrowUpIcon size={14} weight="bold" />}
 							onClick={handleSend}
 							aria-label="Send message"
-						/>
-					</div>
+							sx={{ bgcolor: "primary.main", color: "primary.contrastText", "&:hover": { bgcolor: "primary.dark" } }}
+						>
+							<ArrowUpwardIcon sx={{ fontSize: 18 }} />
+						</IconButton>
+					</Box>
 				)}
-			</div>
-		</div>
+			</Box>
+		</Box>
 	);
 }
 
@@ -527,36 +519,37 @@ export default function AgentPanel() {
 	const [loadError, setLoadError] = useState<string | null>(null);
 
 	useEffect(() => {
-		Promise.all([
-			import("agents/react"),
-			import("@cloudflare/ai-chat/react"),
-		]).then(([a, c]) =>
-			setHooks({
-				useAgent: a.useAgent,
-				useAgentChat: c.useAgentChat,
-			}),
-		).catch((err) => {
-			console.error("Failed to load agent modules:", err);
-			setLoadError("Failed to connect to agent. Reload to retry.");
-		});
+		Promise.all([import("agents/react"), import("@cloudflare/ai-chat/react")])
+			.then(([a, c]) =>
+				setHooks({
+					useAgent: a.useAgent,
+					useAgentChat: c.useAgentChat,
+				}),
+			)
+			.catch((err) => {
+				console.error("Failed to load agent modules:", err);
+				setLoadError("Failed to connect to agent. Reload to retry.");
+			});
 	}, []);
 
 	if (loadError) {
 		return (
-			<div className="flex flex-col items-center justify-center h-full gap-2 px-4 text-center">
-				<span className="text-xs text-kumo-error">{loadError}</span>
-			</div>
+			<Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 1, px: 2, textAlign: "center" }}>
+				<Typography variant="caption" color="error">
+					{loadError}
+				</Typography>
+			</Box>
 		);
 	}
 
 	if (!hooks) {
 		return (
-			<div className="flex flex-col items-center justify-center h-full gap-2">
-				<Loader size="base" />
-				<span className="text-xs text-kumo-subtle">
+			<Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 1 }}>
+				<CircularProgress size={20} />
+				<Typography variant="caption" color="text.secondary">
 					Connecting...
-				</span>
-			</div>
+				</Typography>
+			</Box>
 		);
 	}
 

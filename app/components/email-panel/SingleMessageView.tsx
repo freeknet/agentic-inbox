@@ -2,6 +2,9 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
+import Avatar from "@mui/material/Avatar";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
 import EmailAttachmentList from "~/components/EmailAttachmentList";
 import EmailIframe from "~/components/EmailIframe";
 import { formatDetailDate } from "~/lib/utils";
@@ -21,40 +24,40 @@ export default function SingleMessageView({
 }: SingleMessageViewProps) {
 	const inlineBody = useInlineImages(email.body || "", mailboxId, email.id, email.attachments);
 	return (
-		<div className="flex flex-col h-full">
-			<div className="px-4 py-4 border-b border-kumo-line md:px-6">
-				<div className="flex items-center justify-between gap-3">
-					<div className="flex items-center gap-2.5 min-w-0">
-						<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-xs font-bold text-kumo-default">
+		<Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+			<Box sx={{ px: { xs: 2, md: 3 }, py: 2, borderBottom: 1, borderColor: "divider" }}>
+				<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.5 }}>
+					<Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0 }}>
+						<Avatar sx={{ width: 36, height: 36, fontSize: 12, fontWeight: 700, bgcolor: "action.selected", color: "text.primary" }}>
 							{email.sender.charAt(0).toUpperCase()}
-						</div>
-						<div className="min-w-0">
-							<div className="text-sm font-medium text-kumo-default truncate">
+						</Avatar>
+						<Box sx={{ minWidth: 0 }}>
+							<Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
 								{email.sender}
-							</div>
-							<div className="text-xs text-kumo-subtle">To: {email.recipient}</div>
-						</div>
-					</div>
-					<span className="text-xs text-kumo-subtle shrink-0">
+							</Typography>
+							<Typography variant="caption" color="text.secondary">
+								To: {email.recipient}
+							</Typography>
+						</Box>
+					</Box>
+					<Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
 						{formatDetailDate(email.date)}
-					</span>
-				</div>
-			</div>
+					</Typography>
+				</Box>
+			</Box>
 
-			<div className="flex-1 min-h-0">
-				<EmailIframe
-					body={inlineBody}
-				/>
-			</div>
+			<Box sx={{ flex: 1, minHeight: 0 }}>
+				<EmailIframe body={inlineBody} />
+			</Box>
 
 			<EmailAttachmentList
 				mailboxId={mailboxId}
 				emailId={email.id}
 				attachments={email.attachments}
 				onPreviewImage={onPreviewImage}
-				className="px-4 py-3 border-t border-kumo-line shrink-0 md:px-6"
+				sx={{ px: { xs: 2, md: 3 }, py: 1.5, borderTop: 1, borderColor: "divider", flexShrink: 0 }}
 				showHeading
 			/>
-		</div>
+		</Box>
 	);
 }

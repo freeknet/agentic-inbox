@@ -1,6 +1,12 @@
-import { Button } from "@cloudflare/kumo";
-import { ClockIcon } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import IconButton from "@mui/material/IconButton";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
+import { type MouseEvent, useState } from "react";
 
 function atHour(base: Date, days: number, hour: number): Date {
 	const d = new Date(base);
@@ -24,81 +30,86 @@ function toLocalInput(d: Date): string {
 	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export default function ScheduleSendButton({ onSchedule, disabled }: { onSchedule: (at: Date) => void; disabled?: boolean }) {
-	const [open, setOpen] = useState(false);
+export default function ScheduleSendButton({
+	onSchedule,
+	disabled,
+}: {
+	onSchedule: (at: Date) => void;
+	disabled?: boolean;
+}) {
+	const [anchor, setAnchor] = useState<HTMLElement | null>(null);
 	const [custom, setCustom] = useState("");
-	const ref = useRef<HTMLDivElement>(null);
-
-	useEffect(() => {
-		if (!open) return;
-		const close = (e: MouseEvent) => {
-			if (!ref.current?.contains(e.target as Node)) setOpen(false);
-		};
-		const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-		document.addEventListener("mousedown", close);
-		document.addEventListener("keydown", esc);
-		return () => {
-			document.removeEventListener("mousedown", close);
-			document.removeEventListener("keydown", esc);
-		};
-	}, [open]);
-
-	const pick = (at: Date) => {
-		setOpen(false);
-		onSchedule(at);
-	};
 	const now = new Date();
 	const customDate = custom ? new Date(custom) : null;
-	const customValid = !!customDate && !Number.isNaN(customDate.getTime()) && customDate.getTime() > Date.now() + 60_000;
+	const customValid =
+		!!customDate && !Number.isNaN(customDate.getTime()) && customDate.getTime() > Date.now() + 60_000;
+
+	const pick = (at: Date) => {
+		setAnchor(null);
+		onSchedule(at);
+	};
+
+	const open = (e: MouseEvent<HTMLElement>) => {
+		setCustom(toLocalInput(atHour(new Date(), 1, 8)));
+		setAnchor(e.currentTarget);
+	};
 
 	return (
-		<div className="relative" ref={ref}>
-			<Button
-				type="button"
-				variant="secondary"
-				size="sm"
-				shape="square"
-				icon={<ClockIcon size={14} />}
+		<>
+			<IconButton
+				size="small"
 				disabled={disabled}
 				aria-label="Schedule send"
-				aria-expanded={open}
-				onClick={() => {
-					setCustom(toLocalInput(atHour(new Date(), 1, 8)));
-					setOpen((o) => !o);
-				}}
-			/>
-			{open && (
-				<div
-					role="menu"
-					className="absolute bottom-full right-0 z-50 mb-2 w-64 rounded-lg border border-kumo-line bg-kumo-base p-2 shadow-lg"
-				>
-					<div className="px-2 pb-1 text-xs font-medium text-kumo-subtle">Schedule send</div>
-					{presets(now).map((p) => (
-						<button
-							key={p.label}
-							type="button"
-							role="menuitem"
-							className="flex w-full justify-between rounded px-2 py-1.5 text-left text-sm text-kumo-default hover:bg-kumo-fill"
-							onClick={() => pick(p.at)}
-						>
-							<span>{p.label}</span>
-						</button>
-					))}
-					<div className="mt-1 border-t border-kumo-line px-2 pt-2">
-						<input
-							type="datetime-local"
-							value={custom}
-							min={toLocalInput(now)}
-							onChange={(e) => setCustom(e.target.value)}
-							aria-label="Custom send time"
-							className="w-full rounded border border-kumo-line bg-kumo-recessed px-2 py-1 text-sm text-kumo-default"
-						/>
-						<Button type="button" variant="primary" size="sm" className="mt-2 w-full" disabled={!customValid} onClick={() => customDate && pick(customDate)}>
-							Schedule
-						</Button>
-					</div>
-				</div>
-			)}
-		</div>
+				aria-expanded={!!anchor}
+				onClick={open}
+				sx={{ border: 1, borderColor: "divider" }}
+			>
+				<ScheduleOutlinedIcon fontSize="small" />
+			</IconButton>
+			<Menu
+				anchorEl={anchor}
+				open={!!anchor}
+				onClose={() => setAnchor(null)}
+				anchorOrigin={{ vertical: "top", horizontal: "right" }}
+				transformOrigin={{ vertical: "bottom", horizontal: "right" }}
+				slotProps={{ paper: { sx: { width: 280, p: 1 } } }}
+			>
+				<Typography variant="caption" color="text.secondary" sx={{ px: 1, pb: 0.5, display: "block" }}>
+					Schedule send
+				</Typography>
+				{presets(now).map((p) => (
+					<MenuItem key={p.label} onClick={() => pick(p.at)} sx={{ fontSize: 14 }}>
+						{p.label}
+					</MenuItem>
+				))}
+				<Box sx={{ borderTop: 1, borderColor: "divider", mt: 0.5, pt: 1, px: 1 }}>
+					<TextField
+						fullWidth
+						size="small"
+						type="datetime-local"
+						value={custom}
+						onChange={(e) => setCustom(e.target.value)}
+						slotProps={{
+							input: { sx: { fontSize: 13 } },
+							inputLabel: { shrink: true },
+							htmlInput: {
+								min: toLocalInput(now),
+								"aria-label": "Custom send time",
+							},
+						}}
+					/>
+					<Button
+						fullWidth
+						variant="contained"
+						size="small"
+						sx={{ mt: 1 }}
+						disabled={!customValid}
+						onClick={() => customDate && pick(customDate)}
+					>
+						Schedule
+					</Button>
+				</Box>
+			</Menu>
+		</>
 	);
 }

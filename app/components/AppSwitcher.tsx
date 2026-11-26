@@ -1,4 +1,8 @@
-import { EnvelopeSimpleIcon, HardDrivesIcon } from "@phosphor-icons/react";
+import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined";
+import MailOutlinedIcon from "@mui/icons-material/MailOutlined";
+import Box from "@mui/material/Box";
+import Link from "@mui/material/Link";
+import Typography from "@mui/material/Typography";
 import { useDrive } from "~/queries/drive";
 
 /**
@@ -9,17 +13,57 @@ import { useDrive } from "~/queries/drive";
 export function AppSwitcher() {
 	const drive = useDrive();
 	if (!drive) return null;
-	const base = "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm transition-colors";
 	return (
-		<nav aria-label="Apps" className="flex shrink-0 items-center rounded-lg border border-kumo-line p-0.5">
-			<span aria-current="page" className={`${base} bg-kumo-tint font-medium text-kumo-default`}>
-				<EnvelopeSimpleIcon size={16} weight="duotone" />
-				<span className="hidden sm:inline">Mail</span>
-			</span>
-			<a href={drive.url} className={`${base} text-kumo-subtle no-underline hover:text-kumo-default`}>
-				<HardDrivesIcon size={16} weight="duotone" />
-				<span className="hidden sm:inline">Drive</span>
-			</a>
-		</nav>
+		<Box
+			component="nav"
+			aria-label="Apps"
+			sx={{
+				display: "flex",
+				alignItems: "center",
+				border: 1,
+				borderColor: "divider",
+				borderRadius: 2,
+				p: 0.25,
+				flexShrink: 0,
+			}}
+		>
+			<Box
+				aria-current="page"
+				sx={{
+					display: "flex",
+					alignItems: "center",
+					gap: 0.75,
+					px: 1.25,
+					py: 0.25,
+					borderRadius: 1.5,
+					bgcolor: "action.selected",
+					color: "text.primary",
+				}}
+			>
+				<MailOutlinedIcon sx={{ fontSize: 16 }} />
+				<Typography variant="body2" sx={{ display: { xs: "none", sm: "block" }, fontWeight: 500 }}>
+					Mail
+				</Typography>
+			</Box>
+			<Link
+				href={drive.url}
+				underline="none"
+				sx={{
+					display: "flex",
+					alignItems: "center",
+					gap: 0.75,
+					px: 1.25,
+					py: 0.25,
+					borderRadius: 1.5,
+					color: "text.secondary",
+					"&:hover": { color: "text.primary", bgcolor: "action.hover" },
+				}}
+			>
+				<CloudOutlinedIcon sx={{ fontSize: 16 }} />
+				<Typography variant="body2" sx={{ display: { xs: "none", sm: "block" } }}>
+					Drive
+				</Typography>
+			</Link>
+		</Box>
 	);
 }
