@@ -16,6 +16,7 @@ import SingleMessageView from "~/components/email-panel/SingleMessageView";
 import ThreadMessage from "~/components/email-panel/ThreadMessage";
 import { splitEmailList, toEmailListValue } from "~/lib/utils";
 import api from "~/services/api";
+import { useQueryClient } from "@tanstack/react-query";
 import { useDeleteEmail, useEmail, useMoveEmail, useReplyToEmail, useSendEmail, useThreadReplies, useUpdateEmail } from "~/queries/emails";
 import { useFolders } from "~/queries/folders";
 import { useMailbox } from "~/queries/mailboxes";
@@ -64,6 +65,12 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	};
 	const { closePanel, startCompose } = useUIStore();
 	const toast = useToast();
+	const queryClient = useQueryClient();
+	const refreshMail = () => {
+		if (!mailboxId) return;
+		void queryClient.invalidateQueries({ queryKey: ["emails", mailboxId] });
+		void queryClient.invalidateQueries({ queryKey: ["folders", mailboxId] });
+	};
 	const { confirmSuppressed, notifyQueued } = useSendFeedback();
 	const [isSending, setIsSending] = useState(false);
 	const [sourceViewEmail, setSourceViewEmail] = useState<Email | null>(null);
@@ -126,6 +133,8 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 							await api.moveEmail(mailboxId, email.id, from || Folders.INBOX);
 						} catch {
 							toast.add({ title: "Could not undo the move", variant: "error" });
+						} finally {
+							refreshMail();
 						}
 					},
 				},
@@ -133,39 +142,61 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		});
 		closePanel();
 	};
+	/**
+	 * Outside Trash, Delete moves the email to Trash (Undo moves it back). In
+	 * Trash it is deleted for good, with its attachments, and always asks first.
+	 */
 	const handleDelete = async () => {
 		if (!mailboxId) return;
-		if (confirmBeforeDelete) {
-			const ok = await confirmDialog({
-				title: "Delete this email?",
-				body: `${email.subject || "(no subject)"} — it moves to Trash.`,
-				confirmLabel: "Delete",
-				destructive: true,
-			});
+		const from = email.folder_id || folder || Folders.INBOX;
+		const inTrash = from === Folders.TRASH;
+		if (inTrash || confirmBeforeDelete) {
+			const ok = await confirmDialog(
+				inTrash
+					? {
+							title: "Delete forever?",
+							body: `${email.subject || "(no subject)"} and its attachments will be deleted permanently. This can't be undone.`,
+							confirmLabel: "Delete forever",
+							destructive: true,
+						}
+					: {
+							title: "Move this email to Trash?",
+							body: `${email.subject || "(no subject)"} — you can restore it from Trash.`,
+							confirmLabel: "Move to Trash",
+							destructive: true,
+						},
+			);
 			if (!ok) return;
 		}
-		deleteEmailMut.mutate(
-			{ mailboxId, id: email.id },
-			{ onError: () => toast.add({ title: "Could not delete the email", variant: "error" }) },
-		);
-		toast.add({
-			title: folder === Folders.TRASH ? "Deleted" : "Moved to Trash",
-			actions:
-				folder === Folders.TRASH
-					? undefined
-					: [
-							{
-								children: "Undo",
-								onClick: async () => {
-									try {
-										await api.moveEmail(mailboxId, email.id, email.folder_id || folder || Folders.INBOX);
-									} catch {
-										toast.add({ title: "Could not undo the delete", variant: "error" });
-									}
-								},
-							},
-						],
-		});
+		if (inTrash) {
+			deleteEmailMut.mutate(
+				{ mailboxId, id: email.id },
+				{ onError: () => toast.add({ title: "Could not delete the email", variant: "error" }) },
+			);
+			toast.add({ title: "Deleted forever" });
+		} else {
+			moveEmailMut.mutate(
+				{ mailboxId, id: email.id, folderId: Folders.TRASH },
+				{ onError: () => toast.add({ title: "Could not move the email to Trash", variant: "error" }) },
+			);
+			toast.add({
+				title: "Moved to Trash",
+				actions: [
+					{
+						children: "Undo",
+						onClick: async () => {
+							try {
+								await api.moveEmail(mailboxId, email.id, from);
+							} catch {
+								toast.add({ title: "Could not undo the delete", variant: "error" });
+							} finally {
+								refreshMail();
+							}
+						},
+					},
+				],
+			});
+		}
 		closePanel();
 	};
 

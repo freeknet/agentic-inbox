@@ -38,7 +38,7 @@ import { confirmDialog } from "~/lib/confirm";
 import { rowPadding, usePrefs } from "~/lib/prefs";
 import { useToast } from "~/lib/toast";
 import api from "~/services/api";
-import { useDeleteEmail, useEmails, useMarkThreadRead, useUpdateEmail } from "~/queries/emails";
+import { useDeleteEmail, useEmails, useMarkThreadRead, useMoveEmail, useUpdateEmail } from "~/queries/emails";
 import { useFolders } from "~/queries/folders";
 import { queryKeys } from "~/queries/keys";
 import { useUIStore } from "~/hooks/useUIStore";
@@ -152,6 +152,7 @@ export default function EmailListRoute() {
 	const updateEmail = useUpdateEmail();
 	const markThreadRead = useMarkThreadRead();
 	const deleteEmail = useDeleteEmail();
+	const moveEmail = useMoveEmail();
 
 	const params = useMemo(
 		() => ({
@@ -203,6 +204,48 @@ export default function EmailListRoute() {
 		lastClickedRef.current = null;
 	}, [page]);
 
+	// Rows can disappear (deleted, moved, a background refresh): drop them from
+	// the selection so "N selected" and bulk actions only cover visible rows.
+	useEffect(() => {
+		setSelected((prev) => {
+			const visible = new Set(emails.map((e) => e.id));
+			const kept = [...prev].filter((id) => visible.has(id));
+			return kept.length === prev.size ? prev : new Set(kept);
+		});
+	}, [emails]);
+
+	// A different page size reshuffles pages: start again at page 1.
+	const prevPageSize = useRef(pageSize);
+	useEffect(() => {
+		if (prevPageSize.current !== pageSize) setPage(1);
+		prevPageSize.current = pageSize;
+	}, [pageSize]);
+
+	// After deleting the last rows of the last page, step back to a page that exists.
+	useEffect(() => {
+		if (!emailData) return;
+		const lastPage = Math.max(1, Math.ceil(totalCount / pageSize));
+		if (page > lastPage) setPage(lastPage);
+	}, [emailData, totalCount, pageSize, page]);
+
+	/**
+	 * Rows are conversations: the row id is the newest message. Expand to every
+	 * message of each conversation in this folder, so moving or deleting a row
+	 * doesn't leave its older messages behind.
+	 */
+	const expandRows = async (ids: string[]): Promise<string[]> => {
+		if (!mailboxId) return ids;
+		const out = new Set(ids);
+		const rows = emails.filter((e) => out.has(e.id) && e.thread_id && (e.thread_count ?? 1) > 1);
+		await Promise.all(
+			rows.map(async (row) => {
+				const messages = await api.getThread(mailboxId, row.thread_id!);
+				for (const m of messages) if (m.folder_id === row.folder_id) out.add(m.id);
+			}),
+		);
+		return [...out];
+	};
+
 	const invalidateMail = () => {
 		if (!mailboxId) return;
 		queryClient.invalidateQueries({ queryKey: ["emails", mailboxId] });
@@ -242,7 +285,8 @@ export default function EmailListRoute() {
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
 			const el = document.activeElement as HTMLElement | null;
-			const typing = !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+			const input = el?.tagName === "INPUT" ? (el as HTMLInputElement).type : null;
+			const typing = !!el && ((input !== null && input !== "checkbox" && input !== "radio") || el.tagName === "TEXTAREA" || el.isContentEditable);
 			if (typing) return;
 			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a" && !document.querySelector('[role="dialog"], [role="menu"]')) {
 				e.preventDefault();
@@ -277,80 +321,115 @@ export default function EmailListRoute() {
 		e.preventDefault();
 		e.stopPropagation();
 		if (!mailboxId) return;
-		if (confirmBeforeDelete) {
-			const ok = await confirmDialog({
-				title: "Delete this email?",
-				body: "It moves to Trash, where you can restore it.",
-				confirmLabel: "Delete",
-				destructive: true,
-			});
+		// Outside Trash, Delete moves to Trash (Undo moves it back). In Trash it is
+		// deleted for good, with its attachments, and always asks first.
+		const inTrash = folder === Folders.TRASH;
+		if (inTrash || confirmBeforeDelete) {
+			const ok = await confirmDialog(
+				inTrash
+					? {
+							title: "Delete forever?",
+							body: "This email and its attachments will be deleted permanently. This can't be undone.",
+							confirmLabel: "Delete forever",
+							destructive: true,
+						}
+					: {
+							title: "Move this email to Trash?",
+							body: "You can restore it from Trash.",
+							confirmLabel: "Move to Trash",
+							destructive: true,
+						},
+			);
 			if (!ok) return;
 		}
-		deleteEmail.mutate(
-			{ mailboxId, id: emailId },
-			{ onError: () => toast.add({ title: "Could not delete the email", variant: "error" }) },
-		);
 		if (selectedEmailId === emailId) closePanel();
-
+		let ids = [emailId];
+		try {
+			ids = await expandRows([emailId]);
+		} catch {
+			// Fall back to the newest message alone.
+		}
+		if (inTrash) {
+			for (const id of ids)
+				deleteEmail.mutate({ mailboxId, id }, { onError: () => toast.add({ title: "Could not delete the email", variant: "error" }) });
+			toast.add({ title: "Deleted forever" });
+			return;
+		}
+		for (const id of ids)
+			moveEmail.mutate(
+				{ mailboxId, id, folderId: Folders.TRASH },
+				{ onError: () => toast.add({ title: "Could not move the email to Trash", variant: "error" }) },
+			);
 		const backTo = folder || Folders.INBOX;
 		toast.add({
-			title: folder === Folders.TRASH ? "Deleted" : "Moved to Trash",
-			actions:
-				folder === Folders.TRASH
-					? undefined
-					: [
-							{
-								children: "Undo",
-								onClick: async () => {
-									try {
-										await api.moveEmail(mailboxId, emailId, backTo);
-										invalidateMail();
-									} catch {
-										toast.add({ title: "Could not undo the delete", variant: "error" });
-									}
-								},
-							},
-						],
+			title: "Moved to Trash",
+			actions: [
+				{
+					children: "Undo",
+					onClick: async () => {
+						try {
+							await Promise.all(ids.map((id) => api.moveEmail(mailboxId, id, backTo)));
+						} catch {
+							toast.add({ title: "Could not undo the delete", variant: "error" });
+						} finally {
+							invalidateMail();
+						}
+					},
+				},
+			],
 		});
 	};
 
 	async function bulkDelete() {
 		if (!mailboxId || selected.size === 0) return;
 		const ids = [...selected];
-		if (confirmBeforeDelete) {
-			const ok = await confirmDialog({
-				title: `Delete ${ids.length} email${ids.length === 1 ? "" : "s"}?`,
-				body: "They move to Trash, where you can restore them.",
-				confirmLabel: "Delete",
-				destructive: true,
-			});
+		const n = `${ids.length} email${ids.length === 1 ? "" : "s"}`;
+		const inTrash = folder === Folders.TRASH;
+		if (inTrash || confirmBeforeDelete) {
+			const ok = await confirmDialog(
+				inTrash
+					? {
+							title: `Delete ${n} forever?`,
+							body: "They and their attachments will be deleted permanently. This can't be undone.",
+							confirmLabel: "Delete forever",
+							destructive: true,
+						}
+					: {
+							title: `Move ${n} to Trash?`,
+							body: "You can restore them from Trash.",
+							confirmLabel: "Move to Trash",
+							destructive: true,
+						},
+			);
 			if (!ok) return;
 		}
 		setBulkBusy(true);
 		try {
-			await Promise.all(ids.map((id) => api.deleteEmail(mailboxId, id)));
+			// Outside Trash this is a move, so Undo can bring them back.
+			const all = await expandRows(ids);
+			await Promise.all(all.map((id) => (inTrash ? api.deleteEmail(mailboxId, id) : api.moveEmail(mailboxId, id, Folders.TRASH))));
 			if (selectedEmailId && ids.includes(selectedEmailId)) closePanel();
 			setSelected(new Set());
 			invalidateMail();
 			const backTo = folder || Folders.INBOX;
 			toast.add({
-				title: `Moved ${ids.length} email${ids.length === 1 ? "" : "s"} to Trash`,
-				actions:
-					folder === Folders.TRASH
-						? undefined
-						: [
-								{
-									children: "Undo",
-									onClick: async () => {
-										try {
-											await Promise.all(ids.map((id) => api.moveEmail(mailboxId, id, backTo)));
-											invalidateMail();
-										} catch {
-											toast.add({ title: "Could not undo the delete", variant: "error" });
-										}
-									},
+				title: inTrash ? `Deleted ${n} forever` : `Moved ${n} to Trash`,
+				actions: inTrash
+					? undefined
+					: [
+							{
+								children: "Undo",
+								onClick: async () => {
+									try {
+										await Promise.all(all.map((id) => api.moveEmail(mailboxId, id, backTo)));
+									} catch {
+										toast.add({ title: "Could not undo the delete", variant: "error" });
+									} finally {
+										invalidateMail();
+									}
 								},
-						  ],
+							},
+						],
 			});
 		} catch {
 			toast.add({ title: "Could not delete the selected emails", variant: "error" });
@@ -364,7 +443,13 @@ export default function EmailListRoute() {
 		const ids = [...selected];
 		setBulkBusy(true);
 		try {
-			await Promise.all(ids.map((id) => api.updateEmail(mailboxId, id, data)));
+			if (data.read === true) {
+				// Mark every message of each conversation read, so the unread dot and counts clear.
+				const rows = emails.filter((e) => ids.includes(e.id));
+				await Promise.all(rows.map((e) => (e.thread_id ? api.markThreadRead(mailboxId, e.thread_id) : api.updateEmail(mailboxId, e.id, data))));
+			} else {
+				await Promise.all(ids.map((id) => api.updateEmail(mailboxId, id, data)));
+			}
 			invalidateMail();
 			const n = ids.length;
 			toast.add({
@@ -389,7 +474,8 @@ export default function EmailListRoute() {
 		const target = folders.find((f) => f.id === folderId)?.name ?? folderId;
 		setBulkBusy(true);
 		try {
-			await Promise.all(ids.map((id) => api.moveEmail(mailboxId, id, folderId)));
+			const all = await expandRows(ids);
+			await Promise.all(all.map((id) => api.moveEmail(mailboxId, id, folderId)));
 			if (selectedEmailId && ids.includes(selectedEmailId)) closePanel();
 			setSelected(new Set());
 			invalidateMail();
@@ -400,7 +486,7 @@ export default function EmailListRoute() {
 						children: "Undo",
 						onClick: async () => {
 							try {
-								await Promise.all(ids.map((id) => api.moveEmail(mailboxId, id, backTo)));
+								await Promise.all(all.map((id) => api.moveEmail(mailboxId, id, backTo)));
 								invalidateMail();
 							} catch {
 								toast.add({ title: "Could not undo the move", variant: "error" });
@@ -612,6 +698,10 @@ export default function EmailListRoute() {
 										size="small"
 										checked={checked}
 										onClick={(e) => e.stopPropagation()}
+										onKeyDown={(e) => {
+											// Space/Enter toggle the box; don't let the row open the message. Other keys (Delete, Esc) still reach the list shortcuts.
+											if (e.key === " " || e.key === "Enter") e.stopPropagation();
+										}}
 										onChange={(e) =>
 											toggleRow(index, e.target.checked, (e.nativeEvent as MouseEvent).shiftKey)
 										}
