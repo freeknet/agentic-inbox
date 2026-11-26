@@ -46,8 +46,10 @@ export default function SingleMessageView({
 				</Box>
 			</Box>
 
-			<Box sx={{ flex: 1, minHeight: 0 }}>
-				<EmailIframe body={inlineBody} />
+			<Box sx={{ flex: 1, minHeight: 0, display: "flex", p: { xs: 1.5, md: 2.5 } }}>
+				<Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
+					<EmailIframe body={inlineBody} />
+				</Box>
 			</Box>
 
 			<EmailAttachmentList

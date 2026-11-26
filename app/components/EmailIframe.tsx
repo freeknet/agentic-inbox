@@ -241,43 +241,57 @@ th { background: ${c.tableHeader}; text-align: left; }
 		};
 	}, [htmlBody, autoSize, showRemote, textOnly, dark, c]);
 
-	const frame = (
-		<iframe
-			ref={iframeRef}
-			style={{
-				display: "block",
-				width: "100%",
-				border: 0,
-				...(autoSize ? { height: `${height}px` } : { height: "100%" }),
-			}}
-			// No allow-top-navigation: links can only open new tabs (B6).
-			sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
-			title="Email content"
-		/>
-	);
-	if (!hasRemote || showRemote) return frame;
+	const hideRemote = hasRemote && !showRemote;
+
+	// The message sits in the app's card, not a bare white rectangle.
 	return (
-		<Box sx={{ display: "flex", flexDirection: autoSize ? "column" : "column", height: autoSize ? "auto" : "100%" }}>
-			<Box
-				sx={{
-					display: "flex",
-					alignItems: "center",
-					gap: 1,
-					borderBottom: 1,
-					borderColor: "divider",
-					bgcolor: "action.hover",
-					px: 1.5,
-					py: 0.75,
+		<Box
+			sx={{
+				display: "flex",
+				flexDirection: "column",
+				minHeight: 0,
+				height: autoSize ? "auto" : "100%",
+				borderRadius: "12px",
+				border: 1,
+				borderColor: "divider",
+				bgcolor: "background.paper",
+				overflow: "hidden",
+			}}
+		>
+			{hideRemote && (
+				<Box
+					sx={{
+						display: "flex",
+						alignItems: "center",
+						gap: 1,
+						borderBottom: 1,
+						borderColor: "divider",
+						bgcolor: "action.hover",
+						px: 1.5,
+						py: 0.75,
+						flexShrink: 0,
+					}}
+				>
+					<Typography variant="caption" color="text.secondary">
+						Remote images are hidden.
+					</Typography>
+					<Button size="small" onClick={() => setShowRemote(true)} sx={{ minWidth: 0, fontSize: 12 }}>
+						Show images
+					</Button>
+				</Box>
+			)}
+			<iframe
+				ref={iframeRef}
+				style={{
+					display: "block",
+					width: "100%",
+					border: 0,
+					...(autoSize ? { height: `${height}px` } : { height: "100%", minHeight: 0, flex: 1 }),
 				}}
-			>
-				<Typography variant="caption" color="text.secondary">
-					Remote images are hidden.
-				</Typography>
-				<Button size="small" onClick={() => setShowRemote(true)} sx={{ minWidth: 0, fontSize: 12 }}>
-					Show images
-				</Button>
-			</Box>
-			<Box sx={{ minHeight: 0, flex: autoSize ? undefined : 1 }}>{frame}</Box>
+				// No allow-top-navigation: links can only open new tabs (B6).
+				sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+				title="Email content"
+			/>
 		</Box>
 	);
 }
