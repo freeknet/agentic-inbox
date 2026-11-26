@@ -30,6 +30,8 @@ import api from "~/services/api";
 import { useCreateMailbox, useDeleteMailbox, useMailboxes } from "~/queries/mailboxes";
 import { queryKeys } from "~/queries/keys";
 import { useToast } from "~/lib/toast";
+import { useDrive } from "~/queries/drive";
+import { AppHeader } from "~/shell/AppHeader";
 
 export function meta() {
 	return [{ title: "Agentic Inbox" }];
@@ -148,11 +150,13 @@ export default function HomeRoute() {
 	const isLoading = !configData;
 
 	return (
-		<Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
-			<Container maxWidth="sm" sx={{ py: { xs: 4, md: 8 } }}>
+		<Box sx={{ display: "flex", flexDirection: "column", minHeight: "100dvh", bgcolor: "background.default" }}>
+			<HomeHeader />
+			<Box sx={{ flex: 1, mx: { md: 2 }, mb: { md: 2 }, bgcolor: "background.paper", borderRadius: { md: 4 } }}>
+			<Container maxWidth="sm" sx={{ py: { xs: 3, md: 5 } }}>
 				<Box sx={{ mb: 4 }}>
 					<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-						<Typography variant="h5" sx={{ fontWeight: 700 }}>
+						<Typography component="h1" sx={{ fontSize: 22 }}>
 							Mailboxes
 						</Typography>
 						{!isConfigured && (
@@ -346,6 +350,13 @@ export default function HomeRoute() {
 					</Button>
 				</DialogActions>
 			</Dialog>
+			</Box>
 		</Box>
 	);
+}
+
+/** The shared Mail header on the mailbox picker (no search or settings here). */
+function HomeHeader() {
+	const drive = useDrive();
+	return <AppHeader app="mail" homeHref="/" appUrls={{ drive: drive?.url }} />;
 }

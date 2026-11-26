@@ -3,16 +3,21 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
-import CloseIcon from "@mui/icons-material/Close";
+import DeleteForeverOutlinedIcon from "@mui/icons-material/DeleteForeverOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import DriveFileMoveOutlinedIcon from "@mui/icons-material/DriveFileMoveOutlined";
 import DraftsOutlinedIcon from "@mui/icons-material/DraftsOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined";
+import ForwardIcon from "@mui/icons-material/Forward";
 import InboxIcon from "@mui/icons-material/Inbox";
 import MailOutlinedIcon from "@mui/icons-material/MailOutlined";
 import MarkEmailReadOutlinedIcon from "@mui/icons-material/MarkEmailReadOutlined";
 import MarkEmailUnreadOutlinedIcon from "@mui/icons-material/MarkEmailUnreadOutlined";
-import RefreshIcon from "@mui/icons-material/Refresh";
+import MoveToInboxOutlinedIcon from "@mui/icons-material/MoveToInboxOutlined";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import ReplyIcon from "@mui/icons-material/Reply";
+import ReplyAllIcon from "@mui/icons-material/ReplyAll";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
@@ -43,6 +48,7 @@ import { useFolders } from "~/queries/folders";
 import { queryKeys } from "~/queries/keys";
 import { useUIStore } from "~/hooks/useUIStore";
 import type { Email } from "~/types";
+import { ActionButton, EmptyState, MenuEntry, PositionedMenu, SelectionBar, ViewHeader, ViewTitle } from "~/shell/View";
 
 const FOLDER_EMPTY_STATES: Record<
 	string,
@@ -54,31 +60,31 @@ const FOLDER_EMPTY_STATES: Record<
 	}
 > = {
 	[Folders.INBOX]: {
-		icon: <InboxIcon sx={{ fontSize: 48, color: "text.disabled" }} />,
+		icon: <InboxIcon />,
 		title: "Your inbox is empty",
 		description:
 			"New emails will appear here when they arrive. Send an email to get the conversation started.",
 		showCompose: true,
 	},
 	[Folders.SENT]: {
-		icon: <SendOutlinedIcon sx={{ fontSize: 48, color: "text.disabled" }} />,
+		icon: <SendOutlinedIcon />,
 		title: "No sent emails",
 		description: "Emails you send will show up here.",
 		showCompose: true,
 	},
 	[Folders.DRAFT]: {
-		icon: <DraftsOutlinedIcon sx={{ fontSize: 48, color: "text.disabled" }} />,
+		icon: <DraftsOutlinedIcon />,
 		title: "No drafts",
 		description: "Emails you're still working on will be saved here.",
 		showCompose: true,
 	},
 	[Folders.ARCHIVE]: {
-		icon: <ArchiveOutlinedIcon sx={{ fontSize: 48, color: "text.disabled" }} />,
+		icon: <ArchiveOutlinedIcon />,
 		title: "Archive is empty",
 		description: "Move emails here to keep your inbox clean without deleting them.",
 	},
 	[Folders.TRASH]: {
-		icon: <DeleteOutlinedIcon sx={{ fontSize: 48, color: "text.disabled" }} />,
+		icon: <DeleteOutlinedIcon />,
 		title: "Trash is empty",
 		description: "Deleted emails will appear here. You can restore them or permanently delete them.",
 	},
@@ -107,25 +113,26 @@ function EmailListSkeleton() {
 
 function FolderEmptyState({ folder, onCompose }: { folder?: string; onCompose: () => void }) {
 	const config = (folder && FOLDER_EMPTY_STATES[folder]) || {
-		icon: <MailOutlinedIcon sx={{ fontSize: 48, color: "text.disabled" }} />,
+		icon: <MailOutlinedIcon />,
 		title: "No emails",
 		description: "This folder is empty.",
 	};
-
 	return (
-		<Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", py: 12, px: 3, textAlign: "center" }}>
-			<Box sx={{ mb: 2 }}>{config.icon}</Box>
-			<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
-				{config.title}
-			</Typography>
-			<Typography variant="body2" color="text.secondary" sx={{ maxWidth: 320, mb: 2.5 }}>
-				{config.description}
-			</Typography>
-			{"showCompose" in config && config.showCompose && (
-				<Button variant="contained" size="small" startIcon={<EditOutlinedIcon />} onClick={onCompose}>
-					Compose
-				</Button>
-			)}
+		<Box sx={{ py: 10, px: 3 }}>
+			<EmptyState
+				icon={config.icon}
+				title={config.title}
+				body={config.description}
+				action={
+					"showCompose" in config && config.showCompose ? (
+						<Box>
+							<Button variant="contained" startIcon={<EditOutlinedIcon />} onClick={onCompose}>
+								Compose
+							</Button>
+						</Box>
+					) : undefined
+				}
+			/>
 		</Box>
 	);
 }
@@ -188,8 +195,11 @@ export default function EmailListRoute() {
 	const lastClickedRef = useRef<number | null>(null);
 
 	useEffect(() => {
-		const folderChanged = prevFolderRef.current !== `${mailboxId}/${folder}`;
+		const prev = prevFolderRef.current;
 		prevFolderRef.current = `${mailboxId}/${folder}`;
+		// Only a switch between folders closes the reading/compose pane; on first
+		// load it may hold a compose started from another page.
+		const folderChanged = prev !== undefined && prev !== `${mailboxId}/${folder}`;
 
 		if (folderChanged) {
 			closePanel();
@@ -380,9 +390,9 @@ export default function EmailListRoute() {
 		});
 	};
 
-	async function bulkDelete() {
-		if (!mailboxId || selected.size === 0) return;
-		const ids = [...selected];
+	async function bulkDelete(only?: string[]) {
+		const ids = only ?? [...selected];
+		if (!mailboxId || ids.length === 0) return;
 		const n = `${ids.length} email${ids.length === 1 ? "" : "s"}`;
 		const inTrash = folder === Folders.TRASH;
 		if (inTrash || confirmBeforeDelete) {
@@ -438,9 +448,9 @@ export default function EmailListRoute() {
 		}
 	}
 
-	async function bulkUpdate(data: { read?: boolean; starred?: boolean }) {
-		if (!mailboxId || selected.size === 0) return;
-		const ids = [...selected];
+	async function bulkUpdate(data: { read?: boolean; starred?: boolean }, only?: string[]) {
+		const ids = only ?? [...selected];
+		if (!mailboxId || ids.length === 0) return;
 		setBulkBusy(true);
 		try {
 			if (data.read === true) {
@@ -458,7 +468,9 @@ export default function EmailListRoute() {
 						? `Marked ${n} as read`
 						: data.read === false
 							? `Marked ${n} as unread`
-							: `Starred ${n} email${n === 1 ? "" : "s"}`,
+							: data.starred === false
+								? `Removed the star from ${n}`
+								: `Starred ${n} email${n === 1 ? "" : "s"}`,
 			});
 		} catch {
 			toast.add({ title: "Could not update the selected emails", variant: "error" });
@@ -467,9 +479,9 @@ export default function EmailListRoute() {
 		}
 	}
 
-	async function bulkMove(folderId: string) {
-		if (!mailboxId || selected.size === 0) return;
-		const ids = [...selected];
+	async function bulkMove(folderId: string, only?: string[]) {
+		const ids = only ?? [...selected];
+		if (!mailboxId || ids.length === 0) return;
 		const backTo = folder || Folders.INBOX;
 		const target = folders.find((f) => f.id === folderId)?.name ?? folderId;
 		setBulkBusy(true);
@@ -501,10 +513,6 @@ export default function EmailListRoute() {
 			setBulkBusy(false);
 		}
 	}
-
-	const handleRefresh = () => {
-		invalidateMail();
-	};
 
 	// Thread-aware helpers
 	const hasUnread = (email: Email): boolean => {
@@ -538,124 +546,164 @@ export default function EmailListRoute() {
 
 	const rowPy = rowPadding(density);
 
+	// ── right-click menu ─────────────────────────────────────────────
+	const [menu, setMenu] = useState<{ x: number; y: number; email: Email | null } | null>(null);
+	const [moveMenu, setMoveMenu] = useState<{ x: number; y: number; ids: string[] } | null>(null);
+	const moveTargets = folders.filter((f) => f.id !== folder && f.id !== Folders.DRAFT && f.id !== Folders.SENT);
+
+	const openRowMenu = (e: React.MouseEvent, email: Email) => {
+		e.preventDefault();
+		e.stopPropagation();
+		// Right-clicking an unselected row acts on that row alone, as in Drive.
+		if (!selected.has(email.id)) setSelection([]);
+		setMenu({ x: e.clientX, y: e.clientY, email });
+	};
+
+	/** The rows a menu action applies to: the selection if the row is in it, else the row. */
+	const menuTargets = (email: Email) => (selected.has(email.id) ? emails.filter((e) => selected.has(e.id)) : [email]);
+
+	const composeFrom = async (email: Email, mode: "reply" | "reply-all" | "forward") => {
+		if (!mailboxId) return;
+		try {
+			const full = await api.getEmail(mailboxId, email.id);
+			startCompose({ mode, originalEmail: full });
+		} catch {
+			toast.add({ title: "Could not open the email", variant: "error" });
+		}
+	};
+
+	const rowMenuEntries = (email: Email) => {
+		const targets = menuTargets(email);
+		const ids = targets.map((t) => t.id);
+		const one = targets.length === 1;
+		const allRead = targets.every((t) => !hasUnread(t));
+		const allStarred = targets.every((t) => t.starred);
+		const run = (fn: () => unknown) => () => {
+			setMenu(null);
+			void fn();
+		};
+		return [
+			one && <MenuEntry key="open" icon={<OpenInNewIcon fontSize="small" />} label="Open" hint="Enter" onClick={run(() => handleRowClick(email))} />,
+			one && folder !== Folders.DRAFT && (
+				<MenuEntry key="reply" icon={<ReplyIcon fontSize="small" />} label="Reply" onClick={run(() => composeFrom(email, "reply"))} />
+			),
+			one && folder !== Folders.DRAFT && (
+				<MenuEntry key="reply-all" icon={<ReplyAllIcon fontSize="small" />} label="Reply all" onClick={run(() => composeFrom(email, "reply-all"))} />
+			),
+			one && folder !== Folders.DRAFT && (
+				<MenuEntry key="forward" icon={<ForwardIcon fontSize="small" />} label="Forward" onClick={run(() => composeFrom(email, "forward"))} />
+			),
+			one && folder !== Folders.DRAFT && <Divider key="d1" />,
+			<MenuEntry
+				key="read"
+				icon={allRead ? <MarkEmailUnreadOutlinedIcon fontSize="small" /> : <MarkEmailReadOutlinedIcon fontSize="small" />}
+				label={allRead ? "Mark as unread" : "Mark as read"}
+				onClick={run(() => bulkUpdate({ read: !allRead }, ids))}
+			/>,
+			<MenuEntry
+				key="star"
+				icon={allStarred ? <StarIcon fontSize="small" /> : <StarBorderIcon fontSize="small" />}
+				label={allStarred ? "Remove star" : "Add star"}
+				onClick={run(() => bulkUpdate({ starred: !allStarred }, ids))}
+			/>,
+			<Divider key="d2" />,
+			folder !== Folders.ARCHIVE && folder !== Folders.TRASH && (
+				<MenuEntry key="archive" icon={<ArchiveOutlinedIcon fontSize="small" />} label="Archive" onClick={run(() => bulkMove(Folders.ARCHIVE, ids))} />
+			),
+			(folder === Folders.ARCHIVE || folder === Folders.TRASH) && (
+				<MenuEntry key="inbox" icon={<MoveToInboxOutlinedIcon fontSize="small" />} label="Move to Inbox" onClick={run(() => bulkMove(Folders.INBOX, ids))} />
+			),
+			moveTargets.length > 0 && (
+				<MenuEntry
+					key="move"
+					icon={<DriveFileMoveOutlinedIcon fontSize="small" />}
+					label="Move to…"
+					onClick={() => {
+						const at = menu;
+						setMenu(null);
+						if (at) setMoveMenu({ x: at.x, y: at.y, ids });
+					}}
+				/>
+			),
+			<Divider key="d3" />,
+			<MenuEntry
+				key="delete"
+				icon={folder === Folders.TRASH ? <DeleteForeverOutlinedIcon fontSize="small" /> : <DeleteOutlinedIcon fontSize="small" />}
+				label={folder === Folders.TRASH ? "Delete forever" : "Delete"}
+				hint="Delete"
+				danger={folder === Folders.TRASH}
+				onClick={run(() => bulkDelete(ids))}
+			/>,
+		].filter(Boolean);
+	};
+
 	return (
 		<MailboxSplitView selectedEmailId={selectedEmailId} isComposing={isComposing}>
-			{/* Folder header */}
-			<Box
-				sx={{
-					display: "flex",
-					alignItems: "center",
-					justifyContent: "space-between",
-					px: { xs: 2, md: 2.5 },
-					py: 1.5,
-					borderBottom: 1,
-					borderColor: "divider",
-					flexShrink: 0,
-				}}
+			<ViewHeader
+				title={
+					<Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0 }}>
+						<Checkbox
+							checked={allSelected}
+							indeterminate={!allSelected && someSelected}
+							onChange={(e) => toggleAll(e.target.checked)}
+							disabled={emails.length === 0}
+							slotProps={{ input: { "aria-label": "Select all conversations" } }}
+						/>
+						<Box sx={{ flex: 1, minWidth: 0 }}>
+							{selectedCount > 0 ? (
+								<SelectionBar count={selectedCount} onClear={() => setSelection([])}>
+									<ActionButton title="Mark as read" disabled={bulkBusy} onClick={() => void bulkUpdate({ read: true })}>
+										<MarkEmailReadOutlinedIcon />
+									</ActionButton>
+									<ActionButton title="Mark as unread" disabled={bulkBusy} onClick={() => void bulkUpdate({ read: false })}>
+										<MarkEmailUnreadOutlinedIcon />
+									</ActionButton>
+									<ActionButton title="Add star" disabled={bulkBusy} onClick={() => void bulkUpdate({ starred: true })}>
+										<StarBorderIcon />
+									</ActionButton>
+									{folder !== Folders.ARCHIVE && folder !== Folders.TRASH && (
+										<ActionButton title="Archive" disabled={bulkBusy} onClick={() => void bulkMove(Folders.ARCHIVE)}>
+											<ArchiveOutlinedIcon />
+										</ActionButton>
+									)}
+									{moveTargets.length > 0 && (
+										<ActionButton
+											title="Move to…"
+											disabled={bulkBusy}
+											onClick={(e) => {
+												const r = e.currentTarget.getBoundingClientRect();
+												setMoveMenu({ x: r.left, y: r.bottom, ids: [...selected] });
+											}}
+										>
+											<DriveFileMoveOutlinedIcon />
+										</ActionButton>
+									)}
+									<ActionButton title={folder === Folders.TRASH ? "Delete forever" : "Delete"} disabled={bulkBusy} onClick={() => void bulkDelete()}>
+										{folder === Folders.TRASH ? <DeleteForeverOutlinedIcon /> : <DeleteOutlinedIcon />}
+									</ActionButton>
+								</SelectionBar>
+							) : (
+								<ViewTitle>{folderName}</ViewTitle>
+							)}
+						</Box>
+					</Box>
+				}
 			>
-				<Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-					<Checkbox
-						size="small"
-						checked={allSelected}
-						indeterminate={!allSelected && someSelected}
-						onChange={(e) => toggleAll(e.target.checked)}
-						disabled={emails.length === 0}
-						slotProps={{ input: { "aria-label": "Select all conversations" } }}
-					/>
-					<Typography variant="h6" sx={{ fontSize: 18, fontWeight: 600 }}>
-						{folderName}
+				{totalCount > 0 && selectedCount === 0 && (
+					<Typography variant="body2" color="text.secondary" sx={{ mr: 1, display: { xs: "none", sm: "block" }, whiteSpace: "nowrap" }}>
+						{totalCount} conversation{totalCount !== 1 ? "s" : ""}
 					</Typography>
-				</Box>
-				<Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-					{totalCount > 0 && (
-						<Typography
-							variant="body2"
-							color="text.secondary"
-							sx={{ mr: 1, display: { xs: "none", sm: "block" } }}
-						>
-							{totalCount} conversation{totalCount !== 1 ? "s" : ""}
-						</Typography>
-					)}
-					<Tooltip title={isRefreshing ? "Refreshing..." : "Refresh"}>
-						<span>
-							<IconButton size="small" onClick={handleRefresh} disabled={isRefreshing} aria-label="Refresh">
-								<RefreshIcon
-									fontSize="small"
-									sx={{
-										animation: isRefreshing ? "spin 1s linear infinite" : "none",
-										"@keyframes spin": { from: { transform: "rotate(0deg)" }, to: { transform: "rotate(360deg)" } },
-									}}
-								/>
-							</IconButton>
-						</span>
-					</Tooltip>
-				</Box>
-			</Box>
-
-			{/* Selection action bar */}
-			{selectedCount > 0 && (
-				<Box
-					sx={{
-						display: "flex",
-						alignItems: "center",
-						gap: 0.5,
-						px: { xs: 1.5, md: 2 },
-						py: 0.5,
-						bgcolor: "action.selected",
-						borderBottom: 1,
-						borderColor: "divider",
-						flexShrink: 0,
-					}}
-				>
-					<Typography variant="body2" sx={{ fontWeight: 600, mr: 1 }}>
-						{selectedCount} selected
-					</Typography>
-					<Tooltip title="Mark as read">
-						<span>
-							<IconButton size="small" aria-label="Mark selected as read" disabled={bulkBusy} onClick={() => void bulkUpdate({ read: true })}>
-								<MarkEmailReadOutlinedIcon fontSize="small" />
-							</IconButton>
-						</span>
-					</Tooltip>
-					<Tooltip title="Mark as unread">
-						<span>
-							<IconButton size="small" aria-label="Mark selected as unread" disabled={bulkBusy} onClick={() => void bulkUpdate({ read: false })}>
-								<MarkEmailUnreadOutlinedIcon fontSize="small" />
-							</IconButton>
-						</span>
-					</Tooltip>
-					<Tooltip title="Star">
-						<span>
-							<IconButton size="small" aria-label="Star selected" disabled={bulkBusy} onClick={() => void bulkUpdate({ starred: true })}>
-								<StarBorderIcon fontSize="small" />
-							</IconButton>
-						</span>
-					</Tooltip>
-					<Tooltip title={`Move to ${Folders.ARCHIVE}`}>
-						<span>
-							<IconButton size="small" aria-label="Archive selected" disabled={bulkBusy} onClick={() => void bulkMove(Folders.ARCHIVE)}>
-								<ArchiveOutlinedIcon fontSize="small" />
-							</IconButton>
-						</span>
-					</Tooltip>
-					<Tooltip title="Delete">
-						<span>
-							<IconButton size="small" color="error" aria-label="Delete selected" disabled={bulkBusy} onClick={() => void bulkDelete()}>
-								<DeleteOutlinedIcon fontSize="small" />
-							</IconButton>
-						</span>
-					</Tooltip>
-					<Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 1 }} />
-					<Tooltip title="Clear selection">
-						<IconButton size="small" aria-label="Clear selection" onClick={() => setSelection([])}>
-							<CloseIcon fontSize="small" />
-						</IconButton>
-					</Tooltip>
-				</Box>
-			)}
+				)}
+			</ViewHeader>
 
 			{/* Email rows */}
-			<Box sx={{ flex: 1, overflowY: "auto" }}>
+			<Box
+				sx={{ flex: 1, overflowY: "auto" }}
+				onContextMenu={(e) => {
+					e.preventDefault();
+					setMenu({ x: e.clientX, y: e.clientY, email: null });
+				}}
+			>
 				{isRefreshing && emails.length === 0 ? (
 					<EmailListSkeleton />
 				) : emails.length > 0 ? (
@@ -672,6 +720,7 @@ export default function EmailListRoute() {
 									role="button"
 									tabIndex={0}
 									onClick={() => handleRowClick(email)}
+									onContextMenu={(e) => openRowMenu(e, email)}
 									onKeyDown={(e) => {
 										if (e.key === "Enter" || e.key === " ") {
 											e.preventDefault();
@@ -823,6 +872,39 @@ export default function EmailListRoute() {
 						onChange={(_, p) => setPage(p)}
 					/>
 				</Box>
+			)}
+			{menu && (
+				<PositionedMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}>
+					{menu.email
+						? rowMenuEntries(menu.email)
+						: [
+								<MenuEntry
+									key="compose"
+									icon={<EditOutlinedIcon fontSize="small" />}
+									label="Compose"
+									onClick={() => {
+										setMenu(null);
+										startCompose();
+									}}
+								/>,
+							]}
+				</PositionedMenu>
+			)}
+			{moveMenu && (
+				<PositionedMenu x={moveMenu.x} y={moveMenu.y} onClose={() => setMoveMenu(null)}>
+					{moveTargets.map((f) => (
+						<MenuEntry
+							key={f.id}
+							icon={<FolderOutlinedIcon fontSize="small" />}
+							label={f.name}
+							onClick={() => {
+								const ids = moveMenu.ids;
+								setMoveMenu(null);
+								void bulkMove(f.id, ids);
+							}}
+						/>
+					))}
+				</PositionedMenu>
 			)}
 		</MailboxSplitView>
 	);

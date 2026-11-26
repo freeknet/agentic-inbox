@@ -81,10 +81,10 @@ export default function EmailPanelToolbar({
 				display: "flex",
 				alignItems: "center",
 				gap: 0.5,
-				px: { xs: 1.5, md: 2 },
-				py: 1,
-				borderBottom: 1,
-				borderColor: "divider",
+				px: { xs: 1, sm: 2 },
+				pt: 1.5,
+				pb: 0.5,
+				minHeight: 64,
 				flexShrink: 0,
 			}}
 		>

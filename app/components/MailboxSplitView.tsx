@@ -21,23 +21,24 @@ export default function MailboxSplitView({
 }: MailboxSplitViewProps) {
 	const isPanelOpen = selectedEmailId !== null || isComposing;
 
+	// Same surfaces as Drive: the list and the reading pane are separate cards.
+	const card = { bgcolor: "background.paper", borderRadius: { md: 4 }, overflow: "hidden" } as const;
 	return (
-		<Box sx={{ display: "flex", height: "100%" }}>
+		<Box sx={{ display: "flex", height: "100%", gap: 2 }}>
 			<Box
 				sx={{
+					...card,
 					display: isPanelOpen ? { xs: "none", md: "flex" } : "flex",
 					flexDirection: "column",
 					minWidth: 0,
 					flexShrink: 0,
-					width: isPanelOpen ? { md: 380 } : "100%",
-					borderRight: isPanelOpen ? { md: 1 } : 0,
-					borderColor: "divider",
+					width: isPanelOpen ? { md: 340, xl: 400 } : "100%",
 				}}
 			>
 				{children}
 			</Box>
 			{isPanelOpen && (
-				<Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
+				<Box sx={{ ...card, flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
 					{isComposing && !selectedEmailId ? (
 						<ComposePanel />
 					) : isComposing && selectedEmailId ? (

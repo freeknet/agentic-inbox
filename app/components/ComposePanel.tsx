@@ -65,14 +65,14 @@ export default function ComposePanel() {
 					display: "flex",
 					alignItems: "center",
 					justifyContent: "space-between",
-					px: { xs: 2, md: 3 },
-					py: 1.5,
-					borderBottom: 1,
-					borderColor: "divider",
+					px: { xs: 2, md: 3.5 },
+					pt: 1.5,
+					pb: 0.5,
+					minHeight: 64,
 					flexShrink: 0,
 				}}
 			>
-				<Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+				<Typography component="h2" sx={{ fontSize: 22 }}>
 					{formTitle}
 				</Typography>
 				<IconButton size="small" onClick={discardCompose} disabled={isSending} aria-label="Close compose">

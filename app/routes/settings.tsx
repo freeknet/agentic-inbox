@@ -20,7 +20,6 @@ import FormControl from "@mui/material/FormControl";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import LinearProgress from "@mui/material/LinearProgress";
 import MenuItem from "@mui/material/MenuItem";
-import Paper from "@mui/material/Paper";
 import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
@@ -33,6 +32,7 @@ import api from "~/services/api";
 import { useToast } from "~/lib/toast";
 import { AGENT_MODELS, DEFAULT_AGENT_MODEL } from "shared/ai-models";
 import { ACCENTS, FONT_SIZES, usePrefs, type Accent, type Density, type FontSize } from "~/lib/prefs";
+import { ViewHeader } from "~/shell/View";
 
 // Placeholder shown in the textarea when no custom prompt is set.
 // The authoritative default prompt lives in workers/agent/index.ts (DEFAULT_SYSTEM_PROMPT).
@@ -66,18 +66,16 @@ function Section({
 	children: ReactNode;
 }) {
 	return (
-		<Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
+		<Box component="section" sx={sectionSx}>
 			<Box sx={{ mb: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
 				<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
 					<Box sx={{ display: "flex", color: "text.secondary" }}>{icon}</Box>
-					<Typography variant="body2" sx={{ fontWeight: 500 }}>
-						{title}
-					</Typography>
+					<Typography variant="subtitle2">{title}</Typography>
 				</Box>
 				{aside}
 			</Box>
 			{children}
-		</Paper>
+		</Box>
 	);
 }
 
@@ -114,6 +112,8 @@ function UsageBar({ value, max, label }: { value: number; max: number; label: st
 }
 
 const captionSx = { display: "block", mt: 0.5 };
+/** Sections are separated by a rule, as in Drive's settings. */
+const sectionSx = { py: 3, borderTop: 1, borderColor: "divider", "&:first-of-type": { borderTop: 0, pt: 1 } } as const;
 
 export default function SettingsRoute() {
 	const { mailboxId } = useParams<{ mailboxId: string }>();
@@ -209,14 +209,21 @@ export default function SettingsRoute() {
 	const isCustomPrompt = agentPrompt.trim().length > 0;
 
 	return (
-		<Box sx={{ maxWidth: 672, px: { xs: 2, md: 4 }, py: { xs: 2, md: 3 }, height: "100%", overflowY: "auto" }}>
-			<Typography variant="h6" sx={{ fontSize: 18, fontWeight: 600, mb: 3 }}>
-				Settings
-			</Typography>
-
-			<Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-				<Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
-					<Typography variant="body2" sx={{ fontWeight: 500, mb: 2 }}>
+		<Box sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+			<ViewHeader title="Settings">
+				<Button
+					variant="contained"
+					onClick={handleSave}
+					disabled={isSaving}
+					startIcon={isSaving ? <CircularProgress size={14} color="inherit" /> : undefined}
+				>
+					Save changes
+				</Button>
+			</ViewHeader>
+			<Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", px: { xs: 2, md: 3.5 }, pb: 4 }}>
+			<Box sx={{ display: "flex", flexDirection: "column", maxWidth: 720 }}>
+				<Box component="section" sx={sectionSx}>
+					<Typography variant="subtitle2" sx={{ mb: 2 }}>
 						Account
 					</Typography>
 					<Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
@@ -229,7 +236,7 @@ export default function SettingsRoute() {
 						/>
 						<TextField label="Email" type="email" value={mailbox.email} disabled fullWidth size="small" />
 					</Box>
-				</Paper>
+				</Box>
 
 				<Section icon={<PaletteOutlinedIcon fontSize="small" />} title="Appearance">
 					<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -459,13 +466,11 @@ export default function SettingsRoute() {
 					</Box>
 				</Section>
 
-				<Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
+				<Box component="section" sx={sectionSx}>
 					<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
 						<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
 							<AutoAwesomeOutlinedIcon fontSize="small" sx={{ color: "text.secondary" }} />
-							<Typography variant="body2" sx={{ fontWeight: 500 }}>
-								AI Agent Prompt
-							</Typography>
+							<Typography variant="subtitle2">AI Agent Prompt</Typography>
 							<Chip
 								size="small"
 								label={isCustomPrompt ? "Custom" : "Default"}
@@ -523,7 +528,7 @@ export default function SettingsRoute() {
 						The prompt is sent as the system message to the AI model. It controls the agent's personality, writing
 						style, and behavior rules.
 					</Typography>
-				</Paper>
+				</Box>
 
 				<Section icon={<StorageOutlinedIcon fontSize="small" />} title="Usage">
 					{stats ? (
@@ -582,16 +587,7 @@ export default function SettingsRoute() {
 					)}
 				</Section>
 
-				<Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-					<Button
-						variant="contained"
-						onClick={handleSave}
-						disabled={isSaving}
-						startIcon={isSaving ? <CircularProgress size={14} color="inherit" /> : undefined}
-					>
-						Save Changes
-					</Button>
-				</Box>
+			</Box>
 			</Box>
 		</Box>
 	);

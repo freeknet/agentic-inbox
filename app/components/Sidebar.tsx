@@ -115,6 +115,8 @@ export default function Sidebar() {
 				icon={<EditOutlinedIcon />}
 				label="Compose"
 				onClick={() => {
+					// The compose pane lives in the list views; from elsewhere (Settings), open it over the inbox.
+					if (!pathname.includes("/emails/") && !pathname.includes("/search")) navigate(`/mailbox/${mailboxId}/emails/inbox`);
 					startCompose();
 					closeSidebar();
 				}}

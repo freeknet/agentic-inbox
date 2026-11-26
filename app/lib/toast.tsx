@@ -87,8 +87,11 @@ export function Toaster() {
 					sx={{ position: "static", transform: "none" }}
 				>
 					<Alert
-						severity={toast.variant ?? "info"}
+						severity={toast.variant === "error" ? "error" : "info"}
 						variant="filled"
+						// Same look as Drive's snackbar: dark for everything but errors, no icon.
+						icon={toast.variant === "error" ? undefined : false}
+						sx={{ alignItems: "center", ...(toast.variant !== "error" && { bgcolor: "#323232", color: "#fff" }) }}
 						onClose={() => closeToast(toast.id)}
 						action={
 							toast.actions?.map((action, i) => (

@@ -1,6 +1,6 @@
 import Box from "@mui/material/Box";
 import { useEffect, useRef } from "react";
-import { Outlet, useParams } from "react-router";
+import { Outlet, useMatches, useParams } from "react-router";
 import AgentSidebar from "~/components/AgentSidebar";
 import ComposeEmail from "~/components/ComposeEmail";
 import Header from "~/components/Header";
@@ -29,6 +29,8 @@ export default function MailboxRoute() {
 	}, [mailboxId, closeComposeModal, closePanel, closeSidebar]);
 
 	const card = { bgcolor: "background.paper", borderRadius: { md: 4 }, overflow: "hidden" } as const;
+	// The email list and search results lay out their own cards (MailboxSplitView).
+	const ownCards = useMatches().some((m) => m.id === "routes/email-list" || m.id === "routes/search-results");
 
 	return (
 		<Box sx={{ display: "flex", flexDirection: "column", height: "100dvh", overflow: "hidden", bgcolor: "background.default" }}>
@@ -36,11 +38,11 @@ export default function MailboxRoute() {
 			<Box sx={{ display: "flex", flex: 1, minHeight: 0 }}>
 				<Sidebar />
 				<Box component="main" sx={{ flex: 1, minWidth: 0, display: "flex", gap: 2, pr: { md: 2 }, pb: { md: 2 } }}>
-					<Box sx={{ ...card, flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+					<Box sx={{ ...(ownCards ? {} : card), flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
 						<Outlet />
 					</Box>
 					{isAgentPanelOpen && (
-						<Box sx={{ ...card, display: { xs: "none", lg: "flex" }, width: 380, flexShrink: 0, flexDirection: "column" }}>
+						<Box sx={{ ...card, display: { xs: "none", lg: "flex" }, width: 340, flexShrink: 0, flexDirection: "column" }}>
 							<AgentSidebar />
 						</Box>
 					)}

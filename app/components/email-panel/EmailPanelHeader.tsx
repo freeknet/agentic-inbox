@@ -17,8 +17,8 @@ export default function EmailPanelHeader({
 	showThreadCount,
 }: EmailPanelHeaderProps) {
 	return (
-		<Box sx={{ px: { xs: 2, md: 3 }, py: 1.5, borderBottom: 1, borderColor: "divider", flexShrink: 0 }}>
-			<Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+		<Box sx={{ px: { xs: 2, md: 3.5 }, pb: 1.5, flexShrink: 0 }}>
+			<Typography component="h2" sx={{ fontSize: 22 }}>
 				{subject}
 			</Typography>
 			{showThreadCount && (

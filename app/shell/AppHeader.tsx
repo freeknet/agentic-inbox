@@ -41,7 +41,8 @@ export interface AppHeaderProps {
 	homeHref: string;
 	/** URLs of the other apps, for the launcher. */
 	appUrls: Partial<Record<AppId, string | null>>;
-	search: {
+	/** Omit on pages with nothing to search (the mailbox picker). */
+	search?: {
 		placeholder: string;
 		value: string;
 		onChange: (value: string) => void;
@@ -50,9 +51,9 @@ export interface AppHeaderProps {
 	};
 	/** App-specific icon buttons, shown before theme, settings and apps. */
 	actions?: ReactNode;
-	settings: { onClick: () => void; active?: boolean };
-	/** Opens the sidebar drawer on small screens. */
-	onMenuClick: () => void;
+	settings?: { onClick: () => void; active?: boolean };
+	/** Opens the sidebar drawer on small screens; omit on pages without a sidebar. */
+	onMenuClick?: () => void;
 }
 
 /**
@@ -68,9 +69,11 @@ export function AppHeader({ app, homeHref, appUrls, search, actions, settings, o
 			spacing={1}
 			sx={{ alignItems: "center", px: { xs: 1, sm: 2 }, py: 1, height: HEADER_HEIGHT, flexShrink: 0, bgcolor: "background.default" }}
 		>
-			<IconButton aria-label="Open navigation" onClick={onMenuClick} sx={{ display: { md: "none" } }}>
-				<MenuIcon />
-			</IconButton>
+			{onMenuClick && (
+				<IconButton aria-label="Open navigation" onClick={onMenuClick} sx={{ display: { md: "none" } }}>
+					<MenuIcon />
+				</IconButton>
+			)}
 			<Stack
 				component={RouterLink}
 				to={homeHref}
@@ -83,6 +86,7 @@ export function AppHeader({ app, homeHref, appUrls, search, actions, settings, o
 					{brand.name}
 				</Typography>
 			</Stack>
+			{search ? (
 			<Box
 				component="form"
 				role="search"
@@ -121,15 +125,21 @@ export function AppHeader({ app, homeHref, appUrls, search, actions, settings, o
 					}}
 				/>
 			</Box>
+			) : (
+				<Box sx={{ flex: 1 }} />
+			)}
 			<Box sx={{ flex: { md: 1 } }} />
 			<Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexShrink: 0 }}>
-				{actions}
+				{/* App-specific buttons step aside on phones so the search box keeps its room. */}
+				{actions && <Stack direction="row" spacing={0.5} sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center" }}>{actions}</Stack>}
 				<ThemeToggle />
-				<Tooltip title="Settings">
-					<IconButton aria-label="Settings" onClick={settings.onClick} color={settings.active ? "primary" : "default"}>
-						<SettingsOutlinedIcon />
-					</IconButton>
-				</Tooltip>
+				{settings && (
+					<Tooltip title="Settings">
+						<IconButton aria-label="Settings" onClick={settings.onClick} color={settings.active ? "primary" : "default"}>
+							<SettingsOutlinedIcon />
+						</IconButton>
+					</Tooltip>
+				)}
 				<AppsMenu current={app} urls={appUrls} />
 			</Stack>
 		</Stack>

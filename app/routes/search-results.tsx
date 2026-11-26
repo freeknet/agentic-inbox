@@ -3,7 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import SearchIcon from "@mui/icons-material/Search";
+import SearchOffIcon from "@mui/icons-material/SearchOff";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -20,6 +20,7 @@ import { useSearchEmails, SEARCH_PAGE_SIZE } from "~/queries/search";
 import { useUIStore } from "~/hooks/useUIStore";
 import type { Email } from "~/types";
 import { usePrefs } from "~/lib/prefs";
+import { EmptyState, ViewHeader, ViewTitle } from "~/shell/View";
 
 function highlightTerms(text: string, query: string): React.ReactNode {
 	if (!query || !text) return text;
@@ -96,53 +97,38 @@ export default function SearchResultsRoute() {
 	return (
 		<MailboxSplitView selectedEmailId={selectedEmailId} isComposing={isComposing}>
 			<>
-				<Box
-					sx={{
-						display: "flex",
-						alignItems: "center",
-						gap: 1,
-						px: { xs: 2, md: 2.5 },
-						py: 1.5,
-						borderBottom: 1,
-						borderColor: "divider",
-						flexShrink: 0,
-					}}
+				<ViewHeader
+					title={
+						<Box sx={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+							<IconButton onClick={() => navigate(`/mailbox/${mailboxId}/emails/inbox`)} aria-label="Back to inbox">
+								<ArrowBackIcon />
+							</IconButton>
+							<ViewTitle>{urlQuery ? `Search results for "${urlQuery}"` : "Search"}</ViewTitle>
+						</Box>
+					}
 				>
-					<IconButton
-						size="small"
-						onClick={() => navigate(`/mailbox/${mailboxId}/emails/inbox`)}
-						aria-label="Back to inbox"
-					>
-						<ArrowBackIcon fontSize="small" />
-					</IconButton>
-					<Box sx={{ minWidth: 0, flex: 1 }}>
-						<Typography variant="h6" sx={{ fontSize: 18, fontWeight: 600 }} noWrap>
-							Search Results
+					{!isLoading && (
+						<Typography variant="body2" color="text.secondary" sx={{ mr: 1, whiteSpace: "nowrap", display: { xs: "none", sm: "block" } }}>
+							{totalCount} result{totalCount !== 1 ? "s" : ""}
 						</Typography>
-						{!isLoading && (
-							<Typography variant="body2" color="text.secondary">
-								{totalCount} result{totalCount !== 1 ? "s" : ""}
-								{urlQuery ? ` for "${urlQuery}"` : ""}
-							</Typography>
-						)}
-					</Box>
-				</Box>
+					)}
+				</ViewHeader>
 				<Box sx={{ flex: 1, overflowY: "auto" }}>
 					{isLoading ? (
 						<Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
 							<CircularProgress />
 						</Box>
 					) : results.length === 0 ? (
-						<Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", py: 12, px: 3, textAlign: "center" }}>
-							<SearchIcon sx={{ fontSize: 48, color: "text.disabled", mb: 2 }} />
-							<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
-								No results found
-							</Typography>
-							<Typography variant="body2" color="text.secondary" sx={{ maxWidth: 320 }}>
-								{urlQuery
-									? `Nothing matched "${urlQuery}". Try different keywords or check your spelling.`
-									: "Enter a search term to find emails by subject, sender, or content."}
-							</Typography>
+						<Box sx={{ py: 10, px: 3, textAlign: "center" }}>
+							<EmptyState
+								icon={<SearchOffIcon />}
+								title="No matching results"
+								body={
+									urlQuery
+										? `Nothing matched "${urlQuery}". Try different keywords or check your spelling.`
+										: "Enter a search term to find emails by subject, sender or content."
+								}
+							/>
 							{urlQuery && (
 								<Typography variant="caption" color="text.secondary" sx={{ mt: 1.5, maxWidth: 360 }}>
 									Tip: Use operators like <Box component="code" sx={{ bgcolor: "action.hover", px: 0.5, borderRadius: 1 }}>from:name</Box>,{" "}
