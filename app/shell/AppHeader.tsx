@@ -53,7 +53,7 @@ export interface AppHeaderProps {
 	/** App-specific icon buttons, shown before theme, settings and apps. */
 	actions?: ReactNode;
 	settings?: { onClick: () => void; active?: boolean };
-	/** Opens the sidebar drawer on small screens; omit on pages without a sidebar. */
+	/** The menu button: collapses the sidebar on desktop, opens the drawer on phones (see toggleSidebar in ./layout). Omit on pages without a sidebar. */
 	onMenuClick?: () => void;
 }
 
@@ -86,16 +86,18 @@ export function AppHeader({ app, homeHref, appUrls, search, actions, settings, o
 			}}
 		>
 			{onMenuClick && (
-				<IconButton aria-label="Open navigation" onClick={onMenuClick} sx={{ display: { md: "none" } }}>
-					<MenuIcon />
-				</IconButton>
+				<Tooltip title="Main menu">
+					<IconButton aria-label="Main menu" onClick={onMenuClick}>
+						<MenuIcon />
+					</IconButton>
+				</Tooltip>
 			)}
 			<Stack
 				component={RouterLink}
 				to={homeHref}
 				direction="row"
 				spacing={1}
-				sx={{ alignItems: "center", textDecoration: "none", color: "text.primary", width: { md: SIDEBAR_WIDTH - 16 }, flexShrink: 0 }}
+				sx={{ alignItems: "center", textDecoration: "none", color: "text.primary", width: { md: SIDEBAR_WIDTH - (onMenuClick ? 64 : 16) }, flexShrink: 0 }}
 			>
 				{brand.icon(40)}
 				<Typography variant="h6" sx={{ display: { xs: "none", sm: "block" }, color: "text.secondary" }}>

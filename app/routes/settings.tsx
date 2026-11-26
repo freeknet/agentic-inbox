@@ -7,6 +7,7 @@ import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import BeachAccessOutlinedIcon from "@mui/icons-material/BeachAccessOutlined";
 import ForwardOutlinedIcon from "@mui/icons-material/ForwardOutlined";
 import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
+import ViewQuiltOutlinedIcon from "@mui/icons-material/ViewQuiltOutlined";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import PaletteOutlinedIcon from "@mui/icons-material/PaletteOutlined";
 import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
@@ -32,7 +33,8 @@ import { useMailbox, useUpdateMailbox } from "~/queries/mailboxes";
 import api from "~/services/api";
 import { useToast } from "~/lib/toast";
 import { AGENT_MODELS, DEFAULT_AGENT_MODEL } from "shared/ai-models";
-import { ACCENTS, FONT_SIZES, usePrefs, type Accent, type Density, type FontSize } from "~/lib/prefs";
+import { ACCENTS, DEFAULT_PREFS, FONT_SIZES, usePrefs, type Accent, type Density, type FontSize, type ReadingPane } from "~/lib/prefs";
+import { useShellLayout } from "~/shell/layout";
 import { ViewHeader } from "~/shell/View";
 import { usePushNotifications } from "~/lib/push";
 
@@ -116,6 +118,54 @@ function NotificationsSection({ mailboxId }: { mailboxId: string | undefined }) 
 					{note[status]}
 				</Typography>
 			)}
+		</Section>
+	);
+}
+
+/** Where things sit: reading pane, sidebar, panel sizes (stored in this browser). */
+function LayoutSection() {
+	const prefs = usePrefs();
+	const collapsed = useShellLayout((s) => s.sidebarCollapsed);
+	const setCollapsed = useShellLayout((s) => s.setSidebarCollapsed);
+	return (
+		<Section icon={<ViewQuiltOutlinedIcon fontSize="small" />} title="Layout">
+			<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+				<Box>
+					<Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75 }}>
+						Reading pane
+					</Typography>
+					<ToggleButtonGroup
+						exclusive
+						value={prefs.readingPane}
+						onChange={(_, v: ReadingPane | null) => v && prefs.set("readingPane", v)}
+						size="small"
+						sx={{ flexWrap: "wrap" }}
+					>
+						<ToggleButton value="right">Right of the list</ToggleButton>
+						<ToggleButton value="below">Below the list</ToggleButton>
+						<ToggleButton value="off">No split</ToggleButton>
+					</ToggleButtonGroup>
+					<Typography variant="caption" color="text.secondary" sx={captionSx}>
+						Drag the gap between the list and the message to resize; double-click it to reset. With no split, a message opens in place of the list.
+					</Typography>
+				</Box>
+				<Toggle checked={collapsed} onChange={setCollapsed} label="Collapse the sidebar to icons (the menu button in the header does this too)" />
+				<Box>
+					<Button
+						size="small"
+						startIcon={<RestartAltIcon sx={{ fontSize: 14 }} />}
+						onClick={() => {
+							prefs.set("readingPane", DEFAULT_PREFS.readingPane);
+							prefs.set("listWidth", DEFAULT_PREFS.listWidth);
+							prefs.set("listHeight", DEFAULT_PREFS.listHeight);
+							prefs.set("agentWidth", DEFAULT_PREFS.agentWidth);
+							setCollapsed(false);
+						}}
+					>
+						Reset layout
+					</Button>
+				</Box>
+			</Box>
 		</Section>
 	);
 }
@@ -344,6 +394,8 @@ export default function SettingsRoute() {
 						/>
 					</Box>
 				</Section>
+
+				<LayoutSection />
 
 				<Section icon={<TuneOutlinedIcon fontSize="small" />} title="Behaviour">
 					<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>

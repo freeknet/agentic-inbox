@@ -9,6 +9,7 @@ import { useUIStore } from "~/hooks/useUIStore";
 import { useDrive } from "~/queries/drive";
 import { queryKeys } from "~/queries/keys";
 import { AppHeader } from "~/shell/AppHeader";
+import { toggleSidebar as toggleShellSidebar } from "~/shell/layout";
 
 /** Mail's top bar: the shared shell header with Mail's refresh and agent buttons. */
 export default function Header() {
@@ -94,7 +95,7 @@ export default function Header() {
 				active: isSettingsActive,
 				onClick: () => navigate(isSettingsActive ? inbox : `/mailbox/${mailboxId}/settings`),
 			}}
-			onMenuClick={toggleSidebar}
+			onMenuClick={() => toggleShellSidebar(toggleSidebar)}
 		/>
 	);
 }

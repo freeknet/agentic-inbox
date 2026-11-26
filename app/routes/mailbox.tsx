@@ -9,6 +9,8 @@ import { useMailbox } from "~/queries/mailboxes";
 import { useFolders } from "~/queries/folders";
 import { setAppBadge } from "~/shell/pwa";
 import { usePushSync } from "~/lib/push";
+import { DEFAULT_PREFS, usePrefs } from "~/lib/prefs";
+import { ResizeHandle } from "~/shell/Resizer";
 import { useUIStore } from "~/hooks/useUIStore";
 
 /**
@@ -38,6 +40,8 @@ export default function MailboxRoute() {
 		if (inboxUnread !== undefined) setAppBadge(inboxUnread);
 	}, [inboxUnread]);
 	usePushSync(mailboxId);
+	const agentWidth = usePrefs((p) => p.agentWidth);
+	const setPref = usePrefs((p) => p.set);
 
 	const card = { bgcolor: "background.paper", borderRadius: { md: 4 }, overflow: "hidden" } as const;
 	// The email list and search results lay out their own cards (MailboxSplitView).
@@ -48,12 +52,26 @@ export default function MailboxRoute() {
 			<Header />
 			<Box sx={{ display: "flex", flex: 1, minHeight: 0 }}>
 				<Sidebar />
-				<Box component="main" sx={{ flex: 1, minWidth: 0, display: "flex", gap: 2, pr: { md: 2 }, pb: { md: 2 } }}>
+				<Box component="main" sx={{ flex: 1, minWidth: 0, display: "flex", pr: { md: 2 }, pb: { md: 2 } }}>
 					<Box sx={{ ...(ownCards ? {} : card), flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
 						<Outlet />
 					</Box>
 					{isAgentPanelOpen && (
-						<Box sx={{ ...card, display: { xs: "none", lg: "flex" }, width: 340, flexShrink: 0, flexDirection: "column" }}>
+						<Box sx={{ display: { xs: "none", lg: "flex" } }}>
+							{/* Dragging left widens the panel, so the handle works on the negative width. */}
+							<ResizeHandle
+								axis="x"
+								label="Resize agent panel"
+								value={-agentWidth}
+								min={-720}
+								max={-280}
+								onChange={(v) => setPref("agentWidth", -v)}
+								onReset={() => setPref("agentWidth", DEFAULT_PREFS.agentWidth)}
+							/>
+						</Box>
+					)}
+					{isAgentPanelOpen && (
+						<Box sx={{ ...card, display: { xs: "none", lg: "flex" }, width: agentWidth, flexShrink: 0, flexDirection: "column" }}>
 							<AgentSidebar />
 						</Box>
 					)}

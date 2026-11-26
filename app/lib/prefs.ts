@@ -4,6 +4,8 @@ import { persist } from "zustand/middleware";
 export type Accent = "blue" | "green" | "purple" | "amber" | "red";
 export type Density = "comfortable" | "compact";
 export type FontSize = "small" | "medium" | "large";
+/** Gmail's reading pane: beside the list, under it, or none (the message replaces the list). */
+export type ReadingPane = "right" | "below" | "off";
 
 /** Accent palettes for both colour schemes. */
 export const ACCENTS: Record<Accent, { label: string; light: string; lightSoft: string; dark: string; darkSoft: string }> = {
@@ -26,6 +28,14 @@ interface Prefs {
 	density: Density;
 	fontSize: FontSize;
 	showSnippets: boolean;
+	// Layout
+	readingPane: ReadingPane;
+	/** Message list width (px) with the pane on the right. */
+	listWidth: number;
+	/** Message list height (px) with the pane below. */
+	listHeight: number;
+	/** AI agent panel width (px). */
+	agentWidth: number;
 	// Behaviour
 	confirmBeforeDelete: boolean;
 	markReadOnOpen: boolean;
@@ -40,6 +50,10 @@ export const DEFAULT_PREFS = {
 	density: "comfortable" as Density,
 	fontSize: "medium" as FontSize,
 	showSnippets: true,
+	readingPane: "right" as ReadingPane,
+	listWidth: 400,
+	listHeight: 320,
+	agentWidth: 340,
 	confirmBeforeDelete: true,
 	markReadOnOpen: true,
 	pageSize: 25 as const,
