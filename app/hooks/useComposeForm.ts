@@ -20,7 +20,8 @@ import { useSendFeedback } from "~/hooks/useSendFeedback";
 import type { QueuedSend } from "~/types";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
-import { useComposeAttachments } from "~/hooks/useComposeAttachments";
+import { driveLinksHtml, driveLinksText, useComposeAttachments } from "~/hooks/useComposeAttachments";
+import { useDrive } from "~/queries/drive";
 
 function appendUniqueAddress(
 	addresses: string[],
@@ -175,7 +176,8 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const replyMutation = useReplyToEmail();
 	const forwardMutation = useForwardEmail();
 	const { confirmSuppressed, notifyQueued } = useSendFeedback();
-	const attachments = useComposeAttachments(mailboxId);
+	const drive = useDrive();
+	const attachments = useComposeAttachments(mailboxId, !!drive);
 	const resetAttachments = attachments.reset;
 
 	const [to, setTo] = useState("");
@@ -247,8 +249,8 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		const toRecipients = splitEmailList(to);
 		if (toRecipients.length === 0) { setError("Add at least one recipient."); return; }
 		const ccRecipients = splitEmailList(cc); const bccRecipients = splitEmailList(bcc);
-		if (attachments.isUploading) { setError("Wait for attachments to finish uploading."); return; }
-		if (attachments.hasErrors) { setError("Remove the attachments that failed to upload."); return; }
+		if (attachments.isUploading) { setError("Wait for attachments and Drive uploads to finish."); return; }
+		if (attachments.hasErrors) { setError("Remove the attachments or Drive files that failed to upload."); return; }
 		const fromName = currentMailbox.settings?.fromName || currentMailbox.name;
 		const from = fromName && fromName !== currentMailbox.email ? { email: currentMailbox.email, name: fromName } : currentMailbox.email;
 		const emailData = {
@@ -257,8 +259,9 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 			bcc: toEmailListValue(bccRecipients),
 			from,
 			subject,
-			html: body,
-			text: htmlToPlainText(body),
+			// Files sent through Drive go out as a block of links after the message.
+			html: body + driveLinksHtml(attachments.driveLinks),
+			text: htmlToPlainText(body) + driveLinksText(attachments.driveLinks),
 		};
 		const draftId = composeOptions.draftEmail?.id; const mode = composeOptions.mode; const originalId = composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to;
 		if (!(await confirmSuppressed(mailboxId, [...toRecipients, ...ccRecipients, ...bccRecipients]))) return;

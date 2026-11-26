@@ -22,6 +22,7 @@ This is a fork of [cloudflare/agentic-inbox](https://github.com/cloudflare/agent
 - A warning before you send to an address on Resend's suppression list.
 - **Full-text search** (SQLite FTS5) over subject, people and body, with `from:`, `to:`, `subject:`, `is:unread`, `is:starred`, `has:attachment` and date filters.
 - **Vacation auto-reply** with optional start and end times. It never answers mailing lists, automated mail or no-reply senders, and answers each sender at most once every 4 days (RFC 3834).
+- **Drive** (optional companion app): files over 18 MB go out as download links, received attachments save to Drive, and a Mail | Drive switcher.
 - **Forwarding**: keep mail here and also forward each incoming message, unchanged, to another address through Email Routing (the address must be a verified Email Routing destination; it costs no Resend quota).
 - Signature; folders; a safe HTML viewer (sandboxed frame, remote images blocked until you allow them, inline `cid:` images shown).
 - Dark mode (system, light or dark); works on phones.
@@ -168,6 +169,23 @@ In the dashboard, open your domain → Email → Email Routing:
    ```
 
 Service tokens can reach only `/mcp`, not the web app or its REST API. Sends from MCP go through the same outbox and limits as the UI. Anyone who passes your Access policy can use every mailbox in the app, because Access is the only access boundary.
+
+## Drive (optional)
+
+[agentic-drive](../agentic-drive) is a companion file drive, another Worker on the same account. Deploy it first, then keep the `services` entry in `wrangler.jsonc`:
+
+```jsonc
+"services": [{ "binding": "DRIVE", "service": "agentic-drive", "entrypoint": "DriveService" }]
+```
+
+With it connected:
+
+- **Big files go out as links.** A file that would take a message over 18 MB uploads to Drive (folder "Sent as links", in 50 MiB parts) and the message carries a download link that works for 30 days. Files up to 5 GB.
+- **Add from Drive.** The Drive button in compose adds any Drive file as a link.
+- **Save to Drive.** The cloud button next to a received attachment copies it into Drive's "From email" folder.
+- **Mail | Drive switcher** in both headers. Put both hostnames in one Access application so a single sign-in covers both.
+
+Without the binding (remove the `services` entry), these features are hidden and nothing else changes.
 
 ## AI agent and Neurons
 

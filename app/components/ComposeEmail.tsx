@@ -7,7 +7,7 @@ import { FloppyDiskIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react";
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor from "./RichTextEditor";
-import { AttachButton, AttachmentChips, useFileDrop } from "./ComposeAttachments";
+import { AttachButton, AttachmentChips, FromDriveButton, useFileDrop } from "./ComposeAttachments";
 import ScheduleSendButton from "./ScheduleSendButton";
 import { useUIStore } from "~/hooks/useUIStore";
 
@@ -129,8 +129,9 @@ export default function ComposeEmail() {
 						>
 							Discard
 						</Button>
-						<div className="flex items-center gap-2">
+						<div className="flex flex-wrap items-center justify-end gap-2">
 							<AttachButton attachments={attachments} disabled={isSending} />
+							<FromDriveButton attachments={attachments} disabled={isSending} />
 							<Button
 								type="button"
 								variant="secondary"

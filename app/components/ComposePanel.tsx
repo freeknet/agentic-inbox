@@ -7,7 +7,7 @@ import { FloppyDiskIcon, PaperPlaneTiltIcon, XIcon } from "@phosphor-icons/react
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor from "./RichTextEditor";
-import { AttachButton, AttachmentChips, useFileDrop } from "./ComposeAttachments";
+import { AttachButton, AttachmentChips, FromDriveButton, useFileDrop } from "./ComposeAttachments";
 import ScheduleSendButton from "./ScheduleSendButton";
 
 export default function ComposePanel() {
@@ -164,8 +164,9 @@ export default function ComposePanel() {
 						<Button type="button" variant="ghost" size="sm" onClick={discardCompose} disabled={isSending}>
 							Discard
 						</Button>
-						<div className="flex items-center gap-2">
+						<div className="flex flex-wrap items-center justify-end gap-2">
 							<AttachButton attachments={attachments} disabled={isSending} />
+							<FromDriveButton attachments={attachments} disabled={isSending} />
 							<Button
 								type="button"
 								variant="secondary"

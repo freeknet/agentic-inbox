@@ -8,6 +8,7 @@ import { type KeyboardEvent, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { useUIStore } from "~/hooks/useUIStore";
 import { useTheme } from "~/hooks/useTheme";
+import { AppSwitcher } from "~/components/AppSwitcher";
 
 export default function Header() {
 	const [searchQuery, setSearchQuery] = useState("");
@@ -120,6 +121,7 @@ export default function Header() {
 			)}
 
 			<div className="flex items-center gap-1 ml-auto shrink-0">
+				<AppSwitcher />
 				<Tooltip content={isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"} side="bottom" render={<Button
 						variant={isAgentPanelOpen ? "secondary" : "ghost"}
 						shape="square"

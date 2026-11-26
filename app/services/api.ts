@@ -85,6 +85,27 @@ function del<T>(url: string) {
 	return request<T>(url, { method: "DELETE" });
 }
 
+export type DriveStatus =
+	| { available: false }
+	| { available: true; url: string; bytes: number; files: number; trashBytes: number; limit: number };
+
+export interface DriveItem {
+	id: string;
+	parent_id: string | null;
+	kind: "file" | "folder";
+	name: string;
+	size: number;
+	mime: string | null;
+	created_at: number;
+	updated_at: number;
+}
+
+export interface DriveLink {
+	url: string;
+	token: string;
+	expiresAt: number | null;
+}
+
 export interface UploadedFile {
 	upload_id: string;
 	filename: string;
@@ -170,6 +191,20 @@ const api = {
 	uploadFile,
 	deleteUpload: (mailboxId: string, uploadId: string) =>
 		del<void>(`/api/v1/mailboxes/${mailboxId}/uploads/${uploadId}`),
+
+	// Drive (agentic-drive over a service binding)
+	getDrive: () => get<DriveStatus>("/api/v1/drive"),
+	listDrive: (parentId: string | null) =>
+		get<{ breadcrumbs: Array<{ id: string; name: string }>; items: DriveItem[] }>("/api/v1/drive/files", parentId ? { params: { parent: parentId } } : undefined),
+	searchDrive: (q: string) => get<{ items: DriveItem[] }>("/api/v1/drive/search", { params: { q } }),
+	driveLink: (id: string) => post<DriveLink>(`/api/v1/drive/files/${id}/link`, {}),
+	beginDriveUpload: (b: { name: string; size: number; mime: string }) =>
+		post<{ uploadId: string; partSize: number; partCount: number } | { file: DriveItem; link: DriveLink }>("/api/v1/drive/uploads", b),
+	completeDriveUpload: (uploadId: string, parts: Array<{ partNumber: number; etag: string }>) =>
+		post<{ file: DriveItem; link: DriveLink }>(`/api/v1/drive/uploads/${uploadId}/complete`, { parts }),
+	abortDriveUpload: (uploadId: string) => del<void>(`/api/v1/drive/uploads/${uploadId}`),
+	saveAttachmentToDrive: (mailboxId: string, emailId: string, attachmentId: string) =>
+		post<{ item: DriveItem; folder: string }>(`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/attachments/${attachmentId}/save-to-drive`),
 	saveDraft: (
 		mailboxId: string,
 		draft: {
