@@ -81,3 +81,21 @@ Deployed versions `89c4dcef` and `2c02f161` (branch `forwarding-and-cleanup`).
 
 - The reusable policy "Lawrence B Norton" used to allow any one-time-PIN login (any email address) plus any service token. On 2026-11-19 it was changed to allow only the owner's email. It is attached to no application.
 - The `matrix` app (matrix.midwestfreeks.org) has no policies, so Access denies everyone. The hostname has no DNS record.
+
+## Drive integration (2026-11-26 UTC)
+
+Deployed: agentic-drive `9c219c96` at drive.midwestfreeks.org, agentic-inbox `e7cb47c6` (branch `drive-integration`) with the `DRIVE` service binding.
+
+| Check | Result |
+|---|---|
+| Drive `/` and `/api/*` without a login | 302 to the Access login |
+| A made-up share link `/s/<token>` without a login | Reaches the app: 404 "Link unavailable" page |
+| Mail `/api/v1/drive` | `available: true`, live Drive stats |
+| Mail → Drive switcher | Drive opened with no second login (Access team session) |
+| Save to Drive on a received attachment (notes.txt) | 201; file in Drive's "From email" folder |
+| Compose with a 25 MB file | Uploaded to Drive in parts, Drive chip in compose |
+| Send it to Gmail | Resend `delivered`; Gmail got a 5.7 KB message with the "Files shared from Drive" link block |
+| Download that link with no cookies | Share page 200; download 200, 26,214,400 bytes in 0.85 s, byte-for-byte equal, `attachment` + `nosniff` |
+
+Access: Drive first shared the inbox's Access app (one app, two hostnames). That made every Mail login set its cookie through drive.midwestfreeks.org, and while the owner's router still cached NXDOMAIN for the new hostname (Cloudflare's negative TTL is 30 min) Mail login failed. Drive now has its own Access app, `agentic-drive`; the team session still means one sign-in covers both. Share links: Access app `agentic-drive-share-links` (Bypass, path `/s`).
+
