@@ -6,8 +6,8 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import DOMPurify from "dompurify";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { plainTextToHtml } from "~/lib/plainText";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { isHtmlBody, plainTextToHtml } from "~/lib/plainText";
 
 interface EmailIframeProps {
 	body: string;
@@ -26,6 +26,24 @@ function installLinkHook() {
 			node.setAttribute("rel", "noopener noreferrer");
 		}
 	});
+}
+
+/** The app switches schemes by swapping a class on <html>, so watch that. */
+function subscribeScheme(onChange: () => void) {
+	const observer = new MutationObserver(onChange);
+	observer.observe(document.documentElement, {
+		attributes: true,
+		attributeFilter: ["class", "data-mui-color-scheme"],
+	});
+	return () => observer.disconnect();
+}
+
+const isDarkScheme = () =>
+	document.documentElement.classList.contains("dark") ||
+	document.documentElement.dataset.muiColorScheme === "dark";
+
+function useDarkScheme(): boolean {
+	return useSyncExternalStore(subscribeScheme, isDarkScheme, () => false);
 }
 
 const REMOTE_CONTENT = /(?:src|background)\s*=\s*["']?\s*https?:|url\(\s*["']?\s*https?:/i;
@@ -61,8 +79,34 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 	// Remote images (and CSS url()) are blocked until the user asks; they leak opens and IPs.
 	const [showRemote, setShowRemote] = useState(false);
 	// Text-only messages become paragraphs, breaks and links first.
+	const textOnly = !isHtmlBody(body ?? "");
 	const htmlBody = plainTextToHtml(body);
 	const hasRemote = REMOTE_CONTENT.test(htmlBody);
+
+	// Plain-text mail has no colours of its own, so follow the app's scheme.
+	// HTML mail keeps whatever it sets, as email clients do.
+	const dark = useDarkScheme();
+	const c = useMemo(() => (dark
+		? {
+				bg: "#1b1c1f",
+				fg: "#e4e6e9",
+				muted: "#9aa0a6",
+				link: "#8ab4f8",
+				linkRule: "rgba(138, 180, 248, 0.35)",
+				border: "#3c4043",
+				code: "#26282c",
+				tableHeader: "#26282c",
+			}
+		: {
+				bg: "#ffffff",
+				fg: "#1f2328",
+				muted: "#59636e",
+				link: "#1a5fd6",
+				linkRule: "rgba(26, 95, 214, 0.3)",
+				border: "#d8dee4",
+				code: "#f6f8fa",
+				tableHeader: "#f6f8fa",
+			}), [dark]);
 
 	// Listen for height reports from the sandboxed iframe
 	const handleMessage = useCallback(
@@ -96,12 +140,14 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 
 		// <style> is allowed (B8): newsletters depend on it, and the CSP below
 		// (no remote loads unless opted in, no fonts) stops CSS exfiltration.
-		const cleanBody = DOMPurify.sanitize(htmlBody, {
-			USE_PROFILES: { html: true },
-			ADD_TAGS: ["style"],
-			ADD_ATTR: ["target"],
-			FORCE_BODY: true,
-		});
+					const cleanBody = DOMPurify.sanitize(htmlBody, {
+				USE_PROFILES: { html: true },
+				ADD_TAGS: ["style"],
+				ADD_ATTR: ["target"],
+				FORCE_BODY: true,
+			});
+			// Converted plain text gets a readable measure; HTML mail keeps its layout.
+			const content = textOnly ? `<div class="plain">${cleanBody}</div>` : cleanBody;
 
 		const padding = autoSize ? "0" : "24px";
 		const imgSrc = showRemote ? "data: cid: https:" : "data: cid:";
@@ -122,15 +168,15 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 <style>
 * { box-sizing: border-box; }
 html {
-	background: #ffffff;
-	color-scheme: light;
+	background: ${c.bg};
+	color-scheme: ${dark ? "dark" : "light"};
 }
 body {
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 	font-size: 15px;
 	line-height: 1.65;
-	color: #1f2328;
-	background: #ffffff;
+	color: ${c.fg};
+	background: ${c.bg};
 	padding: ${padding};
 	margin: 0;
 	word-wrap: break-word;
@@ -148,9 +194,9 @@ body {
 p { margin: 0 0 0.9em; }
 p:last-child { margin-bottom: 0; }
 a {
-	color: #1a5fd6;
+	color: ${c.link};
 	text-decoration: none;
-	border-bottom: 1px solid rgba(26, 95, 214, 0.3);
+	border-bottom: 1px solid ${c.linkRule};
 }
 a:hover { border-bottom-color: currentColor; }
 h1, h2, h3, h4 {
@@ -161,14 +207,14 @@ h1:first-child, h2:first-child, h3:first-child, h4:first-child { margin-top: 0; 
 ul, ol { padding-left: 22px; margin: 0 0 0.9em; }
 li { margin: 0.2em 0; }
 blockquote {
-	border-left: 3px solid #d8dee4;
+	border-left: 3px solid ${c.border};
 	padding: 0 0 0 1em;
 	margin: 0 0 0.9em;
-	color: #59636e;
+	color: ${c.muted};
 }
 blockquote p { margin-bottom: 0.4em; }
 pre {
-	background: #f6f8fa;
+	background: ${c.code};
 	padding: 12px 14px;
 	border-radius: 8px;
 	overflow-x: auto;
@@ -178,20 +224,22 @@ pre {
 code, pre {
 	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
-hr { border: 0; border-top: 1px solid #d8dee4; margin: 1.4em 0; }
+hr { border: 0; border-top: 1px solid ${c.border}; margin: 1.4em 0; }
 img { max-width: 100%; height: auto; }
 table { border-collapse: collapse; max-width: 100%; }
-td, th { padding: 6px 10px; border: 1px solid #e5e9ee; }
-th { background: #f6f8fa; text-align: left; }
+td, th { padding: 6px 10px; border: 1px solid ${c.border}; }
+th { background: ${c.tableHeader}; text-align: left; }
+/* Plain-text mail has no layout of its own: keep lines a comfortable length. */
+.plain { max-width: 760px; }
 </style>
 </head>
-<body>${cleanBody}${heightScript}</body>
+<body>${content}${heightScript}</body>
 </html>`;
 		})();
 		return () => {
 			cancelled = true;
 		};
-	}, [htmlBody, autoSize, showRemote]);
+	}, [htmlBody, autoSize, showRemote, textOnly, dark, c]);
 
 	const frame = (
 		<iframe
