@@ -19,6 +19,7 @@ import {
 import { SendEmailRequestSchema } from "./lib/schemas";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { registerDriveRoutes } from "./routes/drive";
+import { notifyNewMail, registerPushRoutes } from "./routes/push";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
 import { sameOriginOnly } from "./lib/same-origin";
@@ -376,6 +377,7 @@ app.get("/api/v1/mailboxes/:mailboxId/search", async (c: AppContext) => {
 // -- Drive (agentic-drive over a service binding; optional) --------
 
 registerDriveRoutes(app);
+registerPushRoutes(app);
 
 // -- Attachments ----------------------------------------------------
 
@@ -506,6 +508,7 @@ async function receiveEmail(message: InboundMessage, env: Env, ctx: ExecutionCon
 	};
 	const stored = await stub.ingestRaw({ key, id, envelopeTo: mailboxId, envelopeFrom: message.from, autoReply: settings.autoReply, fromName: settings.fromName });
 	await forwardCopy(message, mailboxId, settings.forwarding);
+	ctx.waitUntil(notifyNewMail(env, stub, mailboxId, stored));
 
 	// Auto-draft is opt-in: every draft costs Neurons from the 10,000/day free allocation.
 	if (!settings.agent?.autoDraft) return;

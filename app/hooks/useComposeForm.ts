@@ -128,9 +128,16 @@ function buildInitialComposeFields(
 	}
 
 	if (!original) {
+		const pre = composeOptions.prefill;
+		const lead = pre?.text ? `<p>${escapeHtml(pre.text).replace(/\n/g, "<br>")}</p>` : "<p><br></p>";
 		return {
 			...EMPTY_FIELDS,
-			body: sigBlock ? `<p><br></p>${sigBlock}` : "",
+			to: pre?.to ?? "",
+			cc: pre?.cc ?? "",
+			bcc: pre?.bcc ?? "",
+			showCcBcc: Boolean(pre?.cc || pre?.bcc),
+			subject: pre?.subject ?? "",
+			body: pre?.text || sigBlock ? `${lead}${sigBlock}` : "",
 		};
 	}
 
@@ -179,6 +186,8 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const drive = useDrive();
 	const attachments = useComposeAttachments(mailboxId, !!drive);
 	const resetAttachments = attachments.reset;
+	const addFilesRef = useRef(attachments.addFiles);
+	addFilesRef.current = attachments.addFiles;
 
 	const [to, setTo] = useState("");
 	const [cc, setCc] = useState("");
@@ -217,6 +226,9 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		setBody(initialFields.body);
 		const forwarding = composeOptions.mode === "forward" && !composeOptions.draftEmail;
 		resetAttachments({ forwarded: forwarding ? getNonInlineAttachments(composeOptions.originalEmail?.attachments) : [] });
+		// Files shared to the app start uploading as attachments straight away.
+		const shared = composeOptions.prefill?.files;
+		if (shared?.length) queueMicrotask(() => addFilesRef.current(shared));
 	}, [composeOptions, currentMailbox?.email, sigBlock, resetAttachments]);
 
 	const handleSaveDraft = async () => {

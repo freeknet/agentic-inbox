@@ -1069,6 +1069,24 @@ export class MailboxDO extends DurableObject<Env> {
 		return { day, neurons, limit: FREE_NEURONS_PER_DAY, models };
 	}
 
+	/** Saves (or refreshes) a browser's push subscription. */
+	async savePushSubscription(sub: { endpoint: string; p256dh: string; auth: string }) {
+		this.ctx.storage.sql.exec(
+			`INSERT INTO push_subscriptions (endpoint, p256dh, auth, created_at) VALUES (?1, ?2, ?3, ?4)
+			 ON CONFLICT(endpoint) DO UPDATE SET p256dh = ?2, auth = ?3
+			 WHERE p256dh IS NOT ?2 OR auth IS NOT ?3`,
+			sub.endpoint, sub.p256dh, sub.auth, Date.now(),
+		);
+	}
+
+	async deletePushSubscription(endpoint: string) {
+		this.ctx.storage.sql.exec(`DELETE FROM push_subscriptions WHERE endpoint = ?`, endpoint);
+	}
+
+	async listPushSubscriptions() {
+		return [...this.ctx.storage.sql.exec(`SELECT endpoint, p256dh, auth FROM push_subscriptions`)] as Array<{ endpoint: string; p256dh: string; auth: string }>;
+	}
+
 	async checkSuppressed(emails: string[]) {
 		return this.outbox.suppressed(emails);
 	}

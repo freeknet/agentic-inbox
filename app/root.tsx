@@ -26,6 +26,7 @@ import { ConfirmHost } from "~/lib/confirm";
 import { Toaster } from "~/lib/toast";
 import PreferencesApplier from "~/components/PreferencesApplier";
 import { theme } from "~/theme";
+import { PwaHead, PwaSupport } from "~/shell/pwa";
 import "./index.css";
 
 function makeQueryClient() {
@@ -80,6 +81,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 				<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 				<meta name="color-scheme" content="light dark" />
 				<title>Agentic Inbox</title>
+				<PwaHead title="Mail" />
 				<Meta />
 				<Links />
 			</head>
@@ -114,6 +116,7 @@ export default function App() {
 	return (
 		<QueryClientProvider client={queryClient}>
 			<Outlet />
+			<PwaSupport name="Mail" shareLanding="/compose" />
 		</QueryClientProvider>
 	);
 }

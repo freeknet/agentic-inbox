@@ -279,4 +279,16 @@ export const mailboxMigrations: Migration[] = [
             );
         `),
 	},
+	{
+		// Installed-app push notifications: one row per subscribed browser.
+		name: "14_push_subscriptions",
+		sql: txn(`
+            CREATE TABLE IF NOT EXISTS push_subscriptions (
+                endpoint TEXT PRIMARY KEY,
+                p256dh TEXT NOT NULL,
+                auth TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            );
+        `),
+	},
 ];

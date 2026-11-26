@@ -33,7 +33,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 import { Folders } from "shared/folders";
 import { formatListDate } from "shared/dates";
 import MailboxSplitView from "~/components/MailboxSplitView";
@@ -144,6 +144,22 @@ export default function EmailListRoute() {
 	}>();
 	const { selectedEmailId, isComposing, selectEmail, closePanel, startCompose } = useUIStore();
 	const [page, setPage] = useState(1);
+
+	// ?open=<id>: a notification click opens that message, then the URL is tidied.
+	const [searchParams, setSearchParams] = useSearchParams();
+	const openId = searchParams.get("open");
+	useEffect(() => {
+		if (!openId) return;
+		selectEmail(openId);
+		setSearchParams(
+			(prev) => {
+				const next = new URLSearchParams(prev);
+				next.delete("open");
+				return next;
+			},
+			{ replace: true },
+		);
+	}, [openId, selectEmail, setSearchParams]);
 	const [selected, setSelected] = useState<Set<string>>(new Set());
 	const [bulkBusy, setBulkBusy] = useState(false);
 

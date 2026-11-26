@@ -17,6 +17,7 @@ import { useColorScheme } from "@mui/material/styles";
 import type { ReactNode } from "react";
 import { Link as RouterLink } from "react-router";
 import { APP_BRANDS, AppsMenu, type AppId } from "./AppsMenu";
+import { InstallButton } from "./pwa";
 
 export const HEADER_HEIGHT = 64;
 export const SIDEBAR_WIDTH = 256;
@@ -58,7 +59,10 @@ export interface AppHeaderProps {
 
 /**
  * The top bar of both apps: menu (phones), logo and name, a pill search box,
- * then app actions, theme, settings and the apps launcher, always in that order.
+ * then app actions, install, theme, settings and the apps launcher, always in
+ * that order. In an installed desktop window with the title bar hidden
+ * (Window Controls Overlay) it doubles as the title bar: it can be dragged,
+ * and it keeps clear of the window buttons.
  */
 export function AppHeader({ app, homeHref, appUrls, search, actions, settings, onMenuClick }: AppHeaderProps) {
 	const brand = APP_BRANDS[app];
@@ -67,7 +71,19 @@ export function AppHeader({ app, homeHref, appUrls, search, actions, settings, o
 			component="header"
 			direction="row"
 			spacing={1}
-			sx={{ alignItems: "center", px: { xs: 1, sm: 2 }, py: 1, height: HEADER_HEIGHT, flexShrink: 0, bgcolor: "background.default" }}
+			sx={{
+				alignItems: "center",
+				py: 1,
+				height: HEADER_HEIGHT,
+				flexShrink: 0,
+				bgcolor: "background.default",
+				// Window Controls Overlay: the env() values exist only in that mode.
+				pl: "max(var(--header-px), env(titlebar-area-x, 0px))",
+				pr: "max(var(--header-px), calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)))",
+				"--header-px": { xs: "8px", sm: "16px" },
+				WebkitAppRegion: "drag",
+				"& a, & button, & input, & form": { WebkitAppRegion: "no-drag" },
+			}}
 		>
 			{onMenuClick && (
 				<IconButton aria-label="Open navigation" onClick={onMenuClick} sx={{ display: { md: "none" } }}>
@@ -132,6 +148,7 @@ export function AppHeader({ app, homeHref, appUrls, search, actions, settings, o
 			<Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexShrink: 0 }}>
 				{/* App-specific buttons step aside on phones so the search box keeps its room. */}
 				{actions && <Stack direction="row" spacing={0.5} sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center" }}>{actions}</Stack>}
+				<InstallButton name={brand.name} />
 				<ThemeToggle />
 				{settings && (
 					<Tooltip title="Settings">

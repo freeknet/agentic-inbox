@@ -8,4 +8,6 @@ export interface Env extends Cloudflare.Env {
 	RESEND_API_KEY?: string;
 	/** Resend webhook signing secret, `whsec_…` (secret). */
 	RESEND_WEBHOOK_SECRET?: string;
+	/** VAPID key for push notifications: a P-256 private JWK as JSON (secret). Push is off without it. */
+	VAPID_PRIVATE_KEY?: string;
 }

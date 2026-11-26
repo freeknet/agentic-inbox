@@ -6,6 +6,7 @@ import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
 import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import BeachAccessOutlinedIcon from "@mui/icons-material/BeachAccessOutlined";
 import ForwardOutlinedIcon from "@mui/icons-material/ForwardOutlined";
+import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import PaletteOutlinedIcon from "@mui/icons-material/PaletteOutlined";
 import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
@@ -33,6 +34,7 @@ import { useToast } from "~/lib/toast";
 import { AGENT_MODELS, DEFAULT_AGENT_MODEL } from "shared/ai-models";
 import { ACCENTS, FONT_SIZES, usePrefs, type Accent, type Density, type FontSize } from "~/lib/prefs";
 import { ViewHeader } from "~/shell/View";
+import { usePushNotifications } from "~/lib/push";
 
 // Placeholder shown in the textarea when no custom prompt is set.
 // The authoritative default prompt lives in workers/agent/index.ts (DEFAULT_SYSTEM_PROMPT).
@@ -76,6 +78,45 @@ function Section({
 			</Box>
 			{children}
 		</Box>
+	);
+}
+
+/** New-mail notifications on this device (acts at once; not part of Save). */
+function NotificationsSection({ mailboxId }: { mailboxId: string | undefined }) {
+	const { status, busy, enable, disable } = usePushNotifications(mailboxId);
+	const toast = useToast();
+	const note: Record<string, string> = {
+		unsupported: "This browser can't show notifications from Mail. On iPhone and iPad, add Mail to your Home Screen first.",
+		unavailable: "Notifications aren't set up on the server yet.",
+		blocked: "Notifications are blocked for this site. Allow them in the browser's site settings, then come back here.",
+		off: "Get a notification on this device when new mail arrives, even when Mail is closed.",
+		on: "This device is notified when new mail arrives in the inbox.",
+	};
+	const toggle = async (on: boolean) => {
+		try {
+			await (on ? enable() : disable());
+		} catch (e) {
+			toast.add({ title: (e as Error).message || "Couldn't change notifications", variant: "error" });
+		}
+	};
+	return (
+		<Section icon={<NotificationsOutlinedIcon fontSize="small" />} title="Notifications">
+			<FormControlLabel
+				control={
+					<Switch
+						checked={status === "on"}
+						disabled={busy || !status || status === "unsupported" || status === "unavailable"}
+						onChange={(e) => toggle(e.target.checked)}
+					/>
+				}
+				label={<Typography variant="body2">Notify me about new mail on this device</Typography>}
+			/>
+			{status && (
+				<Typography variant="caption" color="text.secondary" sx={captionSx}>
+					{note[status]}
+				</Typography>
+			)}
+		</Section>
 	);
 }
 
@@ -350,6 +391,8 @@ export default function SettingsRoute() {
 						</Box>
 					</Box>
 				</Section>
+
+				<NotificationsSection mailboxId={mailboxId} />
 
 				<Section icon={<AttachFileOutlinedIcon fontSize="small" />} title="Signature">
 					<Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>

@@ -4,6 +4,7 @@
 
 import { create } from "zustand";
 import type { Email } from "~/types";
+import type { ComposePrefill } from "~/lib/mailto";
 
 export type ComposeMode = "new" | "reply" | "reply-all" | "forward";
 
@@ -12,6 +13,8 @@ export interface ComposeOptions {
 	originalEmail?: Email | null;
 	/** When editing a draft, this holds the draft email to pre-fill the composer */
 	draftEmail?: Email | null;
+	/** A new message's fields from a mailto: link or a share (see routes/launch.tsx). */
+	prefill?: ComposePrefill;
 }
 
 interface UIState {

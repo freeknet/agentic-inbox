@@ -142,6 +142,16 @@ interface EmailListResponse {
 // ---------- API client ----------
 
 const api = {
+	// Push notifications (installed app)
+	getPushConfig: () => get<{ publicKey: string | null }>("/api/v1/push"),
+	savePushSubscription: (mailboxId: string, subscription: PushSubscriptionJSON) =>
+		post<{ ok: true }>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/push-subscriptions`, subscription),
+	deletePushSubscription: (mailboxId: string, endpoint: string) =>
+		request<{ ok: true }>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/push-subscriptions`, {
+			method: "DELETE",
+			body: JSON.stringify({ endpoint }),
+		}),
+
 	// Config
 	getConfig: () =>
 		get<{ domains: string[]; emailAddresses: string[] }>("/api/v1/config"),

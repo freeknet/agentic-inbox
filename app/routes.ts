@@ -10,6 +10,9 @@ import {
 
 export default [
 	index("routes/home.tsx"),
+	// Installed-app entry points (start page, shortcuts, mailto:, share target).
+	route("inbox", "routes/launch.tsx", { id: "launch-inbox" }),
+	route("compose", "routes/launch.tsx", { id: "launch-compose" }),
 	route("mailbox/:mailboxId", "routes/mailbox.tsx", [
 		index("routes/mailbox-index.tsx"),
 		route("emails/:folder", "routes/email-list.tsx"),
