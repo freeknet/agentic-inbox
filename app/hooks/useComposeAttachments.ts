@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { uploadToDrive } from "~/lib/driveUpload";
+import { useToast } from "~/lib/toast";
 import { escapeHtml, formatBytes } from "~/lib/utils";
 import api, { ApiError, type DriveItem } from "~/services/api";
 import type { Attachment } from "~/types";
@@ -64,6 +65,7 @@ export function driveLinksText(links: DriveLinkAttachment[]): string {
  * link, and Drive files can be added as links.
  */
 export function useComposeAttachments(mailboxId: string | undefined, driveAvailable = false) {
+	const toast = useToast();
 	const [files, setFiles] = useState<ComposeAttachment[]>([]);
 	const [forwarded, setForwarded] = useState<Attachment[]>([]);
 	const [driveLinks, setDriveLinks] = useState<DriveLinkAttachment[]>([]);
@@ -92,6 +94,7 @@ export function useComposeAttachments(mailboxId: string | undefined, driveAvaila
 			.catch((e: unknown) => {
 				if (controller.signal.aborted) return;
 				updateLink(key, { status: "error", error: message(e) });
+				toast.add({ title: `${file.name} could not go to Drive: ${message(e)}`, variant: "error" });
 			})
 			.finally(() => controllers.current.delete(key));
 	}, []);
@@ -122,7 +125,9 @@ export function useComposeAttachments(mailboxId: string | undefined, driveAvaila
 					.then((up) => update(key, { status: "done", uploadId: up.upload_id }))
 					.catch((err: unknown) => {
 						if (controller.signal.aborted) return;
-						update(key, { status: "error", error: err instanceof Error ? err.message : "Upload failed" });
+						const reason = err instanceof Error ? err.message : "Upload failed";
+						update(key, { status: "error", error: reason });
+						toast.add({ title: `${file.name} failed to attach: ${reason}`, variant: "error" });
 					})
 					.finally(() => controllers.current.delete(key));
 			}

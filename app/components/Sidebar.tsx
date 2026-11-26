@@ -32,6 +32,7 @@ import { Folders, SYSTEM_FOLDER_IDS } from "shared/folders";
 import { useCreateFolder, useFolders } from "~/queries/folders";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
+import { useToast } from "~/lib/toast";
 
 const FOLDER_ICONS: Record<string, React.ReactNode> = {
 	[Folders.INBOX]: <InboxIcon fontSize="small" />,
@@ -70,12 +71,19 @@ export default function Sidebar() {
 		return found?.unreadCount || 0;
 	};
 
-	const handleCreateFolder = (e: FormEvent) => {
+	const toast = useToast();
+
+	const handleCreateFolder = async (e: FormEvent) => {
 		e.preventDefault();
-		if (newFolderName.trim() && mailboxId) {
-			createFolderMutation.mutate({ mailboxId, name: newFolderName.trim() });
+		const name = newFolderName.trim();
+		if (!name || !mailboxId) return;
+		try {
+			await createFolderMutation.mutateAsync({ mailboxId, name });
+			toast.add({ title: `Folder "${name}" created`, variant: "success" });
 			setNewFolderName("");
 			setIsCreateFolderOpen(false);
+		} catch (err) {
+			toast.add({ title: err instanceof Error ? err.message : "Could not create folder", variant: "error" });
 		}
 	};
 

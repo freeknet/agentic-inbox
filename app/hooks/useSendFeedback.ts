@@ -67,7 +67,12 @@ export function useSendFeedback() {
 			return;
 		}
 		if (windowMs < 1000) {
-			toast.add({ title: "Sending…" });
+			// Goes out right away: confirm once the queue has flushed.
+			toast.add({ title: "Sending…", timeout: 2000 });
+			setTimeout(() => {
+				toast.add({ title: "Message sent", variant: "success" });
+				refresh(mailboxId);
+			}, 2200);
 			return;
 		}
 		toast.add({

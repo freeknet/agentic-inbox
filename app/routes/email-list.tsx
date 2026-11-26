@@ -36,6 +36,7 @@ import { DeliveryBadge } from "~/components/DeliveryBadge";
 import { getSnippetText } from "~/lib/utils";
 import { confirmDialog } from "~/lib/confirm";
 import { rowPadding, usePrefs } from "~/lib/prefs";
+import { useToast } from "~/lib/toast";
 import api from "~/services/api";
 import { useDeleteEmail, useEmails, useMarkThreadRead, useUpdateEmail } from "~/queries/emails";
 import { useFolders } from "~/queries/folders";
@@ -146,6 +147,7 @@ export default function EmailListRoute() {
 	const markReadOnOpen = usePrefs((p) => p.markReadOnOpen);
 	const confirmBeforeDelete = usePrefs((p) => p.confirmBeforeDelete);
 
+	const toast = useToast();
 	const queryClient = useQueryClient();
 	const updateEmail = useUpdateEmail();
 	const markThreadRead = useMarkThreadRead();
@@ -284,8 +286,32 @@ export default function EmailListRoute() {
 			});
 			if (!ok) return;
 		}
-		deleteEmail.mutate({ mailboxId, id: emailId });
+		deleteEmail.mutate(
+			{ mailboxId, id: emailId },
+			{ onError: () => toast.add({ title: "Could not delete the email", variant: "error" }) },
+		);
 		if (selectedEmailId === emailId) closePanel();
+
+		const backTo = folder || Folders.INBOX;
+		toast.add({
+			title: folder === Folders.TRASH ? "Deleted" : "Moved to Trash",
+			actions:
+				folder === Folders.TRASH
+					? undefined
+					: [
+							{
+								children: "Undo",
+								onClick: async () => {
+									try {
+										await api.moveEmail(mailboxId, emailId, backTo);
+										invalidateMail();
+									} catch {
+										toast.add({ title: "Could not undo the delete", variant: "error" });
+									}
+								},
+							},
+						],
+		});
 	};
 
 	async function bulkDelete() {
@@ -306,6 +332,28 @@ export default function EmailListRoute() {
 			if (selectedEmailId && ids.includes(selectedEmailId)) closePanel();
 			setSelected(new Set());
 			invalidateMail();
+			const backTo = folder || Folders.INBOX;
+			toast.add({
+				title: `Moved ${ids.length} email${ids.length === 1 ? "" : "s"} to Trash`,
+				actions:
+					folder === Folders.TRASH
+						? undefined
+						: [
+								{
+									children: "Undo",
+									onClick: async () => {
+										try {
+											await Promise.all(ids.map((id) => api.moveEmail(mailboxId, id, backTo)));
+											invalidateMail();
+										} catch {
+											toast.add({ title: "Could not undo the delete", variant: "error" });
+										}
+									},
+								},
+						  ],
+			});
+		} catch {
+			toast.add({ title: "Could not delete the selected emails", variant: "error" });
 		} finally {
 			setBulkBusy(false);
 		}
@@ -318,6 +366,17 @@ export default function EmailListRoute() {
 		try {
 			await Promise.all(ids.map((id) => api.updateEmail(mailboxId, id, data)));
 			invalidateMail();
+			const n = ids.length;
+			toast.add({
+				title:
+					data.read === true
+						? `Marked ${n} as read`
+						: data.read === false
+							? `Marked ${n} as unread`
+							: `Starred ${n} email${n === 1 ? "" : "s"}`,
+			});
+		} catch {
+			toast.add({ title: "Could not update the selected emails", variant: "error" });
 		} finally {
 			setBulkBusy(false);
 		}
@@ -326,12 +385,32 @@ export default function EmailListRoute() {
 	async function bulkMove(folderId: string) {
 		if (!mailboxId || selected.size === 0) return;
 		const ids = [...selected];
+		const backTo = folder || Folders.INBOX;
+		const target = folders.find((f) => f.id === folderId)?.name ?? folderId;
 		setBulkBusy(true);
 		try {
 			await Promise.all(ids.map((id) => api.moveEmail(mailboxId, id, folderId)));
 			if (selectedEmailId && ids.includes(selectedEmailId)) closePanel();
 			setSelected(new Set());
 			invalidateMail();
+			toast.add({
+				title: `Moved ${ids.length} to ${target}`,
+				actions: [
+					{
+						children: "Undo",
+						onClick: async () => {
+							try {
+								await Promise.all(ids.map((id) => api.moveEmail(mailboxId, id, backTo)));
+								invalidateMail();
+							} catch {
+								toast.add({ title: "Could not undo the move", variant: "error" });
+							}
+						},
+					},
+				],
+			});
+		} catch {
+			toast.add({ title: "Could not move the selected emails", variant: "error" });
 		} finally {
 			setBulkBusy(false);
 		}

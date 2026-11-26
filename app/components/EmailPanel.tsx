@@ -108,7 +108,31 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	if (!email) return <EmailPanelSkeleton />;
 
 	const toggleStar = () => { if (mailboxId) updateEmail.mutate({ mailboxId, id: email.id, data: { starred: !email.starred } }); };
-	const handleMove = (folderId: string) => { if (mailboxId) { moveEmailMut.mutate({ mailboxId, id: email.id, folderId }); closePanel(); } };
+	const handleMove = (folderId: string) => {
+		if (!mailboxId) return;
+		const from = email.folder_id;
+		const target = folders.find((f) => f.id === folderId)?.name ?? "folder";
+		moveEmailMut.mutate(
+			{ mailboxId, id: email.id, folderId },
+			{ onError: () => toast.add({ title: "Could not move the email", variant: "error" }) },
+		);
+		toast.add({
+			title: `Moved to ${target}`,
+			actions: [
+				{
+					children: "Undo",
+					onClick: async () => {
+						try {
+							await api.moveEmail(mailboxId, email.id, from || Folders.INBOX);
+						} catch {
+							toast.add({ title: "Could not undo the move", variant: "error" });
+						}
+					},
+				},
+			],
+		});
+		closePanel();
+	};
 	const handleDelete = async () => {
 		if (!mailboxId) return;
 		if (confirmBeforeDelete) {
@@ -120,7 +144,28 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 			});
 			if (!ok) return;
 		}
-		deleteEmailMut.mutate({ mailboxId, id: email.id });
+		deleteEmailMut.mutate(
+			{ mailboxId, id: email.id },
+			{ onError: () => toast.add({ title: "Could not delete the email", variant: "error" }) },
+		);
+		toast.add({
+			title: folder === Folders.TRASH ? "Deleted" : "Moved to Trash",
+			actions:
+				folder === Folders.TRASH
+					? undefined
+					: [
+							{
+								children: "Undo",
+								onClick: async () => {
+									try {
+										await api.moveEmail(mailboxId, email.id, email.folder_id || folder || Folders.INBOX);
+									} catch {
+										toast.add({ title: "Could not undo the delete", variant: "error" });
+									}
+								},
+							},
+						],
+		});
 		closePanel();
 	};
 

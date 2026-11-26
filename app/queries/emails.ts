@@ -204,20 +204,54 @@ export function useMarkThreadRead() {
 	});
 }
 
+type EmailLists = Array<[readonly unknown[], { emails: Email[]; totalCount: number } | undefined]>;
+
+/** Drop emails from every cached list so delete/move land immediately. */
+function useOptimisticRemove() {
+	const qc = useQueryClient();
+	return async (mailboxId: string, ids: string[]): Promise<EmailLists> => {
+		await qc.cancelQueries({ queryKey: ["emails", mailboxId] });
+		const lists = qc.getQueriesData<{ emails: Email[]; totalCount: number }>({
+			queryKey: ["emails", mailboxId],
+		});
+		for (const [key, cached] of lists) {
+			if (!cached?.emails) continue;
+			const kept = cached.emails.filter((e) => !ids.includes(e.id));
+			if (kept.length === cached.emails.length) continue;
+			qc.setQueryData(key, {
+				...cached,
+				emails: kept,
+				totalCount: Math.max(0, cached.totalCount - (cached.emails.length - kept.length)),
+			});
+		}
+		return lists as EmailLists;
+	};
+}
+
+function rollbackLists(qc: ReturnType<typeof useQueryClient>, lists: EmailLists | undefined) {
+	for (const [key, cached] of lists ?? []) qc.setQueryData(key, cached);
+}
+
 export function useDeleteEmail() {
+	const qc = useQueryClient();
 	const invalidate = useInvalidateEmailData();
+	const remove = useOptimisticRemove();
 	return useMutation({
 		mutationFn: ({
 			mailboxId,
 			id,
 		}: { mailboxId: string; id: string }) =>
 			api.deleteEmail(mailboxId, id),
-		onSuccess: (_data, { mailboxId }) => invalidate(mailboxId),
+		onMutate: ({ mailboxId, id }) => remove(mailboxId, [id]),
+		onError: (_err, _vars, lists) => rollbackLists(qc, lists),
+		onSettled: (_data, _err, { mailboxId }) => invalidate(mailboxId),
 	});
 }
 
 export function useMoveEmail() {
+	const qc = useQueryClient();
 	const invalidate = useInvalidateEmailData();
+	const remove = useOptimisticRemove();
 	return useMutation({
 		mutationFn: ({
 			mailboxId,
@@ -225,7 +259,9 @@ export function useMoveEmail() {
 			folderId,
 		}: { mailboxId: string; id: string; folderId: string }) =>
 			api.moveEmail(mailboxId, id, folderId),
-		onSuccess: (_data, { mailboxId }) => invalidate(mailboxId),
+		onMutate: ({ mailboxId, id }) => remove(mailboxId, [id]),
+		onError: (_err, _vars, lists) => rollbackLists(qc, lists),
+		onSettled: (_data, _err, { mailboxId }) => invalidate(mailboxId),
 	});
 }
 
