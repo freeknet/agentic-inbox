@@ -53,7 +53,12 @@ export const usePrefs = create<Prefs>()(
 			set: (key, value) => set({ [key]: value } as Partial<Prefs>),
 			reset: () => set({ ...DEFAULT_PREFS }),
 		}),
-		{ name: "inbox-prefs" },
+		{
+			name: "inbox-prefs",
+			// Loaded in an effect (PreferencesApplier), so the first browser render
+			// matches the server's, which only knows the defaults.
+			skipHydration: true,
+		},
 	),
 );
 
