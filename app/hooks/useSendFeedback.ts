@@ -67,11 +67,18 @@ export function useSendFeedback() {
 			return;
 		}
 		if (windowMs < 1000) {
-			// Goes out right away: confirm once the queue has flushed.
+			// Goes out right away: report what the outbox says once it has had a moment.
 			toast.add({ title: "Sending…", timeout: 2000 });
-			setTimeout(() => {
-				toast.add({ title: "Message sent", variant: "success" });
+			setTimeout(async () => {
 				refresh(mailboxId);
+				try {
+					const entry = await api.getOutboxEntry(mailboxId, result.id);
+					if (entry.status === "sent") toast.add({ title: "Message sent", variant: "success" });
+					else if (entry.status === "failed") toast.add({ title: entry.last_error ? `Send failed: ${entry.last_error}` : "Send failed", variant: "error" });
+					// Still queued or retrying: Sent shows its delivery state when it goes.
+				} catch {
+					// No outbox entry to read; the Sent folder shows the outcome.
+				}
 			}, 2200);
 			return;
 		}
