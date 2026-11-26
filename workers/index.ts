@@ -18,6 +18,7 @@ import {
 } from "./lib/email-helpers";
 import { SendEmailRequestSchema } from "./lib/schemas";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
+import { registerDriveRoutes } from "./routes/drive";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
 
@@ -367,6 +368,10 @@ app.get("/api/v1/mailboxes/:mailboxId/search", async (c: AppContext) => {
 	const totalCount = await stub.countSearchResults(searchOpts);
 	return c.json({ emails, totalCount });
 });
+
+// -- Drive (agentic-drive over a service binding; optional) --------
+
+registerDriveRoutes(app);
 
 // -- Attachments ----------------------------------------------------
 

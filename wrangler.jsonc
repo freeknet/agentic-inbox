@@ -33,6 +33,10 @@
 	"ai": {
 		"binding": "AI"
 	},
+	// agentic-drive (separate repo): Save to Drive, and large files sent as links.
+	"services": [
+		{ "binding": "DRIVE", "service": "agentic-drive", "entrypoint": "DriveService" }
+	],
 	"durable_objects": {
 		"bindings": [
 			{

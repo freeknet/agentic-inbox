@@ -19,6 +19,15 @@ export default defineConfig({
 					RESEND_API_KEY: "re_test_key",
 					RESEND_WEBHOOK_SECRET: "whsec_dGVzdC13ZWJob29rLXNlY3JldC0wMTIzNDU2Nzg5",
 				},
+				// A stand-in for the agentic-drive Worker behind the DRIVE service binding.
+				workers: [
+					{
+						name: "agentic-drive",
+						modules: true,
+						compatibilityDate: "2026-11-01",
+						scriptPath: "./test/fake-drive.mjs",
+					},
+				],
 			},
 		}),
 	],
