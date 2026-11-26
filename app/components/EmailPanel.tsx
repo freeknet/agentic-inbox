@@ -21,7 +21,9 @@ import { useFolders } from "~/queries/folders";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
 import { useSendFeedback } from "~/hooks/useSendFeedback";
+import { confirmDialog } from "~/lib/confirm";
 import { useToast } from "~/lib/toast";
+import { usePrefs } from "~/lib/prefs";
 import type { Email, Folder, Mailbox } from "~/types";
 
 function EmailPanelSkeleton() {
@@ -68,6 +70,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
 	const [previewImage, setPreviewImage] = useState<{ url: string; filename: string } | null>(null);
 	const isDraftFolder = folder === Folders.DRAFT;
+	const confirmBeforeDelete = usePrefs((p) => p.confirmBeforeDelete);
 
 	const threadReplies = useMemo(() => {
 		if (!threadRepliesRaw || !email) return [];
@@ -106,7 +109,20 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 
 	const toggleStar = () => { if (mailboxId) updateEmail.mutate({ mailboxId, id: email.id, data: { starred: !email.starred } }); };
 	const handleMove = (folderId: string) => { if (mailboxId) { moveEmailMut.mutate({ mailboxId, id: email.id, folderId }); closePanel(); } };
-	const handleDelete = () => { if (mailboxId) { if (!window.confirm("Are you sure you want to delete this email?")) return; deleteEmailMut.mutate({ mailboxId, id: email.id }); closePanel(); } };
+	const handleDelete = async () => {
+		if (!mailboxId) return;
+		if (confirmBeforeDelete) {
+			const ok = await confirmDialog({
+				title: "Delete this email?",
+				body: `${email.subject || "(no subject)"} — it moves to Trash.`,
+				confirmLabel: "Delete",
+				destructive: true,
+			});
+			if (!ok) return;
+		}
+		deleteEmailMut.mutate({ mailboxId, id: email.id });
+		closePanel();
+	};
 
 	const handleEditDraft = (draftMsg?: Email) => {
 		const target = draftMsg || email;
@@ -117,7 +133,13 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	const handleDeleteDraft = async (draftMsg?: Email) => {
 		const target = draftMsg || email;
 		if (!mailboxId) return;
-		if (!window.confirm("Discard this draft?")) return;
+		const ok = await confirmDialog({
+			title: "Discard this draft?",
+			body: "The draft is deleted and cannot be recovered.",
+			confirmLabel: "Discard",
+			destructive: true,
+		});
+		if (!ok) return;
 		deleteEmailMut.mutate({ mailboxId, id: target.id });
 		toast.add({ title: "Draft discarded" });
 		if (target.id === emailId) closePanel();
@@ -193,7 +215,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 				}}
 				onMove={handleMove}
 				onViewSource={() => setSourceViewEmail(email)}
-				onDelete={handleDelete}
+				onDelete={() => void handleDelete()}
 			/>
 
 			<EmailPanelHeader

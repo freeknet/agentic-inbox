@@ -32,6 +32,7 @@ import { useParams } from "react-router";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useUIStore } from "~/hooks/useUIStore";
+import { confirmDialog } from "~/lib/confirm";
 import type { UIMessage } from "ai";
 
 const TOOL_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
@@ -339,11 +340,15 @@ function AgentChatConnected({
 						<Tooltip title="Clear chat">
 							<IconButton
 								size="small"
-								onClick={() => {
-									if (window.confirm("Clear chat history?")) {
-										clearHistory();
-									}
-								}}
+																	onClick={async () => {
+										const ok = await confirmDialog({
+											title: "Clear chat history?",
+											body: "The conversation with the agent is removed. This cannot be undone.",
+											confirmLabel: "Clear",
+											destructive: true,
+										});
+										if (ok) clearHistory();
+									}}
 								aria-label="Clear chat"
 							>
 								<DeleteOutlinedIcon sx={{ fontSize: 14 }} />

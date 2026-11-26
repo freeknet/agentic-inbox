@@ -1,4 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { confirmDialog } from "~/lib/confirm";
 import { useToast } from "~/lib/toast";
 import api from "~/services/api";
 import type { QueuedSend } from "~/types";
@@ -27,9 +28,12 @@ export function useSendFeedback() {
 		}
 		if (suppressed.length === 0) return true;
 		const lines = suppressed.map((s) => `• ${s.email}${s.origin ? ` (${s.origin})` : ""}`).join("\n");
-		return window.confirm(
-			`These recipients are on the suppression list. Resend will not deliver to them:\n\n${lines}\n\nSend anyway?`,
-		);
+		return confirmDialog({
+			title: "Some recipients can't receive mail",
+			body: `These addresses are on the suppression list, so Resend will not deliver to them:\n\n${lines}`,
+			confirmLabel: "Send anyway",
+			cancelLabel: "Cancel",
+		});
 	}
 
 	function notifyQueued(mailboxId: string, result: QueuedSend | undefined) {

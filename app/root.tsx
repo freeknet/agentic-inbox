@@ -22,7 +22,9 @@ import {
 	ScrollRestoration,
 } from "react-router";
 import { ApiError } from "~/services/api";
+import { ConfirmHost } from "~/lib/confirm";
 import { Toaster } from "~/lib/toast";
+import PreferencesApplier from "~/components/PreferencesApplier";
 import { theme } from "~/theme";
 import "./index.css";
 
@@ -85,8 +87,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
 				<InitColorSchemeScript attribute="class" defaultMode="system" />
 				<ThemeProvider theme={theme} defaultMode="system">
 					<CssBaseline enableColorScheme />
+					<PreferencesApplier />
 					{children}
 					<Toaster />
+					<ConfirmHost />
 				</ThemeProvider>
 				<ScrollRestoration />
 				<Scripts />

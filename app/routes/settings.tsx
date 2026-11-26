@@ -7,8 +7,12 @@ import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import BeachAccessOutlinedIcon from "@mui/icons-material/BeachAccessOutlined";
 import ForwardOutlinedIcon from "@mui/icons-material/ForwardOutlined";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import PaletteOutlinedIcon from "@mui/icons-material/PaletteOutlined";
 import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
+import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
 import Box from "@mui/material/Box";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -28,6 +32,7 @@ import { useMailbox, useUpdateMailbox } from "~/queries/mailboxes";
 import api from "~/services/api";
 import { useToast } from "~/lib/toast";
 import { AGENT_MODELS, DEFAULT_AGENT_MODEL } from "shared/ai-models";
+import { ACCENTS, FONT_SIZES, usePrefs, type Accent, type Density, type FontSize } from "~/lib/prefs";
 
 // Placeholder shown in the textarea when no custom prompt is set.
 // The authoritative default prompt lives in workers/agent/index.ts (DEFAULT_SYSTEM_PROMPT).
@@ -135,6 +140,7 @@ export default function SettingsRoute() {
 	const [autoDraft, setAutoDraft] = useState(false);
 	const [agentModel, setAgentModel] = useState(DEFAULT_AGENT_MODEL);
 	const [isSaving, setIsSaving] = useState(false);
+	const prefs = usePrefs();
 
 	useEffect(() => {
 		if (!mailbox) return;
@@ -224,6 +230,119 @@ export default function SettingsRoute() {
 						<TextField label="Email" type="email" value={mailbox.email} disabled fullWidth size="small" />
 					</Box>
 				</Paper>
+
+				<Section icon={<PaletteOutlinedIcon fontSize="small" />} title="Appearance">
+					<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+						<Box>
+							<Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+								Accent colour
+							</Typography>
+							<ToggleButtonGroup
+								exclusive
+								value={prefs.accent}
+								onChange={(_, v: Accent | null) => v && prefs.set("accent", v)}
+								size="small"
+								aria-label="Accent colour"
+							>
+								{(Object.keys(ACCENTS) as Accent[]).map((key) => (
+									<ToggleButton key={key} value={key} aria-label={ACCENTS[key].label} sx={{ gap: 0.75, px: 1.5 }}>
+										<Box
+											sx={{
+												width: 14,
+												height: 14,
+												borderRadius: "50%",
+												bgcolor: ACCENTS[key].light,
+											}}
+										/>
+										{ACCENTS[key].label}
+									</ToggleButton>
+								))}
+							</ToggleButtonGroup>
+						</Box>
+						<Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 1fr" } }}>
+							<Box>
+								<Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75 }}>
+									Row density
+								</Typography>
+								<ToggleButtonGroup
+									exclusive
+									value={prefs.density}
+									onChange={(_, v: Density | null) => v && prefs.set("density", v)}
+									size="small"
+									fullWidth
+								>
+									<ToggleButton value="comfortable">Comfortable</ToggleButton>
+									<ToggleButton value="compact">Compact</ToggleButton>
+								</ToggleButtonGroup>
+							</Box>
+							<TextField
+								select
+								label="Text size"
+								value={prefs.fontSize}
+								onChange={(e) => prefs.set("fontSize", e.target.value as FontSize)}
+								size="small"
+							>
+								{(Object.keys(FONT_SIZES) as FontSize[]).map((key) => (
+									<MenuItem key={key} value={key}>
+										{FONT_SIZES[key].label}
+									</MenuItem>
+								))}
+							</TextField>
+						</Box>
+						<Toggle
+							checked={prefs.showSnippets}
+							onChange={(v) => prefs.set("showSnippets", v)}
+							label="Show a preview line of each message"
+						/>
+					</Box>
+				</Section>
+
+				<Section icon={<TuneOutlinedIcon fontSize="small" />} title="Behaviour">
+					<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+						<Toggle
+							checked={prefs.confirmBeforeDelete}
+							onChange={(v) => prefs.set("confirmBeforeDelete", v)}
+							label="Ask before deleting emails"
+						/>
+						<Toggle
+							checked={prefs.markReadOnOpen}
+							onChange={(v) => prefs.set("markReadOnOpen", v)}
+							label="Mark an email as read when I open it"
+						/>
+						<Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 1fr" } }}>
+							<TextField
+								select
+								label="Messages per page"
+								value={prefs.pageSize}
+								onChange={(e) => prefs.set("pageSize", Number(e.target.value) as 25 | 50)}
+								size="small"
+							>
+								<MenuItem value={25}>25</MenuItem>
+								<MenuItem value={50}>50</MenuItem>
+							</TextField>
+							<TextField
+								select
+								label="Auto-refresh"
+								value={prefs.refreshSeconds}
+								onChange={(e) => prefs.set("refreshSeconds", Number(e.target.value) as 0 | 15 | 30 | 60)}
+								size="small"
+							>
+								<MenuItem value={0}>Off</MenuItem>
+								<MenuItem value={15}>Every 15 seconds</MenuItem>
+								<MenuItem value={30}>Every 30 seconds</MenuItem>
+								<MenuItem value={60}>Every minute</MenuItem>
+							</TextField>
+						</Box>
+						<Typography variant="caption" color="text.secondary">
+							Preferences are stored in this browser only. Selection, Shift-click and Ctrl+A work in the message list.
+						</Typography>
+						<Box>
+							<Button size="small" startIcon={<RestartAltIcon sx={{ fontSize: 14 }} />} onClick={prefs.reset}>
+								Reset preferences
+							</Button>
+						</Box>
+					</Box>
+				</Section>
 
 				<Section icon={<AttachFileOutlinedIcon fontSize="small" />} title="Signature">
 					<Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
