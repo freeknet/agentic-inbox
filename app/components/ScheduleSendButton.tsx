@@ -2,7 +2,8 @@ import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
-import Menu from "@mui/material/Menu";
+import MenuList from "@mui/material/MenuList";
+import Popover from "@mui/material/Popover";
 import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
@@ -66,7 +67,8 @@ export default function ScheduleSendButton({
 			>
 				<ScheduleOutlinedIcon fontSize="small" />
 			</IconButton>
-			<Menu
+			{/* A Popover, not a Menu: a Menu's arrow-key and Tab handling would take over the date field. */}
+			<Popover
 				anchorEl={anchor}
 				open={!!anchor}
 				onClose={() => setAnchor(null)}
@@ -77,11 +79,13 @@ export default function ScheduleSendButton({
 				<Typography variant="caption" color="text.secondary" sx={{ px: 1, pb: 0.5, display: "block" }}>
 					Schedule send
 				</Typography>
-				{presets(now).map((p) => (
-					<MenuItem key={p.label} onClick={() => pick(p.at)} sx={{ fontSize: 14 }}>
-						{p.label}
-					</MenuItem>
-				))}
+				<MenuList dense autoFocusItem aria-label="Send later presets" sx={{ py: 0 }}>
+					{presets(now).map((p) => (
+						<MenuItem key={p.label} onClick={() => pick(p.at)} sx={{ fontSize: 14 }}>
+							{p.label}
+						</MenuItem>
+					))}
+				</MenuList>
 				<Box sx={{ borderTop: 1, borderColor: "divider", mt: 0.5, pt: 1, px: 1 }}>
 					<TextField
 						fullWidth
@@ -109,7 +113,7 @@ export default function ScheduleSendButton({
 						Schedule
 					</Button>
 				</Box>
-			</Menu>
+			</Popover>
 		</>
 	);
 }

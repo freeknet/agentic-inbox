@@ -19,6 +19,7 @@ import { useUpdateEmail } from "~/queries/emails";
 import { useSearchEmails, SEARCH_PAGE_SIZE } from "~/queries/search";
 import { useUIStore } from "~/hooks/useUIStore";
 import type { Email } from "~/types";
+import { usePrefs } from "~/lib/prefs";
 
 function highlightTerms(text: string, query: string): React.ReactNode {
 	if (!query || !text) return text;
@@ -80,10 +81,11 @@ export default function SearchResultsRoute() {
 	const results = searchData?.results ?? [];
 	const totalCount = searchData?.totalCount ?? 0;
 	const isPanelOpen = selectedEmailId !== null || isComposing;
+	const markReadOnOpen = usePrefs((p) => p.markReadOnOpen);
 
 	const handleRowClick = (email: Email) => {
 		selectEmail(email.id);
-		if (!email.read && mailboxId) updateEmail.mutate({ mailboxId, id: email.id, data: { read: true } });
+		if (!email.read && mailboxId && markReadOnOpen) updateEmail.mutate({ mailboxId, id: email.id, data: { read: true } });
 	};
 	const folderDisplayName = (name: string | null | undefined): string => {
 		if (!name) return "";
