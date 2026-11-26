@@ -7,6 +7,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import MenuIcon from "@mui/icons-material/Menu";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
@@ -15,11 +16,13 @@ import IconButton from "@mui/material/IconButton";
 import InputAdornment from "@mui/material/InputAdornment";
 import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { type KeyboardEvent, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { AppSwitcher } from "~/components/AppSwitcher";
 import { useTheme } from "~/hooks/useTheme";
 import { useUIStore } from "~/hooks/useUIStore";
+import { queryKeys } from "~/queries/keys";
 
 export default function Header() {
 	const [searchQuery, setSearchQuery] = useState("");
@@ -30,6 +33,23 @@ export default function Header() {
 	const [searchParams] = useSearchParams();
 	const { toggleSidebar, toggleAgentPanel, isAgentPanelOpen } = useUIStore();
 	const { preference: theme, cycle: cycleTheme } = useTheme();
+	const queryClient = useQueryClient();
+	const isRefreshing =
+		useIsFetching({
+			predicate: (query) => ["emails", "folders", "mailboxes", "search"].includes(String(query.queryKey[0])),
+		}) > 0;
+
+	/** Reload the list, folder counts and the open thread without a page reload. */
+	const refreshMailbox = () => {
+		if (!mailboxId) {
+			void queryClient.invalidateQueries();
+			return;
+		}
+		void queryClient.invalidateQueries({ queryKey: ["emails", mailboxId] });
+		void queryClient.invalidateQueries({ queryKey: queryKeys.folders.list(mailboxId) });
+		void queryClient.invalidateQueries({ queryKey: queryKeys.mailboxes.detail(mailboxId) });
+		void queryClient.invalidateQueries({ queryKey: ["search", mailboxId] });
+	};
 	const themeLabel = theme === "system" ? "Theme: system" : theme === "light" ? "Theme: light" : "Theme: dark";
 
 	// Sync search input with URL query param so it stays populated
@@ -150,6 +170,21 @@ export default function Header() {
 			)}
 
 			<Box sx={{ display: "flex", alignItems: "center", gap: 0.5, ml: "auto", flexShrink: 0 }}>
+				<Tooltip title={isRefreshing ? "Refreshing…" : "Refresh inbox"}>
+					<span>
+						<IconButton onClick={refreshMailbox} aria-label="Refresh inbox" disabled={isRefreshing}>
+							<RefreshIcon
+								sx={{
+									animation: isRefreshing ? "spin 1s linear infinite" : "none",
+									"@keyframes spin": {
+										from: { transform: "rotate(0deg)" },
+										to: { transform: "rotate(360deg)" },
+									},
+								}}
+							/>
+						</IconButton>
+					</span>
+				</Tooltip>
 				<AppSwitcher />
 				<Tooltip title={isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"}>
 					<IconButton
