@@ -7,7 +7,7 @@ import { useEffect, useRef } from "react";
 import { Outlet, useParams } from "react-router";
 import AgentSidebar from "~/components/AgentSidebar";
 import ComposeEmail from "~/components/ComposeEmail";
-import Header from "~/components/Header";
+import Header, { HEADER_HEIGHT } from "~/components/Header";
 import Sidebar from "~/components/Sidebar";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
@@ -30,64 +30,80 @@ export default function MailboxRoute() {
 	}, [mailboxId, closeComposeModal, closePanel, closeSidebar]);
 
 	return (
-		<Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
-			{/* Mobile sidebar overlay backdrop */}
-			{isSidebarOpen && (
-				<Box
-					onClick={closeSidebar}
-					role="presentation"
-					sx={{
-						position: "fixed",
-						inset: 0,
-						zIndex: 30,
-						bgcolor: "rgba(0,0,0,0.3)",
-						display: { xs: "block", md: "none" },
-					}}
-				/>
-			)}
+		// Same shell as Drive: a full-width header, then sidebar + content below it.
+		<Box
+			sx={{
+				display: "flex",
+				flexDirection: "column",
+				height: "100dvh",
+				overflow: "hidden",
+				bgcolor: "background.default",
+			}}
+		>
+			<Header />
 
-			{/* Sidebar: hidden on mobile by default, shown as overlay when open */}
-			<Box
-				sx={{
-					position: { xs: "fixed", md: "relative" },
-					inset: { xs: "0 auto 0 0", md: "auto" },
-					zIndex: { xs: 40, md: 0 },
-					width: { xs: 256, md: "auto" },
-					transform: {
-						xs: isSidebarOpen ? "translateX(0)" : "translateX(-100%)",
-						md: "none",
-					},
-					transition: "transform 200ms ease-in-out",
-				}}
-			>
-				<Sidebar />
-			</Box>
+			<Box sx={{ display: "flex", flex: 1, minHeight: 0 }}>
+				{/* Mobile sidebar overlay backdrop, below the header */}
+				{isSidebarOpen && (
+					<Box
+						onClick={closeSidebar}
+						role="presentation"
+						sx={{
+							position: "fixed",
+							inset: `${HEADER_HEIGHT}px 0 0 0`,
+							zIndex: 30,
+							bgcolor: "rgba(0,0,0,0.3)",
+							display: { xs: "block", md: "none" },
+						}}
+					/>
+				)}
 
-			{/* Main content */}
-			<Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, bgcolor: "background.paper" }}>
-				<Header />
-				<Box component="main" sx={{ flex: 1, overflow: "hidden" }}>
-					<Outlet />
-				</Box>
-			</Box>
-
-			{/* Agent + MCP sidebar -- togglable on desktop */}
-			{isAgentPanelOpen && (
+				{/* Sidebar: hidden on mobile by default, shown as overlay when open */}
 				<Box
 					sx={{
-						display: { xs: "none", lg: "flex" },
-						width: 380,
+						position: { xs: "fixed", md: "relative" },
+						top: { xs: `${HEADER_HEIGHT}px`, md: "auto" },
+						bottom: { xs: 0, md: "auto" },
+						left: 0,
+						zIndex: { xs: 40, md: 0 },
+						width: { xs: 256, md: "auto" },
 						flexShrink: 0,
-						borderLeft: 1,
-						borderColor: "divider",
-						flexDirection: "column",
-						bgcolor: "background.paper",
-						overflow: "hidden",
+						transform: {
+							xs: isSidebarOpen ? "translateX(0)" : "translateX(-100%)",
+							md: "none",
+						},
+						transition: "transform 200ms ease-in-out",
 					}}
 				>
-					<AgentSidebar />
+					<Sidebar />
 				</Box>
-			)}
+
+				{/* Main content */}
+				<Box
+					component="main"
+					sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, bgcolor: "background.paper" }}
+				>
+					<Outlet />
+				</Box>
+
+				{/* Agent + MCP sidebar -- togglable on desktop */}
+				{isAgentPanelOpen && (
+					<Box
+						sx={{
+							display: { xs: "none", lg: "flex" },
+							width: 380,
+							flexShrink: 0,
+							borderLeft: 1,
+							borderColor: "divider",
+							flexDirection: "column",
+							bgcolor: "background.paper",
+							overflow: "hidden",
+						}}
+					>
+						<AgentSidebar />
+					</Box>
+				)}
+			</Box>
 
 			<ComposeEmail />
 		</Box>

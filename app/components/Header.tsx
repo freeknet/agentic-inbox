@@ -6,6 +6,7 @@ import AutoModeIcon from "@mui/icons-material/AutoMode";
 import CloseIcon from "@mui/icons-material/Close";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
+import MailOutlinedIcon from "@mui/icons-material/MailOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
@@ -14,19 +15,24 @@ import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import InputAdornment from "@mui/material/InputAdornment";
+import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
+import Typography from "@mui/material/Typography";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { type KeyboardEvent, useEffect, useState } from "react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
+import { NavLink, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { AppSwitcher } from "~/components/AppSwitcher";
 import { useTheme } from "~/hooks/useTheme";
 import { useUIStore } from "~/hooks/useUIStore";
 import { queryKeys } from "~/queries/keys";
 
+/** Matches Drive's shell: brand, pill search, then the action icons. */
+const BRAND_WIDTH = 240;
+export const HEADER_HEIGHT = 64;
+
 export default function Header() {
 	const [searchQuery, setSearchQuery] = useState("");
-	const [isSearchExpanded, setIsSearchExpanded] = useState(false);
 	const { mailboxId } = useParams<{ mailboxId: string }>();
 	const navigate = useNavigate();
 	const location = useLocation();
@@ -34,6 +40,8 @@ export default function Header() {
 	const { toggleSidebar, toggleAgentPanel, isAgentPanelOpen } = useUIStore();
 	const { preference: theme, cycle: cycleTheme } = useTheme();
 	const queryClient = useQueryClient();
+	const themeLabel = theme === "system" ? "Theme: system" : theme === "light" ? "Theme: light" : "Theme: dark";
+
 	const isRefreshing =
 		useIsFetching({
 			predicate: (query) => ["emails", "folders", "mailboxes", "search"].includes(String(query.queryKey[0])),
@@ -50,7 +58,6 @@ export default function Header() {
 		void queryClient.invalidateQueries({ queryKey: queryKeys.mailboxes.detail(mailboxId) });
 		void queryClient.invalidateQueries({ queryKey: ["search", mailboxId] });
 	};
-	const themeLabel = theme === "system" ? "Theme: system" : theme === "light" ? "Theme: light" : "Theme: dark";
 
 	// Sync search input with URL query param so it stays populated
 	const urlQuery = searchParams.get("q") || "";
@@ -64,7 +71,6 @@ export default function Header() {
 		if (mailboxId && searchQuery.trim()) {
 			const q = searchQuery.trim();
 			navigate(`/mailbox/${mailboxId}/search?q=${encodeURIComponent(q)}`);
-			setIsSearchExpanded(false);
 		}
 	};
 
@@ -76,100 +82,86 @@ export default function Header() {
 	};
 
 	const handleKeyDown = (e: KeyboardEvent) => {
-		if (e.key === "Enter") {
-			performSearch();
-		}
-		if (e.key === "Escape") {
-			if (searchQuery) {
-				clearSearch();
-			} else {
-				setIsSearchExpanded(false);
-			}
-		}
+		if (e.key === "Enter") performSearch();
+		if (e.key === "Escape" && searchQuery) clearSearch();
 	};
 
 	const isSettingsActive = location.pathname.includes("/settings");
 
 	return (
-		<Box
+		<Stack
 			component="header"
+			direction="row"
+			spacing={1}
 			sx={{
-				display: "flex",
 				alignItems: "center",
-				gap: { xs: 1, md: 2 },
-				px: { xs: 1.5, md: 2.5 },
+				px: { xs: 1, sm: 2 },
 				py: 1,
-				bgcolor: "background.paper",
+				height: HEADER_HEIGHT,
+				flexShrink: 0,
+				bgcolor: "background.default",
 				borderBottom: 1,
 				borderColor: "divider",
-				position: "sticky",
-				top: 0,
-				zIndex: 10,
 			}}
 		>
-			{/* Hamburger menu - mobile only */}
-			<IconButton
-				onClick={toggleSidebar}
-				aria-label="Toggle sidebar"
-				sx={{ display: { xs: "inline-flex", md: "none" }, flexShrink: 0 }}
-			>
+			<IconButton aria-label="Toggle sidebar" onClick={toggleSidebar} sx={{ display: { md: "none" } }}>
 				<MenuIcon />
 			</IconButton>
 
-			{/* Search - full on desktop, collapsible on mobile */}
-			<Box
+			<Stack
+				component={NavLink}
+				to={mailboxId ? `/mailbox/${mailboxId}/emails/inbox` : "/"}
+				direction="row"
+				spacing={1}
 				sx={{
-					flex: 1,
-					maxWidth: 560,
-					display: isSearchExpanded ? "flex" : { xs: "none", md: "flex" },
 					alignItems: "center",
-					gap: 1,
+					textDecoration: "none",
+					color: "text.primary",
+					width: { md: BRAND_WIDTH },
+					flexShrink: 0,
 				}}
 			>
+				<MailOutlinedIcon sx={{ fontSize: 34, color: "primary.main" }} />
+				<Typography variant="h6" sx={{ display: { xs: "none", sm: "block" }, color: "text.secondary" }}>
+					Mail
+				</Typography>
+			</Stack>
+
+			<Box component="form" role="search" sx={{ flex: 1, maxWidth: 720, minWidth: 0 }} onSubmit={(e) => e.preventDefault()}>
 				<TextField
 					fullWidth
 					size="small"
+					placeholder="Search mail"
 					value={searchQuery}
 					onChange={(e) => setSearchQuery(e.target.value)}
 					onKeyDown={handleKeyDown}
-					placeholder="Search emails... (try from:name, is:unread, has:attachment)"
 					slotProps={{
+						htmlInput: { "aria-label": "Search emails" },
 						input: {
 							startAdornment: (
 								<InputAdornment position="start">
-									<SearchIcon fontSize="small" />
+									<SearchIcon />
 								</InputAdornment>
 							),
 							endAdornment: searchQuery ? (
 								<InputAdornment position="end">
-									<IconButton size="small" onClick={clearSearch} aria-label="Clear search">
+									<IconButton size="small" aria-label="Search" onClick={performSearch}>
+										<SearchIcon fontSize="small" />
+									</IconButton>
+									<IconButton size="small" aria-label="Clear search" onClick={clearSearch}>
 										<CloseIcon fontSize="small" />
 									</IconButton>
 								</InputAdornment>
 							) : undefined,
+							sx: { borderRadius: 999, bgcolor: "action.hover", "& fieldset": { border: 0 }, height: 48 },
 						},
-						htmlInput: { "aria-label": "Search emails" },
 					}}
 				/>
-				<Tooltip title="Search">
-					<IconButton onClick={performSearch} aria-label="Search">
-						<SearchIcon />
-					</IconButton>
-				</Tooltip>
 			</Box>
 
-			{/* Search toggle button - mobile only, hidden when search is expanded */}
-			{!isSearchExpanded && (
-				<IconButton
-					onClick={() => setIsSearchExpanded(true)}
-					aria-label="Search"
-					sx={{ display: { xs: "inline-flex", md: "none" }, flexShrink: 0 }}
-				>
-					<SearchIcon />
-				</IconButton>
-			)}
+			<Box sx={{ flex: { md: 1 } }} />
 
-			<Box sx={{ display: "flex", alignItems: "center", gap: 0.5, ml: "auto", flexShrink: 0 }}>
+			<Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexShrink: 0 }}>
 				<Tooltip title={isRefreshing ? "Refreshing…" : "Refresh inbox"}>
 					<span>
 						<IconButton onClick={refreshMailbox} aria-label="Refresh inbox" disabled={isRefreshing}>
@@ -185,7 +177,6 @@ export default function Header() {
 						</IconButton>
 					</span>
 				</Tooltip>
-				<AppSwitcher />
 				<Tooltip title={isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"}>
 					<IconButton
 						onClick={toggleAgentPanel}
@@ -197,22 +188,14 @@ export default function Header() {
 				</Tooltip>
 				<Tooltip title={`${themeLabel} (click to change)`}>
 					<IconButton onClick={cycleTheme} aria-label={`${themeLabel} (click to change)`}>
-						{theme === "dark" ? (
-							<DarkModeIcon />
-						) : theme === "light" ? (
-							<LightModeIcon />
-						) : (
-							<AutoModeIcon />
-						)}
+						{theme === "dark" ? <DarkModeIcon /> : theme === "light" ? <LightModeIcon /> : <AutoModeIcon />}
 					</IconButton>
 				</Tooltip>
 				<Tooltip title="Settings">
 					<IconButton
 						onClick={() =>
 							navigate(
-								isSettingsActive
-									? `/mailbox/${mailboxId}/emails/inbox`
-									: `/mailbox/${mailboxId}/settings`,
+								isSettingsActive ? `/mailbox/${mailboxId}/emails/inbox` : `/mailbox/${mailboxId}/settings`,
 							)
 						}
 						aria-label="Settings"
@@ -221,7 +204,8 @@ export default function Header() {
 						<SettingsOutlinedIcon />
 					</IconButton>
 				</Tooltip>
-			</Box>
-		</Box>
+				<AppSwitcher />
+			</Stack>
+		</Stack>
 	);
 }
