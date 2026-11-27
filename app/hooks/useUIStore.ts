@@ -38,6 +38,11 @@ interface UIState {
 
 	// Agent panel
 	isAgentPanelOpen: boolean;
+	/** Keyboard shortcuts help ("?") and command palette (Ctrl+K). */
+	isShortcutsOpen: boolean;
+	setShortcutsOpen: (open: boolean) => void;
+	isPaletteOpen: boolean;
+	setPaletteOpen: (open: boolean) => void;
 	toggleAgentPanel: () => void;
 
 	// Legacy dialog support (kept for non-split views)
@@ -55,6 +60,10 @@ export const useUIStore = create<UIState>((set, get) => ({
 	isSidebarOpen: false,
 	// Closed by default, like Drive's details panel; the header button opens it.
 	isAgentPanelOpen: false,
+	isShortcutsOpen: false,
+	setShortcutsOpen: (isShortcutsOpen) => set({ isShortcutsOpen }),
+	isPaletteOpen: false,
+	setPaletteOpen: (isPaletteOpen) => set({ isPaletteOpen }),
 
 	selectEmail: (id) => set({ selectedEmailId: id, isComposing: false }),
 

@@ -41,6 +41,8 @@ interface Prefs {
 	markReadOnOpen: boolean;
 	pageSize: 25 | 50;
 	refreshSeconds: 0 | 15 | 30 | 60;
+	/** Gmail-style single-key shortcuts ("?" lists them). */
+	keyboardShortcuts: boolean;
 	set: <K extends keyof Prefs>(key: K, value: Prefs[K]) => void;
 	reset: () => void;
 }
@@ -58,6 +60,7 @@ export const DEFAULT_PREFS = {
 	markReadOnOpen: true,
 	pageSize: 25 as const,
 	refreshSeconds: 30 as const,
+	keyboardShortcuts: true,
 };
 
 export const usePrefs = create<Prefs>()(

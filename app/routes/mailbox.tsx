@@ -4,6 +4,7 @@ import { Outlet, useMatches, useParams } from "react-router";
 import AgentSidebar from "~/components/AgentSidebar";
 import ComposeEmail from "~/components/ComposeEmail";
 import Header from "~/components/Header";
+import MailShortcuts from "~/components/MailShortcuts";
 import Sidebar from "~/components/Sidebar";
 import { useMailbox } from "~/queries/mailboxes";
 import { useFolders } from "~/queries/folders";
@@ -78,6 +79,7 @@ export default function MailboxRoute() {
 				</Box>
 			</Box>
 			<ComposeEmail />
+			<MailShortcuts />
 		</Box>
 	);
 }

@@ -67,8 +67,10 @@ export default function EmailPanelToolbar({
 	onViewSource,
 	onDelete,
 }: EmailPanelToolbarProps) {
-	const iconButton = (title: string, icon: React.ReactNode, onClick: () => void) => (
-		<Tooltip title={title}>
+	// Tooltips name the keyboard shortcut too ("?" lists them all).
+	const hint = (title: string, key?: string) => (key ? `${title} (${key})` : title);
+	const iconButton = (title: string, icon: React.ReactNode, onClick: () => void, key?: string) => (
+		<Tooltip title={hint(title, key)}>
 			<IconButton size="small" onClick={onClick} aria-label={title}>
 				{icon}
 			</IconButton>
@@ -114,9 +116,9 @@ export default function EmailPanelToolbar({
 				</>
 			) : (
 				<>
-					{iconButton("Reply", <ReplyIcon />, onReply)}
-					{iconButton("Reply All", <ReplyAllIcon />, onReplyAll)}
-					{iconButton("Forward", <ForwardIcon />, onForward)}
+					{iconButton("Reply", <ReplyIcon />, onReply, "r")}
+					{iconButton("Reply all", <ReplyAllIcon />, onReplyAll, "a")}
+					{iconButton("Forward", <ForwardIcon />, onForward, "f")}
 				</>
 			)}
 
@@ -140,8 +142,8 @@ export default function EmailPanelToolbar({
 
 			<Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 0.25 }}>
 				{iconButton("View source", <CodeIcon />, onViewSource)}
-				{iconButton("Delete", <DeleteOutlinedIcon />, onDelete)}
-				<Tooltip title="Close">
+				{iconButton("Delete", <DeleteOutlinedIcon />, onDelete, "#")}
+				<Tooltip title="Close (u)">
 					<IconButton
 						size="small"
 						onClick={onBack}
@@ -161,7 +163,7 @@ function MoveToFolderMenu({ folders, onMove }: { folders: Folder[]; onMove: (id:
 
 	return (
 		<>
-			<Tooltip title="Move to folder">
+			<Tooltip title="Move to folder (v)">
 				<IconButton
 					size="small"
 					onClick={(e) => setAnchor(e.currentTarget)}

@@ -37,6 +37,7 @@ import { ACCENTS, DEFAULT_PREFS, FONT_SIZES, usePrefs, type Accent, type Density
 import { useShellLayout } from "~/shell/layout";
 import { ViewHeader } from "~/shell/View";
 import { usePushNotifications } from "~/lib/push";
+import { useUIStore } from "~/hooks/useUIStore";
 
 // Placeholder shown in the textarea when no custom prompt is set.
 // The authoritative default prompt lives in workers/agent/index.ts (DEFAULT_SYSTEM_PROMPT).
@@ -409,6 +410,16 @@ export default function SettingsRoute() {
 							onChange={(v) => prefs.set("markReadOnOpen", v)}
 							label="Mark an email as read when I open it"
 						/>
+						<Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+							<Toggle
+								checked={prefs.keyboardShortcuts}
+								onChange={(v) => prefs.set("keyboardShortcuts", v)}
+								label="Keyboard shortcuts (c to compose, j/k to move, e to archive…)"
+							/>
+							<Button size="small" onClick={() => useUIStore.getState().setShortcutsOpen(true)}>
+								Show shortcuts
+							</Button>
+						</Box>
 						<Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 1fr" } }}>
 							<TextField
 								select

@@ -34,6 +34,7 @@ import Typography from "@mui/material/Typography";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
+import { isTyping, useShortcuts } from "~/shell/Shortcuts";
 import { Folders } from "shared/folders";
 import { formatListDate } from "shared/dates";
 import MailboxSplitView from "~/components/MailboxSplitView";
@@ -308,27 +309,86 @@ export default function EmailListRoute() {
 		lastClickedRef.current = null;
 	};
 
+	// ── keyboard (Gmail-style; "?" lists them, Settings can turn them off) ──
+	// The cursor is the row j/k move to; actions without a selection use the
+	// open message, else the cursor row.
+	const [cursor, setCursor] = useState(-1);
 	useEffect(() => {
-		const onKey = (e: KeyboardEvent) => {
-			const el = document.activeElement as HTMLElement | null;
-			const input = el?.tagName === "INPUT" ? (el as HTMLInputElement).type : null;
-			const typing = !!el && ((input !== null && input !== "checkbox" && input !== "radio") || el.tagName === "TEXTAREA" || el.isContentEditable);
-			if (typing) return;
-			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a" && !document.querySelector('[role="dialog"], [role="menu"]')) {
-				e.preventDefault();
-				toggleAll(true);
-			}
-			if (e.key === "Escape" && selected.size) {
-				e.preventDefault();
-				setSelection([]);
-			}
-			if ((e.key === "Delete" || e.key === "Backspace") && selected.size) {
-				e.preventDefault();
-				void bulkDelete();
-			}
-		};
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
+		if (!selectedEmailId) return;
+		const i = emails.findIndex((e) => e.id === selectedEmailId);
+		if (i >= 0) setCursor(i);
+	}, [selectedEmailId, emails]);
+	useEffect(() => setCursor(-1), [folder, page]);
+	const shortcutsOn = usePrefs((p) => p.keyboardShortcuts);
+	const cursorRow = cursor >= 0 ? emails[cursor] : undefined;
+	const openRow = selectedEmailId ? emails.find((e) => e.id === selectedEmailId) : undefined;
+	const focusRow = openRow ?? cursorRow;
+	const keyTargets = () => (selected.size ? emails.filter((e) => selected.has(e.id)) : focusRow ? [focusRow] : []);
+	const moveCursor = (delta: number) => {
+		if (!emails.length) return;
+		const next = Math.min(emails.length - 1, Math.max(0, (cursor < 0 ? (delta > 0 ? -1 : emails.length) : cursor) + delta));
+		setCursor(next);
+		document.querySelector(`[data-row="${next}"]`)?.scrollIntoView({ block: "nearest" });
+		// With a message open, j/k step through messages, as in Gmail.
+		if (selectedEmailId) handleRowClick(emails[next]);
+	};
+	useShortcuts(
+		{
+			j: () => moveCursor(1),
+			k: () => moveCursor(-1),
+			arrowdown: () => !selectedEmailId && moveCursor(1),
+			arrowup: () => !selectedEmailId && moveCursor(-1),
+			o: () => cursorRow && handleRowClick(cursorRow),
+			enter: () => cursorRow && !selectedEmailId && handleRowClick(cursorRow),
+			u: () => selectedEmailId && closePanel(),
+			x: () => {
+				if (!cursorRow) return;
+				const next = new Set(selected);
+				if (next.has(cursorRow.id)) next.delete(cursorRow.id);
+				else next.add(cursorRow.id);
+				setSelected(next);
+			},
+			"shift+a": () => toggleAll(selected.size !== emails.length),
+			e: () => {
+				const t = keyTargets();
+				if (t.length && folder !== Folders.ARCHIVE) void bulkMove(Folders.ARCHIVE, t.map((r) => r.id));
+			},
+			"#": () => {
+				const t = keyTargets();
+				if (t.length) void bulkDelete(t.map((r) => r.id));
+			},
+			s: () => {
+				const t = keyTargets();
+				if (t.length) void bulkUpdate({ starred: !t.every((r) => r.starred) }, t.map((r) => r.id));
+			},
+			"shift+i": () => {
+				const t = keyTargets();
+				if (t.length) void bulkUpdate({ read: true }, t.map((r) => r.id));
+			},
+			"shift+u": () => {
+				const t = keyTargets();
+				if (t.length) void bulkUpdate({ read: false }, t.map((r) => r.id));
+			},
+			r: () => focusRow && void composeFrom(focusRow, "reply"),
+			a: () => focusRow && void composeFrom(focusRow, "reply-all"),
+			f: () => focusRow && void composeFrom(focusRow, "forward"),
+			v: () => {
+				const t = keyTargets();
+				if (!t.length) return;
+				const row = document.querySelector(`[data-row="${emails.indexOf(t[0])}"]`)?.getBoundingClientRect();
+				setMoveMenu({ x: row ? row.left + 80 : window.innerWidth / 2, y: row ? row.bottom : window.innerHeight / 3, ids: t.map((r) => r.id) });
+			},
+			escape: () => selected.size && setSelection([]),
+			delete: () => selected.size && void bulkDelete(),
+			backspace: () => selected.size && void bulkDelete(),
+		},
+		shortcutsOn,
+	);
+	// Select-all is standard, so it works even with single-key shortcuts off.
+	useShortcuts({
+		"mod+a": () => {
+			if (!isTyping()) toggleAll(true);
+		},
 	});
 
 	// ── actions ──────────────────────────────────────────────────────
@@ -735,7 +795,11 @@ export default function EmailListRoute() {
 									className="mail-row"
 									role="button"
 									tabIndex={0}
-									onClick={() => handleRowClick(email)}
+									data-row={index}
+									onClick={() => {
+										setCursor(index);
+										handleRowClick(email);
+									}}
 									onContextMenu={(e) => openRowMenu(e, email)}
 									onKeyDown={(e) => {
 										if (e.key === "Enter" || e.key === " ") {
@@ -755,6 +819,8 @@ export default function EmailListRoute() {
 										px: isPanelOpen ? { xs: 1.5, md: 1.5 } : { xs: 1.5, md: 2.5 },
 										py: rowPy,
 										bgcolor: checked ? "action.selected" : isSelected ? "action.focus" : "transparent",
+										// The keyboard cursor (j/k): a bar on the left, as in Gmail.
+										boxShadow: index === cursor && shortcutsOn ? "inset 3px 0 0 var(--mui-palette-primary-main)" : "none",
 										"&:hover": { bgcolor: checked ? "action.selected" : "action.hover" },
 										"&:hover .row-actions": { display: "flex" },
 									}}
