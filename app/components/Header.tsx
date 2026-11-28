@@ -10,6 +10,9 @@ import { useDrive } from "~/queries/drive";
 import { queryKeys } from "~/queries/keys";
 import { AppHeader } from "~/shell/AppHeader";
 import { toggleSidebar as toggleShellSidebar } from "~/shell/layout";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import Button from "@mui/material/Button";
+import { AccountMenu } from "~/shell/AccountMenu";
 
 /** Mail's top bar: the shared shell header with Mail's refresh and agent buttons. */
 export default function Header() {
@@ -95,6 +98,19 @@ export default function Header() {
 				active: isSettingsActive,
 				onClick: () => navigate(isSettingsActive ? inbox : `/mailbox/${mailboxId}/settings`),
 			}}
+			account={
+				<AccountMenu fallback={{ name: null, email: mailboxId ?? null }}>
+					<Button
+						fullWidth
+						color="inherit"
+						startIcon={<SwapHorizIcon />}
+						onClick={() => navigate("/")}
+						sx={{ justifyContent: "flex-start", px: 2.5, py: 1.5, borderRadius: 0 }}
+					>
+						Switch mailbox
+					</Button>
+				</AccountMenu>
+			}
 			onMenuClick={() => toggleShellSidebar(toggleSidebar)}
 		/>
 	);

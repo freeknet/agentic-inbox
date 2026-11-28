@@ -55,6 +55,8 @@ export interface AppHeaderProps {
 	settings?: { onClick: () => void; active?: boolean };
 	/** The menu button: collapses the sidebar on desktop, opens the drawer on phones (see toggleSidebar in ./layout). Omit on pages without a sidebar. */
 	onMenuClick?: () => void;
+	/** The account button (AccountMenu), last on the right as in Google's apps. */
+	account?: ReactNode;
 }
 
 /**
@@ -64,7 +66,7 @@ export interface AppHeaderProps {
  * (Window Controls Overlay) it doubles as the title bar: it can be dragged,
  * and it keeps clear of the window buttons.
  */
-export function AppHeader({ app, homeHref, appUrls, search, actions, settings, onMenuClick }: AppHeaderProps) {
+export function AppHeader({ app, homeHref, appUrls, search, actions, settings, account, onMenuClick }: AppHeaderProps) {
 	const brand = APP_BRANDS[app];
 	return (
 		<Stack
@@ -160,6 +162,7 @@ export function AppHeader({ app, homeHref, appUrls, search, actions, settings, o
 					</Tooltip>
 				)}
 				<AppsMenu current={app} urls={appUrls} />
+				{account}
 			</Stack>
 		</Stack>
 	);
