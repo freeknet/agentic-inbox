@@ -169,16 +169,16 @@ export function useComposeAttachments(mailboxId: string | undefined, driveAvaila
 
 	/** Start over. Pass `discard` to delete uploads that were never sent. */
 	const reset = useCallback(
-		(opts: { forwarded?: Attachment[]; discard?: boolean } = {}) => {
+		(opts: { forwarded?: Attachment[]; discard?: boolean; files?: ComposeAttachment[]; driveLinks?: DriveLinkAttachment[] } = {}) => {
 			for (const c of controllers.current.values()) c.abort();
 			controllers.current.clear();
 			setFiles((prev) => {
 				if (opts.discard && mailboxId) {
 					for (const f of prev) if (f.uploadId) void api.deleteUpload(mailboxId, f.uploadId).catch(() => {});
 				}
-				return [];
+				return opts.files ?? [];
 			});
-			setDriveLinks([]);
+			setDriveLinks(opts.driveLinks ?? []);
 			setForwarded(opts.forwarded ?? []);
 		},
 		[mailboxId],

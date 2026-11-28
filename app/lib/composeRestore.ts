@@ -21,6 +21,9 @@ export interface SavedCompose {
 	subject: string;
 	body: string;
 	hadAttachments?: boolean;
+	/** Finished uploads (attachments and Drive links), restored as they were. */
+	files?: { key: string; filename: string; size: number; status: "done"; uploadId?: string }[];
+	driveLinks?: { key: string; filename: string; size: number; status: "done"; sent: number; url?: string; expiresAt?: number | null }[];
 }
 
 export function saveCompose(state: SavedCompose) {

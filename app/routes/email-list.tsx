@@ -58,6 +58,7 @@ import Avatar from "@mui/material/Avatar";
 import CheckIcon from "@mui/icons-material/Check";
 import { SwipeRow } from "~/components/SwipeRow";
 import { avatarColor } from "~/components/email-panel/people";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
 
 const FOLDER_EMPTY_STATES: Record<
 	string,
@@ -192,6 +193,8 @@ export default function EmailListRoute() {
 		}
 	}, [openId, selectedEmailId, selectEmail, setSearchParams]);
 	const [selected, setSelected] = useState<Set<string>>(new Set());
+	const viewKey = `mail-list:${mailboxId}:${folder}:${page}`;
+	const listRef = useRef<HTMLDivElement>(null);
 	const [bulkBusy, setBulkBusy] = useState(false);
 
 	const pageSize = usePrefs((p) => p.pageSize);
@@ -338,6 +341,37 @@ export default function EmailListRoute() {
 		setSelection(checked ? emails.map((e) => e.id) : []);
 		lastClickedRef.current = null;
 	};
+
+	// Scroll position and selection come back after a refresh (this tab, per
+	// folder and page), once the list has loaded.
+	const rememberTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+	const rememberView = (patch: { top?: number; ids?: string[] }) => {
+		clearTimeout(rememberTimer.current);
+		rememberTimer.current = setTimeout(() => {
+			try {
+				const prev = JSON.parse(sessionStorage.getItem(viewKey) ?? "{}");
+				sessionStorage.setItem(viewKey, JSON.stringify({ ...prev, ...patch }));
+			} catch {}
+		}, 150);
+	};
+	const restoredView = useRef<string | null>(null);
+	useEffect(() => {
+		if (!emails.length || restoredView.current === viewKey) return;
+		restoredView.current = viewKey;
+		try {
+			const saved = JSON.parse(sessionStorage.getItem(viewKey) ?? "{}") as { top?: number; ids?: string[] };
+			if (saved.ids?.length) {
+				const here = new Set(emails.map((e) => e.id));
+				const keep = saved.ids.filter((id) => here.has(id));
+				if (keep.length) setSelected(new Set(keep));
+			}
+			if (saved.top) requestAnimationFrame(() => listRef.current?.scrollTo({ top: saved.top }));
+		} catch {}
+	}, [emails, viewKey]);
+	useEffect(() => {
+		if (restoredView.current === viewKey) rememberView({ ids: [...selected] });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [selected]);
 
 	// ── keyboard (Gmail-style; "?" lists them, Settings can turn them off) ──
 	// The cursor is the row j/k move to; actions without a selection use the
@@ -805,8 +839,13 @@ export default function EmailListRoute() {
 
 			{/* Email rows */}
 			<Box
+				ref={listRef}
 				sx={{ flex: 1, overflowY: "auto" }}
-				onScroll={(e) => setScrolled((e.currentTarget as HTMLElement).scrollTop > 24)}
+				onScroll={(e) => {
+					const top = (e.currentTarget as HTMLElement).scrollTop;
+					setScrolled(top > 24);
+					rememberView({ top });
+				}}
 				onContextMenu={(e) => {
 					e.preventDefault();
 					setMenu({ x: e.clientX, y: e.clientY, email: null });
@@ -946,7 +985,12 @@ export default function EmailListRoute() {
 													<ReplyIcon sx={{ fontSize: 14, color: "warning.main", flexShrink: 0 }} />
 												</Tooltip>
 											)}
-											<Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, ml: "auto" }}>
+											{email.has_attachments && (
+												<Tooltip title="Has attachments">
+													<AttachFileIcon aria-label="Has attachments" sx={{ fontSize: 16, color: "text.secondary", flexShrink: 0, ml: "auto", transform: "rotate(45deg)" }} />
+												</Tooltip>
+											)}
+											<Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, ml: email.has_attachments ? 0.5 : "auto" }}>
 												{formatListDate(email.date)}
 											</Typography>
 										</Box>

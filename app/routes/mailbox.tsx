@@ -56,13 +56,13 @@ export default function MailboxRoute() {
 		restoredFor.current = mailboxId;
 		const saved = loadCompose(mailboxId);
 		if (!saved || useUIStore.getState().isComposing) return;
-		const fields = { to: saved.to, cc: saved.cc, bcc: saved.bcc, subject: saved.subject, body: saved.body };
+		const fields = { to: saved.to, cc: saved.cc, bcc: saved.bcc, subject: saved.subject, body: saved.body, files: saved.files, driveLinks: saved.driveLinks };
 		void (async () => {
 			const fetchOne = (id?: string | null) => (id ? api.getEmail(mailboxId, id).catch(() => null) : Promise.resolve(null));
 			const [originalEmail, draftEmail] = await Promise.all([fetchOne(saved.originalId), fetchOne(saved.draftId)]);
 			startCompose({ mode: saved.mode, originalEmail, draftEmail, restored: fields });
 			addToast({
-				title: saved.hadAttachments ? "Your unsent message is back. Attachments weren't kept; add them again." : "Your unsent message is back.",
+				title: saved.hadAttachments ? "Your unsent message is back. Uploads that hadn't finished weren't kept; add them again." : "Your unsent message is back.",
 				variant: "info",
 			});
 		})();

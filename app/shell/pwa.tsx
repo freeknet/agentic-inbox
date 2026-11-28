@@ -93,6 +93,8 @@ export function InstallButton({ name }: { name: string }) {
 export function PwaSupport({ name, shareLanding }: { name: string; shareLanding: string }) {
 	const navigate = useNavigate();
 	const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
+	// A deploy changes the page's build manifest; an open tab notices and offers a reload.
+	const [stale, setStale] = useState(false);
 	const [offline, setOffline] = useState(false);
 	const reloading = useRef(false);
 	const { colorScheme } = useColorScheme();
@@ -146,6 +148,29 @@ export function PwaSupport({ name, shareLanding }: { name: string; shareLanding:
 	}, [name, shareLanding, navigate]);
 
 	useEffect(() => {
+		const BUILD = /\/assets\/manifest-[\w-]+\.js/;
+		const mine = document.documentElement.innerHTML.match(BUILD)?.[0];
+		if (!mine) return; // dev server: no build manifest
+		let timer: ReturnType<typeof setInterval> | undefined;
+		const check = async () => {
+			if (document.visibilityState !== "visible" || !navigator.onLine) return;
+			try {
+				const res = await fetch("/", { cache: "no-store", credentials: "same-origin", redirect: "error" });
+				const live = (await res.text()).match(BUILD)?.[0];
+				if (live && live !== mine) setStale(true);
+			} catch {
+				// Signed out or offline: try again later.
+			}
+		};
+		timer = setInterval(check, 15 * 60 * 1000);
+		document.addEventListener("visibilitychange", check);
+		return () => {
+			clearInterval(timer);
+			document.removeEventListener("visibilitychange", check);
+		};
+	}, []);
+
+	useEffect(() => {
 		const update = () => setOffline(!navigator.onLine);
 		update();
 		window.addEventListener("online", update);
@@ -167,12 +192,19 @@ export function PwaSupport({ name, shareLanding }: { name: string; shareLanding:
 	return (
 		<>
 			<Snackbar
-				open={!!waiting}
+				open={!!waiting || stale}
 				message={`A new version of ${name} is ready`}
 				anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
 				action={
 					<>
-						<Button color="inherit" size="small" onClick={() => setWaiting(null)}>
+						<Button
+							color="inherit"
+							size="small"
+							onClick={() => {
+								setWaiting(null);
+								setStale(false);
+							}}
+						>
 							Later
 						</Button>
 						<Button
@@ -180,8 +212,9 @@ export function PwaSupport({ name, shareLanding }: { name: string; shareLanding:
 							size="small"
 							variant="contained"
 							onClick={() => {
+								if (!waiting) return window.location.reload();
 								reloading.current = true;
-								waiting?.postMessage({ type: "SKIP_WAITING" });
+								waiting.postMessage({ type: "SKIP_WAITING" });
 							}}
 						>
 							Reload
@@ -190,7 +223,7 @@ export function PwaSupport({ name, shareLanding }: { name: string; shareLanding:
 				}
 			/>
 			<Snackbar
-				open={offline && !waiting}
+				open={offline && !waiting && !stale}
 				message="You're offline. Changes won't save until you reconnect."
 				anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
 			/>

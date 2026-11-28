@@ -130,7 +130,10 @@ export function ToastStack({ children }: { children: ReactNode }) {
 			sx={{
 				position: "fixed",
 				left: 16,
-				bottom: { xs: "calc(88px + env(safe-area-inset-bottom, 0px))", md: 24 },
+				// Phones: just under the header, clear of the Compose button, the
+				// upload panel and compose's footer. Larger screens: bottom left.
+				top: { xs: "calc(72px + env(safe-area-inset-top, 0px))", md: "auto" },
+				bottom: { xs: "auto", md: 24 },
 				zIndex: (t) => t.zIndex.snackbar,
 				display: "flex",
 				flexDirection: "column",

@@ -231,7 +231,11 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		setSubject(initialFields.subject);
 		setBody(initialFields.body);
 		const forwarding = composeOptions.mode === "forward" && !composeOptions.draftEmail;
-		resetAttachments({ forwarded: forwarding ? getNonInlineAttachments(composeOptions.originalEmail?.attachments) : [] });
+		resetAttachments({
+			forwarded: forwarding ? getNonInlineAttachments(composeOptions.originalEmail?.attachments) : [],
+			files: composeOptions.restored?.files,
+			driveLinks: composeOptions.restored?.driveLinks,
+		});
 		// Files shared to the app start uploading as attachments straight away.
 		const shared = composeOptions.prefill?.files;
 		if (shared?.length) queueMicrotask(() => addFilesRef.current(shared));
@@ -254,12 +258,17 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 					bcc,
 					subject,
 					body,
-					hadAttachments: attachments.files.length > 0 || attachments.driveLinks.length > 0,
+					// Uploads still in flight can't be resumed; finished ones come back.
+					hadAttachments: attachments.files.some((f) => f.status !== "done") || attachments.driveLinks.some((l) => l.status !== "done"),
+					files: attachments.files.filter((f) => f.status === "done").map(({ key, filename, size, uploadId }) => ({ key, filename, size, status: "done" as const, uploadId })),
+					driveLinks: attachments.driveLinks
+						.filter((l) => l.status === "done")
+						.map(({ key, filename, size, sent, url, expiresAt }) => ({ key, filename, size, status: "done" as const, sent, url, expiresAt })),
 				}),
 			400,
 		);
 		return () => clearTimeout(t);
-	}, [isComposing, mailboxId, to, cc, bcc, subject, body, composeOptions, attachments.files.length, attachments.driveLinks.length]);
+	}, [isComposing, mailboxId, to, cc, bcc, subject, body, composeOptions, attachments.files, attachments.driveLinks]);
 
 	const handleSaveDraft = async () => {
 		if (!mailboxId || isSending) return; setIsSavingDraft(true); setError(null);

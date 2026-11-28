@@ -16,7 +16,15 @@ export interface ComposeOptions {
 	/** When editing a draft, this holds the draft email to pre-fill the composer */
 	draftEmail?: Email | null;
 	/** Fields of an unsent message brought back after a refresh (lib/composeRestore). */
-	restored?: { to: string; cc: string; bcc: string; subject: string; body: string };
+	restored?: {
+		to: string;
+		cc: string;
+		bcc: string;
+		subject: string;
+		body: string;
+		files?: import("~/lib/composeRestore").SavedCompose["files"];
+		driveLinks?: import("~/lib/composeRestore").SavedCompose["driveLinks"];
+	};
 	/** A new message's fields from a mailto: link or a share (see routes/launch.tsx). */
 	prefill?: ComposePrefill;
 }

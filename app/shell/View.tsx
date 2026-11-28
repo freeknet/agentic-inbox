@@ -116,7 +116,8 @@ export function MenuEntry({ icon, label, hint, danger, onClick }: { icon: ReactN
 			<ListItemIcon sx={danger ? { color: "error.main" } : undefined}>{icon}</ListItemIcon>
 			<ListItemText>{label}</ListItemText>
 			{hint && (
-				<Typography variant="body2" sx={{ color: "text.secondary", ml: 3 }}>
+				// Keyboard hints mean nothing on a touch screen.
+				<Typography variant="body2" sx={{ color: "text.secondary", ml: 3, "@media (pointer: coarse)": { display: "none" } }}>
 					{hint}
 				</Typography>
 			)}
