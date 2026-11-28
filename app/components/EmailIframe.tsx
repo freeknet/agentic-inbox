@@ -328,9 +328,10 @@ th { background: ${c.tableHeader}; text-align: left; }
 								fontSize: 14,
 								letterSpacing: 1,
 								borderRadius: 1,
+								// Neutral grey like Gmail's, whatever the accent colour.
 								color: lightPage ? "#444" : "text.secondary",
-								bgcolor: lightPage ? "#e8eaed" : "action.selected",
-								"&:hover": { bgcolor: lightPage ? "#dadce0" : "action.focus" },
+								bgcolor: lightPage ? "#e8eaed" : "rgba(128, 128, 128, 0.22)",
+								"&:hover": { bgcolor: lightPage ? "#dadce0" : "rgba(128, 128, 128, 0.35)" },
 							}}
 						>
 							•••

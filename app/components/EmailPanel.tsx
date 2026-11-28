@@ -391,32 +391,55 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 
 const replyButtonSx = { borderRadius: 999, px: 2.5, color: "text.secondary", borderColor: "divider", textTransform: "none" } as const;
 
-/** Gmail's fold: a rule with a count bubble that opens the hidden messages. */
+/**
+ * Gmail's fold: a doubled rule with a count bubble sitting on it; clicking
+ * either shows the hidden messages.
+ */
 function OlderMessagesFold({ count, onClick }: { count: number; onClick: () => void }) {
 	return (
-		<Box sx={{ position: "relative", height: 40, borderTop: 1, borderColor: "divider" }}>
-			<Box sx={{ position: "absolute", left: 0, right: 0, top: 6, borderTop: 1, borderColor: "divider" }} />
-			<ButtonBase
-				onClick={onClick}
-				aria-label={`Show ${count} older messages`}
+		<ButtonBase
+			onClick={onClick}
+			aria-label={`Show ${count} older messages`}
+			sx={{
+				position: "relative",
+				display: "block",
+				width: "100%",
+				height: 44,
+				borderTop: 1,
+				borderColor: "divider",
+				// The doubled rule runs through the middle, under the bubble.
+				"&::before, &::after": { content: '""', position: "absolute", left: 0, right: 0, borderTop: 1, borderColor: "divider" },
+				"&::before": { top: 19 },
+				"&::after": { top: 23 },
+				"&:hover .fold-count": { bgcolor: "action.hover", color: "text.primary" },
+			}}
+		>
+			<Box
+				className="fold-count"
+				component="span"
 				sx={{
 					position: "absolute",
+					zIndex: 1,
 					left: { xs: 16, md: 24 },
-					top: 0,
-					width: 40,
-					height: 40,
+					top: "50%",
+					transform: "translateY(-50%)",
+					width: 36,
+					height: 36,
 					borderRadius: "50%",
 					border: 1,
 					borderColor: "divider",
 					bgcolor: "background.paper",
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "center",
 					typography: "body2",
 					fontWeight: 500,
 					color: "text.secondary",
-					"&:hover": { bgcolor: "action.hover" },
+					transition: "background-color .15s, color .15s",
 				}}
 			>
 				{count}
-			</ButtonBase>
-		</Box>
+			</Box>
+		</ButtonBase>
 	);
 }
