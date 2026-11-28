@@ -45,7 +45,7 @@ export default function MailboxSplitView({ selectedEmailId, isComposing, childre
 	const width = Math.min(listWidth, maxW);
 	const height = Math.min(listHeight, maxH);
 
-	const card = { bgcolor: "background.paper", borderRadius: { md: 4 }, overflow: "hidden" } as const;
+	const card = { bgcolor: "background.paper", borderRadius: { md: 3 }, overflow: "hidden" } as const;
 	const below = pane === "below";
 	// With no split, or on phones, an open message takes the whole area.
 	const replace = pane === "off";

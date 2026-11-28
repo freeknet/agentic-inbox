@@ -153,7 +153,7 @@ export default function HomeRoute() {
 	return (
 		<Box sx={{ display: "flex", flexDirection: "column", minHeight: "100dvh", bgcolor: "background.default" }}>
 			<HomeHeader />
-			<Box sx={{ flex: 1, mx: { md: 2 }, mb: { md: 2 }, bgcolor: "background.paper", borderRadius: { md: 4 } }}>
+			<Box sx={{ flex: 1, mx: { md: 2 }, mb: { md: 2 }, bgcolor: "background.paper", borderRadius: { md: 3 } }}>
 			<Container maxWidth="sm" sx={{ py: { xs: 3, md: 5 } }}>
 				<Box sx={{ mb: 4 }}>
 					<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>

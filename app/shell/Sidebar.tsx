@@ -15,9 +15,10 @@ import { createContext, type DragEvent, type ReactNode, useContext, useEffect, u
 import { Link as RouterLink } from "react-router";
 import { SIDEBAR_WIDTH } from "./AppHeader";
 import { useShellLayout } from "./layout";
+import { RAINBOW_CONIC } from "~/theme";
 
 /** Width of the collapsed icon rail. */
-export const SIDEBAR_RAIL_WIDTH = 72;
+export const SIDEBAR_RAIL_WIDTH = 80;
 
 /** True inside the collapsed rail (and not while it's hovered open). */
 const RailContext = createContext(false);
@@ -86,14 +87,21 @@ export function SidebarFrame({ open, onClose, children }: { open: boolean; onClo
 	);
 }
 
-/** The big action button at the top (Compose, New), like Google's. */
+/**
+ * The big action button at the top (Compose, New): an M3 extended FAB with a
+ * rainbow ring. In the rail it's the square FAB.
+ */
 export function SidebarPrimaryButton({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: (e: React.MouseEvent<HTMLElement>) => void }) {
 	const rail = useRail();
 	const look = {
-		bgcolor: "background.paper",
 		color: "text.primary",
+		border: "2px solid transparent",
+		// Paper inside, the spectrum showing through the border.
+		background: `linear-gradient(var(--mui-palette-background-paper), var(--mui-palette-background-paper)) padding-box, ${RAINBOW_CONIC} border-box`,
 		boxShadow: 2,
-		"&:hover": { bgcolor: "action.hover", boxShadow: 4 },
+		transition: "box-shadow .2s, transform .2s",
+		"&:hover": { boxShadow: 6, transform: "translateY(-1px)" },
+		"&:active": { transform: "none" },
 	} as const;
 	if (rail) {
 		return (
@@ -108,13 +116,7 @@ export function SidebarPrimaryButton({ icon, label, onClick }: { icon: ReactNode
 	}
 	return (
 		<Box sx={{ px: 2, pt: 0.5, pb: 2 }}>
-			<Button
-				variant="contained"
-				color="inherit"
-				startIcon={icon}
-				onClick={onClick}
-				sx={{ ...look, borderRadius: 4, px: 2.5, py: 1.75, whiteSpace: "nowrap" }}
-			>
+			<Button variant="contained" color="inherit" startIcon={icon} onClick={onClick} sx={{ ...look, borderRadius: 4, px: 2.5, py: 1.5, whiteSpace: "nowrap", fontSize: 15 }}>
 				{label}
 			</Button>
 		</Box>
@@ -130,6 +132,8 @@ export interface SidebarItemProps {
 	onClick?: () => void;
 	/** Unread count or similar, shown bold at the right. */
 	count?: number;
+	/** The item's accent (rainbow): its icon, count and selected tint. */
+	color?: string;
 	/** Drop target highlighting (drag files onto a folder). */
 	dropActive?: boolean;
 	onDragOver?: (e: DragEvent) => void;
@@ -137,12 +141,60 @@ export interface SidebarItemProps {
 	onDrop?: (e: DragEvent) => void;
 }
 
-/** One navigation row: pill-shaped, icon, label, optional count. In the rail, the icon with a badge. */
-export function SidebarItem({ icon, label, selected, to, onClick, count, dropActive, onDragOver, onDragLeave, onDrop }: SidebarItemProps) {
+/**
+ * One navigation row: icon in its accent colour, label, optional count; the
+ * selected row takes a tint of the accent. In the collapsed rail it's an M3
+ * navigation-rail destination: the icon in an indicator pill with a short
+ * label underneath and the count as a badge.
+ */
+export function SidebarItem({ icon, label, selected, to, onClick, count, color, dropActive, onDragOver, onDragLeave, onDrop }: SidebarItemProps) {
 	const rail = useRail();
 	const link = to ? { component: RouterLink, to } : {};
 	const shown = count != null && count > 0 ? (count > 999 ? "999+" : String(count)) : null;
-	const button = (
+	const accent = color ?? "var(--mui-palette-primary-main)";
+	const tint = color ? `color-mix(in srgb, ${color} 18%, transparent)` : "var(--mui-palette-action-selected)";
+	const drop = dropActive ? { outline: "2px solid", outlineColor: "primary.main", outlineOffset: -2 } : {};
+
+	if (rail) {
+		return (
+			<ListItemButton
+				{...link}
+				selected={selected}
+				onClick={onClick}
+				onDragOver={onDragOver}
+				onDragLeave={onDragLeave}
+				onDrop={onDrop}
+				aria-label={shown ? `${label}, ${shown}` : label}
+				sx={{
+					flexDirection: "column",
+					gap: 0.5,
+					mx: "auto",
+					mb: 0.5,
+					py: 0.5,
+					px: 0,
+					width: 72,
+					bgcolor: "transparent !important",
+					"&:hover .rail-pill": { bgcolor: selected ? tint : "action.hover" },
+					...drop,
+				}}
+			>
+				<Box className="rail-pill" sx={{ width: 56, height: 32, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: selected ? tint : "transparent", color: color ?? "inherit", transition: "background-color .2s" }}>
+					{shown ? (
+						<Badge badgeContent={shown} max={999} sx={{ "& .MuiBadge-badge": { fontSize: 10, height: 16, minWidth: 16, bgcolor: accent, color: "#fff" } }}>
+							{icon}
+						</Badge>
+					) : (
+						icon
+					)}
+				</Box>
+				<Typography noWrap sx={{ fontSize: 11, fontWeight: selected ? 700 : 500, maxWidth: 72, color: "text.primary" }}>
+					{label}
+				</Typography>
+			</ListItemButton>
+		);
+	}
+
+	return (
 		<ListItemButton
 			{...link}
 			selected={selected}
@@ -150,39 +202,24 @@ export function SidebarItem({ icon, label, selected, to, onClick, count, dropAct
 			onDragOver={onDragOver}
 			onDragLeave={onDragLeave}
 			onDrop={onDrop}
-			aria-label={rail ? (shown ? `${label}, ${shown}` : label) : undefined}
 			sx={{
 				mx: 1,
 				mb: 0.25,
 				py: 0.5,
 				minHeight: 36,
-				...(rail && { justifyContent: "center", px: 0, mx: "auto", width: 56, borderRadius: 4 }),
-				...(dropActive && { outline: "2px solid", outlineColor: "primary.main", outlineOffset: -2 }),
+				transition: "background-color .15s",
+				"&.Mui-selected, &.Mui-selected:hover": { bgcolor: tint },
+				...drop,
 			}}
 		>
-			<ListItemIcon sx={{ minWidth: rail ? 0 : 40, color: "inherit" }}>
-				{rail && shown ? (
-					<Badge badgeContent={shown} color="primary" max={999} sx={{ "& .MuiBadge-badge": { fontSize: 10, height: 16, minWidth: 16 } }}>
-						{icon}
-					</Badge>
-				) : (
-					icon
-				)}
-			</ListItemIcon>
-			{!rail && <ListItemText primary={label} slotProps={{ primary: { noWrap: true, sx: { fontSize: 14, fontWeight: selected ? 600 : 400 } } }} />}
-			{!rail && shown && (
-				<Typography variant="body2" sx={{ fontWeight: 600, fontSize: 12, ml: 1 }}>
+			<ListItemIcon sx={{ minWidth: 40, color: color ?? "inherit" }}>{icon}</ListItemIcon>
+			<ListItemText primary={label} slotProps={{ primary: { noWrap: true, sx: { fontSize: 14, fontWeight: selected ? 700 : 400 } } }} />
+			{shown && (
+				<Box component="span" sx={{ ml: 1, px: 0.75, minWidth: 20, height: 20, borderRadius: 2.5, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: color ? "#fff" : "text.primary", bgcolor: color ?? "transparent" }}>
 					{shown}
-				</Typography>
+				</Box>
 			)}
 		</ListItemButton>
-	);
-	return rail ? (
-		<Tooltip title={label} placement="right">
-			{button}
-		</Tooltip>
-	) : (
-		button
 	);
 }
 

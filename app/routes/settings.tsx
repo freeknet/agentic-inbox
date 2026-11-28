@@ -74,7 +74,7 @@ function Section({
 		<Box component="section" sx={sectionSx}>
 			<Box sx={{ mb: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
 				<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-					<Box sx={{ display: "flex", color: "text.secondary" }}>{icon}</Box>
+					<Box sx={{ display: "flex", width: 32, height: 32, borderRadius: 2, alignItems: "center", justifyContent: "center", bgcolor: "action.hover" }}>{icon}</Box>
 					<Typography variant="subtitle2">{title}</Typography>
 				</Box>
 				{aside}
@@ -103,7 +103,7 @@ function NotificationsSection({ mailboxId }: { mailboxId: string | undefined }) 
 		}
 	};
 	return (
-		<Section icon={<NotificationsOutlinedIcon fontSize="small" />} title="Notifications">
+		<Section icon={<NotificationsOutlinedIcon fontSize="small" sx={{ color: "#ea4335" }} />} title="Notifications">
 			<FormControlLabel
 				control={
 					<Switch
@@ -129,7 +129,7 @@ function LayoutSection() {
 	const collapsed = useShellLayout((s) => s.sidebarCollapsed);
 	const setCollapsed = useShellLayout((s) => s.setSidebarCollapsed);
 	return (
-		<Section icon={<ViewQuiltOutlinedIcon fontSize="small" />} title="Layout">
+		<Section icon={<ViewQuiltOutlinedIcon fontSize="small" sx={{ color: "#24c1e0" }} />} title="Layout">
 			<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
 				<Box>
 					<Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75 }}>
@@ -198,7 +198,7 @@ function UsageBar({ value, max, label }: { value: number; max: number; label: st
 			value={pct}
 			color={color}
 			aria-label={label}
-			sx={{ height: 8, borderRadius: 999 }}
+			sx={{ height: 8, borderRadius: 1 }}
 		/>
 	);
 }
@@ -332,7 +332,7 @@ export default function SettingsRoute() {
 					</Box>
 				</Box>
 
-				<Section icon={<PaletteOutlinedIcon fontSize="small" />} title="Appearance">
+				<Section icon={<PaletteOutlinedIcon fontSize="small" sx={{ color: "#f538a0" }} />} title="Appearance">
 					<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
 						<Box>
 							<Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
@@ -345,7 +345,7 @@ export default function SettingsRoute() {
 								size="small"
 								aria-label="Accent colour"
 								// Wraps on phones instead of running off the screen.
-								sx={{ flexWrap: "wrap", "& .MuiToggleButtonGroup-grouped": { borderRadius: "999px !important", border: 1, borderColor: "divider", m: 0.25 } }}
+								sx={{ flexWrap: "wrap", "& .MuiToggleButtonGroup-grouped": { borderRadius: "8px !important", border: 1, borderColor: "divider", m: 0.25 } }}
 							>
 								{(Object.keys(ACCENTS) as Accent[]).map((key) => (
 									<ToggleButton key={key} value={key} aria-label={ACCENTS[key].label} sx={{ gap: 0.75, px: 1.5 }}>
@@ -402,7 +402,7 @@ export default function SettingsRoute() {
 
 				<LayoutSection />
 
-				<Section icon={<TuneOutlinedIcon fontSize="small" />} title="Behaviour">
+				<Section icon={<TuneOutlinedIcon fontSize="small" sx={{ color: "#4285f4" }} />} title="Behaviour">
 					<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
 						<Toggle
 							checked={prefs.confirmBeforeDelete}
@@ -461,7 +461,7 @@ export default function SettingsRoute() {
 
 				<NotificationsSection mailboxId={mailboxId} />
 
-				<Section icon={<AttachFileOutlinedIcon fontSize="small" />} title="Signature">
+				<Section icon={<AttachFileOutlinedIcon fontSize="small" sx={{ color: "#fa7b17" }} />} title="Signature">
 					<Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
 						<Toggle
 							checked={sigEnabled}
@@ -482,7 +482,7 @@ export default function SettingsRoute() {
 				</Section>
 
 				<Section
-					icon={<BeachAccessOutlinedIcon fontSize="small" />}
+					icon={<BeachAccessOutlinedIcon fontSize="small" sx={{ color: "#fbbc04" }} />}
 					title="Vacation auto-reply"
 					aside={
 						<Chip
@@ -542,7 +542,7 @@ export default function SettingsRoute() {
 				</Section>
 
 				<Section
-					icon={<ForwardOutlinedIcon fontSize="small" />}
+					icon={<ForwardOutlinedIcon fontSize="small" sx={{ color: "#a142f4" }} />}
 					title="Forwarding"
 					aside={
 						<Chip
@@ -640,7 +640,7 @@ export default function SettingsRoute() {
 					</Typography>
 				</Box>
 
-				<Section icon={<StorageOutlinedIcon fontSize="small" />} title="Usage">
+				<Section icon={<StorageOutlinedIcon fontSize="small" sx={{ color: "#34a853" }} />} title="Usage">
 					{stats ? (
 						<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
 							<Box>

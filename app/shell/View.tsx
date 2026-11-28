@@ -10,6 +10,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import CloseIcon from "@mui/icons-material/Close";
 import type { ReactNode } from "react";
+import { RAINBOW_CONIC } from "~/theme";
 
 /**
  * The row at the top of the content card: a title (or breadcrumbs, or the
@@ -44,7 +45,7 @@ export function SelectionBar({ count, onClear, children }: { count: number; onCl
 			sx={{
 				alignItems: "center",
 				bgcolor: "action.hover",
-				borderRadius: 999,
+				borderRadius: 3,
 				px: 1,
 				minHeight: 48,
 				// Scrolls sideways on phones, without a scrollbar.
@@ -78,8 +79,26 @@ export function ActionButton({ title, onClick, disabled, children }: { title: st
 /** Large faded icon, title and one line of help, centred in an empty view. */
 export function EmptyState({ icon, title, body, action }: { icon: ReactNode; title: string; body: string; action?: ReactNode }) {
 	return (
-		<Stack spacing={1.5} sx={{ alignItems: "center", textAlign: "center", maxWidth: 380, mx: "auto", color: "text.secondary", "& > svg": { fontSize: 96, opacity: 0.4 } }}>
-			{icon}
+		<Stack spacing={1.5} sx={{ alignItems: "center", textAlign: "center", maxWidth: 380, mx: "auto", color: "text.secondary" }}>
+			{/* The icon sits in a circle washed with the rainbow, as a friendly focal point. */}
+			<Box
+				aria-hidden
+				sx={{
+					width: 128,
+					height: 128,
+					mb: 1,
+					borderRadius: "50%",
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "center",
+					color: "primary.main",
+					background: `radial-gradient(circle at 50% 50%, var(--mui-palette-background-paper) 52%, transparent 53%), ${RAINBOW_CONIC}`,
+					opacity: 0.9,
+					"& > svg": { fontSize: 56 },
+				}}
+			>
+				{icon}
+			</Box>
 			<Typography variant="h6" sx={{ color: "text.primary" }}>
 				{title}
 			</Typography>

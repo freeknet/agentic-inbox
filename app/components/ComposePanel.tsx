@@ -193,19 +193,20 @@ export default function ComposePanel() {
 							>
 								{isSavingDraft ? "Saving..." : "Save as Draft"}
 							</Button>
-							<ScheduleSendButton
-								disabled={isSavingDraft || isSending}
-								onSchedule={(at) => handleSend(null, closePanel, at)}
-							/>
-							<Button
-								type="submit"
-								variant="contained"
-								size="small"
-								disabled={isSavingDraft || isSending}
-								startIcon={isSending ? <CircularProgress size={14} color="inherit" /> : <SendIcon />}
-							>
-								{isSending ? "Sending..." : "Send"}
-							</Button>
+							{/* M3 split button: Send, and ▾ to schedule it. */}
+							<Box sx={{ display: "inline-flex", alignItems: "stretch", flexShrink: 0 }}>
+								<Button
+									type="submit"
+									variant="contained"
+									size="small"
+									disabled={isSavingDraft || isSending}
+									startIcon={isSending ? <CircularProgress size={14} color="inherit" /> : <SendIcon />}
+									sx={{ borderRadius: "8px 0 0 8px", fontSize: "0.8125rem !important", px: "12px !important", "& .MuiButton-startIcon": { mr: "8px !important", ml: "-4px !important" } }}
+								>
+									{isSending ? "Sending..." : "Send"}
+								</Button>
+								<ScheduleSendButton variant="split" disabled={isSavingDraft || isSending} onSchedule={(at) => handleSend(null, closePanel, at)} />
+							</Box>
 						</Box>
 					</Box>
 				</Box>

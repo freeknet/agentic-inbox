@@ -59,6 +59,7 @@ import CheckIcon from "@mui/icons-material/Check";
 import { SwipeRow } from "~/components/SwipeRow";
 import { avatarColor } from "~/components/email-panel/people";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
+import { NAV_BAR_HEIGHT } from "~/shell/NavBar";
 
 const FOLDER_EMPTY_STATES: Record<
 	string,
@@ -1074,7 +1075,8 @@ export default function EmailListRoute() {
 						display: { xs: "inline-flex", md: "none" },
 						position: "fixed",
 						right: 16,
-						bottom: "calc(24px + env(safe-area-inset-bottom, 0px))",
+						// Above the phone navigation bar.
+						bottom: `calc(${NAV_BAR_HEIGHT + 16}px + env(safe-area-inset-bottom, 0px))`,
 						zIndex: (t) => t.zIndex.speedDial,
 						bgcolor: "primary.light",
 						color: "primary.dark",

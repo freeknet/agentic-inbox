@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type Accent = "blue" | "green" | "purple" | "amber" | "red";
+export type Accent = "blue" | "teal" | "green" | "amber" | "orange" | "red" | "pink" | "purple";
 export type Density = "comfortable" | "compact";
 export type FontSize = "small" | "medium" | "large";
 /** Gmail's reading pane: beside the list, under it, or none (the message replaces the list). */
@@ -14,6 +14,9 @@ export const ACCENTS: Record<Accent, { label: string; light: string; lightSoft: 
 	purple: { label: "Purple", light: "#6b3fc4", lightSoft: "#e7dcfb", dark: "#c9b2f7", darkSoft: "#2b1a4d" },
 	amber: { label: "Amber", light: "#9a5b00", lightSoft: "#fbe6c8", dark: "#fdd663", darkSoft: "#4a3200" },
 	red: { label: "Red", light: "#b3261e", lightSoft: "#fadbd8", dark: "#f2b8b5", darkSoft: "#4d1f1c" },
+	teal: { label: "Teal", light: "#00696f", lightSoft: "#c5eef0", dark: "#6fd8e0", darkSoft: "#004f53" },
+	orange: { label: "Orange", light: "#b3470b", lightSoft: "#ffdbc8", dark: "#ffb68d", darkSoft: "#5c2300" },
+	pink: { label: "Pink", light: "#b0186f", lightSoft: "#ffd8ea", dark: "#ffafd3", darkSoft: "#5e0039" },
 };
 
 export const FONT_SIZES: Record<FontSize, { label: string; root: string }> = {

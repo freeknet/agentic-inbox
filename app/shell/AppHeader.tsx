@@ -143,7 +143,7 @@ export function AppHeader({ app, homeHref, appUrls, search, actions, settings, a
 									</IconButton>
 								</InputAdornment>
 							) : undefined,
-							sx: { borderRadius: 999, bgcolor: "action.hover", "& fieldset": { border: 0 }, height: 48 },
+							sx: { borderRadius: 3, bgcolor: "action.hover", "& fieldset": { border: 0 }, height: 48, transition: "background-color .15s, box-shadow .15s", "&.Mui-focused": { bgcolor: "background.paper", boxShadow: 2 } },
 						},
 					}}
 				/>

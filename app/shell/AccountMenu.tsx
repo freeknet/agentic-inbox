@@ -108,7 +108,7 @@ export function AccountMenu({ fallback, children }: { fallback?: Identity; child
 				onClose={() => setAnchor(null)}
 				anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
 				transformOrigin={{ vertical: "top", horizontal: "right" }}
-				slotProps={{ paper: { sx: { width: 340, maxWidth: "calc(100vw - 32px)", borderRadius: 7, p: 1.5, bgcolor: "background.default" } } }}
+				slotProps={{ paper: { sx: { width: 340, maxWidth: "calc(100vw - 32px)", borderRadius: 3, p: 1.5, bgcolor: "background.default" } } }}
 			>
 				<Stack sx={{ alignItems: "center", textAlign: "center", pt: 1.5, pb: 2, px: 2 }}>
 					{id.email && (
@@ -126,7 +126,7 @@ export function AccountMenu({ fallback, children }: { fallback?: Identity; child
 					</Stack>
 				</Stack>
 				{/* Theme (the header's toggle is hidden on phones) and install. */}
-				<Box sx={{ bgcolor: "background.paper", borderRadius: 4, mb: 1, px: 2, py: 1.5 }}>
+				<Box sx={{ bgcolor: "background.paper", borderRadius: 2, mb: 1, px: 2, py: 1.5 }}>
 					<Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
 						Theme
 					</Typography>
@@ -151,11 +151,11 @@ export function AccountMenu({ fallback, children }: { fallback?: Identity; child
 					)}
 				</Box>
 				{children && (
-					<Box sx={{ bgcolor: "background.paper", borderRadius: 4, mb: 1, overflow: "hidden" }}>
+					<Box sx={{ bgcolor: "background.paper", borderRadius: 2, mb: 1, overflow: "hidden" }}>
 						{children}
 					</Box>
 				)}
-				<Box sx={{ bgcolor: "background.paper", borderRadius: 4, overflow: "hidden" }}>
+				<Box sx={{ bgcolor: "background.paper", borderRadius: 2, overflow: "hidden" }}>
 					<Button
 						fullWidth
 						color="inherit"

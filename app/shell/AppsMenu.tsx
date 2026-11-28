@@ -39,9 +39,9 @@ export function AppsMenu({ current, urls }: { current: AppId; urls: Partial<Reco
 				onClose={() => setAnchor(null)}
 				anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
 				transformOrigin={{ vertical: "top", horizontal: "right" }}
-				slotProps={{ paper: { sx: { borderRadius: 4, p: 1.5, bgcolor: "background.default" } } }}
+				slotProps={{ paper: { sx: { borderRadius: 3, p: 1.5, bgcolor: "background.default" } } }}
 			>
-				<Paper sx={{ p: 1, borderRadius: 3, display: "grid", gridTemplateColumns: "repeat(2, 96px)", gap: 0.5 }}>
+				<Paper sx={{ p: 1, borderRadius: 2, display: "grid", gridTemplateColumns: "repeat(2, 96px)", gap: 0.5 }}>
 					{apps.map((id) => (
 						<Stack
 							key={id}
@@ -52,7 +52,7 @@ export function AppsMenu({ current, urls }: { current: AppId; urls: Partial<Reco
 							sx={{
 								alignItems: "center",
 								py: 1.5,
-								borderRadius: 3,
+								borderRadius: 2,
 								textDecoration: "none",
 								color: "text.primary",
 								bgcolor: id === current ? "action.selected" : undefined,

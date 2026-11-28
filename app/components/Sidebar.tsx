@@ -32,6 +32,7 @@ import { useUIStore } from "~/hooks/useUIStore";
 import { useToast } from "~/lib/toast";
 import { SidebarFooter, SidebarFrame, SidebarItem, SidebarPrimaryButton, SidebarSection } from "~/shell/Sidebar";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+import { rainbowFor } from "~/theme";
 
 const FOLDER_ICONS: Record<string, React.ReactNode> = {
 	[Folders.INBOX]: <InboxOutlinedIcon />,
@@ -106,8 +107,10 @@ export default function Sidebar() {
 	const isActive = (folderId: string) =>
 		pathname === `/mailbox/${mailboxId}/emails/${folderId}`;
 
+	// Each folder has its own rainbow colour: system folders fixed, yours by id.
+	const FOLDER_COLORS: Record<string, string> = { inbox: "#4285f4", sent: "#34a853", draft: "#fa7b17", archive: "#a142f4", trash: "#ea4335", spam: "#fbbc04" };
 	const folderRow = (folderId: string, label: string, icon: React.ReactNode, unread?: number) => (
-		<SidebarItem key={folderId} icon={icon} label={label} selected={isActive(folderId)} onClick={() => go(folderId)} count={unread} />
+		<SidebarItem key={folderId} icon={icon} label={label} color={FOLDER_COLORS[folderId] ?? rainbowFor(folderId)} selected={isActive(folderId)} onClick={() => go(folderId)} count={unread} />
 	);
 
 	return (
@@ -145,6 +148,7 @@ export default function Sidebar() {
 				<List aria-label="More" disablePadding sx={{ mt: 1 }}>
 					<SidebarItem
 						icon={<SettingsOutlinedIcon />}
+						color="#24c1e0"
 						label="Settings"
 						selected={pathname.endsWith("/settings")}
 						onClick={() => {

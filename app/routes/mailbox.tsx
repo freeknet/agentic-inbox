@@ -16,6 +16,16 @@ import { useUIStore } from "~/hooks/useUIStore";
 import { loadCompose } from "~/lib/composeRestore";
 import api from "~/services/api";
 import { addToast } from "~/lib/toast";
+import { useLocation } from "react-router";
+import { NAV_BAR_HEIGHT, NavBar } from "~/shell/NavBar";
+import InboxOutlinedIcon from "@mui/icons-material/InboxOutlined";
+import InboxIcon from "@mui/icons-material/Inbox";
+import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
+import SendIcon from "@mui/icons-material/Send";
+import DraftsOutlinedIcon from "@mui/icons-material/DraftsOutlined";
+import DraftsIcon from "@mui/icons-material/Drafts";
+import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
+import ArchiveIcon from "@mui/icons-material/Archive";
 
 /**
  * The same shell as Drive (app/shell/): a full-width header, the sidebar
@@ -70,9 +80,15 @@ export default function MailboxRoute() {
 	const agentWidth = usePrefs((p) => p.agentWidth);
 	const setPref = usePrefs((p) => p.set);
 
-	const card = { bgcolor: "background.paper", borderRadius: { md: 4 }, overflow: "hidden" } as const;
+	const card = { bgcolor: "background.paper", borderRadius: { md: 3 }, overflow: "hidden" } as const;
 	// The email list and search results lay out their own cards (MailboxSplitView).
 	const ownCards = useMatches().some((m) => m.id === "routes/email-list" || m.id === "routes/search-results");
+	// Phones: an open message or compose is full screen (no header or nav bar).
+	const fullScreen = ownCards && !!(selectedEmailId || isComposing);
+	const { pathname } = useLocation();
+	const currentFolder = pathname.match(/\/emails\/([^/?]+)/)?.[1];
+	const base = `/mailbox/${encodeURIComponent(mailboxId ?? "")}`;
+
 
 	return (
 		<Box sx={{ display: "flex", flexDirection: "column", height: "100dvh", overflow: "hidden", bgcolor: "background.default" }}>
@@ -82,7 +98,7 @@ export default function MailboxRoute() {
 			</Box>
 			<Box sx={{ display: "flex", flex: 1, minHeight: 0 }}>
 				<Sidebar />
-				<Box component="main" sx={{ flex: 1, minWidth: 0, display: "flex", pr: { md: 2 }, pb: { md: 2 } }}>
+				<Box component="main" sx={{ flex: 1, minWidth: 0, display: "flex", pr: { md: 2 }, pb: { xs: fullScreen ? 0 : `${NAV_BAR_HEIGHT}px`, md: 2 } }}>
 					<Box sx={{ ...(ownCards ? {} : card), flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
 						<Outlet />
 					</Box>
@@ -109,6 +125,15 @@ export default function MailboxRoute() {
 			</Box>
 			<ComposeEmail />
 			<MailShortcuts />
+			<NavBar
+				hidden={fullScreen}
+				items={[
+					{ label: "Inbox", icon: <InboxOutlinedIcon />, activeIcon: <InboxIcon />, color: "#4285f4", to: `${base}/emails/inbox`, selected: currentFolder === "inbox", badge: inboxUnread },
+					{ label: "Sent", icon: <SendOutlinedIcon />, activeIcon: <SendIcon />, color: "#34a853", to: `${base}/emails/sent`, selected: currentFolder === "sent" },
+					{ label: "Drafts", icon: <DraftsOutlinedIcon />, activeIcon: <DraftsIcon />, color: "#fa7b17", to: `${base}/emails/draft`, selected: currentFolder === "draft" },
+					{ label: "Archive", icon: <ArchiveOutlinedIcon />, activeIcon: <ArchiveIcon />, color: "#a142f4", to: `${base}/emails/archive`, selected: currentFolder === "archive" },
+				]}
+			/>
 		</Box>
 	);
 }

@@ -13,6 +13,7 @@ import IconButton from "@mui/material/IconButton";
 import Slide from "@mui/material/Slide";
 import Typography from "@mui/material/Typography";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { RAINBOW_GRADIENT } from "~/theme";
 
 export type ToastVariant = "success" | "error" | "info";
 
@@ -175,7 +176,7 @@ export function TopProgress({ active }: { active: boolean }) {
 					position: "absolute",
 					inset: 0,
 					width: "40%",
-					bgcolor: "primary.main",
+					background: RAINBOW_GRADIENT,
 					borderRadius: 2,
 					animation: visible ? "top-progress 1.1s ease-in-out infinite" : "none",
 				},

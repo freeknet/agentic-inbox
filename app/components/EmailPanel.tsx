@@ -389,7 +389,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	);
 }
 
-const replyButtonSx = { borderRadius: 999, px: 2.5, color: "text.secondary", borderColor: "divider", textTransform: "none" } as const;
+const replyButtonSx = { borderRadius: 2, px: 2.5, color: "text.secondary", borderColor: "divider", textTransform: "none" } as const;
 
 /**
  * Gmail's fold: a doubled rule with a count bubble sitting on it; clicking
