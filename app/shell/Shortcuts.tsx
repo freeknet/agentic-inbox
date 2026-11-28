@@ -41,6 +41,17 @@ function keyName(e: KeyboardEvent): string {
 	return [...mods, k].join("+");
 }
 
+/**
+ * A dialog, menu or listbox is actually showing. Hidden ones (a speed dial's
+ * action list on desktop, a closed menu still in the DOM) don't count.
+ */
+export function overlayOpen(): boolean {
+	for (const el of document.querySelectorAll<HTMLElement>('[role="dialog"], [role="menu"], [role="listbox"]')) {
+		if (el.getClientRects().length && getComputedStyle(el).visibility !== "hidden" && !el.closest('[aria-hidden="true"]')) return true;
+	}
+	return false;
+}
+
 export type ShortcutMap = Record<string, (e: KeyboardEvent) => void>;
 
 /**
@@ -59,7 +70,7 @@ export function useShortcuts(map: ShortcutMap, enabled = true) {
 			if (e.defaultPrevented || e.isComposing) return;
 			const name = keyName(e);
 			const modded = name.startsWith("mod+");
-			if (!modded && (isTyping() || document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]'))) return;
+			if (!modded && (isTyping() || overlayOpen())) return;
 			const shortcuts = ref.current;
 			const seq = pending ? `${pending} ${name}` : null;
 			pending = null;

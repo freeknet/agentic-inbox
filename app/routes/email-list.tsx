@@ -62,6 +62,7 @@ import AttachFileIcon from "@mui/icons-material/AttachFile";
 import { NAV_BAR_HEIGHT } from "~/shell/NavBar";
 import { dateGroup, folderColor, folderIcon } from "~/lib/folders";
 import Stack from "@mui/material/Stack";
+import TaskAltIcon from "@mui/icons-material/TaskAlt";
 
 const FOLDER_EMPTY_STATES: Record<
 	string,
@@ -73,10 +74,9 @@ const FOLDER_EMPTY_STATES: Record<
 	}
 > = {
 	[Folders.INBOX]: {
-		icon: <InboxIcon />,
-		title: "Your inbox is empty",
-		description:
-			"New emails will appear here when they arrive. Send an email to get the conversation started.",
+		icon: <TaskAltIcon />,
+		title: "You're all caught up",
+		description: "Nothing waiting in your inbox. New mail shows up here the moment it arrives.",
 		showCompose: true,
 	},
 	[Folders.SENT]: {

@@ -29,6 +29,7 @@ import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
 import CheckIcon from "@mui/icons-material/Check";
 import Avatar from "@mui/material/Avatar";
 import { avatarColor } from "~/components/email-panel/people";
+import { folderColor } from "~/lib/folders";
 
 function highlightTerms(text: string, query: string): React.ReactNode {
 	if (!query || !text) return text;
@@ -203,9 +204,9 @@ export default function SearchResultsRoute() {
 												{folderName && (
 													<Chip
 														size="small"
-														variant="outlined"
 														label={folderDisplayName(folderName)}
-														sx={{ height: 18, fontSize: 11 }}
+														// Tinted with the folder's colour, as in the sidebar.
+														sx={{ height: 20, fontSize: 11, fontWeight: 600, color: folderColor(email.folder_id ?? folderName), bgcolor: `color-mix(in srgb, ${folderColor(email.folder_id ?? folderName)} 14%, transparent)` }}
 													/>
 												)}
 												{email.has_attachments && (
