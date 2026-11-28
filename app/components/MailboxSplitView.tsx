@@ -4,6 +4,7 @@
 
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
+import Fade from "@mui/material/Fade";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import ComposePanel from "~/components/ComposePanel";
 import EmailPanel from "~/components/EmailPanel";
@@ -96,7 +97,14 @@ export default function MailboxSplitView({ selectedEmailId, isComposing, childre
 					/>
 				</Box>
 			)}
-			{isPanelOpen && <Box sx={{ ...card, flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>{panel}</Box>}
+			{isPanelOpen && (
+				<Box sx={{ ...card, flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
+					{/* Each message fades in as it opens. */}
+					<Fade in appear key={selectedEmailId ?? "compose"} timeout={200}>
+						<Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>{panel}</Box>
+					</Fade>
+				</Box>
+			)}
 		</Box>
 	);
 }

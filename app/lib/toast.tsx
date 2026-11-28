@@ -1,7 +1,4 @@
-import Alert from "@mui/material/Alert";
-import Button from "@mui/material/Button";
-import Snackbar from "@mui/material/Snackbar";
-import Stack from "@mui/material/Stack";
+import { ToastCard, ToastStack } from "~/shell/Toast";
 import { useSyncExternalStore } from "react";
 
 export interface ToastAction {
@@ -38,22 +35,15 @@ function snapshot() {
 	return toasts;
 }
 
-const timers = new Map<string, ReturnType<typeof setTimeout>>();
-
 export function addToast(input: ToastInput): string {
 	const id = `toast-${++seq}`;
-	toasts = [...toasts, { ...input, id }];
+	// At most three on screen; the oldest goes first.
+	toasts = [...toasts.slice(-2), { ...input, id }];
 	emit();
-	// Toasts close themselves; ones with an action (Undo) get a little longer.
-	const ms = input.timeout ?? (input.actions?.length ? 8000 : 6000);
-	timers.set(id, setTimeout(() => closeToast(id), ms));
 	return id;
 }
 
 export function closeToast(id: string) {
-	const timer = timers.get(id);
-	if (timer) clearTimeout(timer);
-	timers.delete(id);
 	toasts = toasts.filter((t) => t.id !== id);
 	emit();
 }
@@ -64,55 +54,22 @@ export function useToast() {
 	return { toasts: current, add: addToast, close: closeToast };
 }
 
-/** Mounted once in the root layout. */
+/** Mounted once in the root layout. Toasts close themselves (hover pauses); ones with an action (Undo) stay longer. */
 export function Toaster() {
 	const current = useSyncExternalStore(subscribe, snapshot, snapshot);
 	if (current.length === 0) return null;
 	return (
-		<Stack
-			spacing={1}
-			sx={{
-				position: "fixed",
-				bottom: 16,
-				left: 16,
-				zIndex: (t) => t.zIndex.snackbar,
-				maxWidth: 420,
-			}}
-		>
+		<ToastStack>
 			{current.map((toast) => (
-				<Snackbar
+				<ToastCard
 					key={toast.id}
-					open
-					anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-					sx={{ position: "static", transform: "none" }}
-				>
-					<Alert
-						severity={toast.variant === "error" ? "error" : "info"}
-						variant="filled"
-						// Same look as Drive's snackbar: dark for everything but errors, no icon.
-						icon={toast.variant === "error" ? undefined : false}
-						sx={{ alignItems: "center", ...(toast.variant !== "error" && { bgcolor: "#323232", color: "#fff" }) }}
-						onClose={() => closeToast(toast.id)}
-						action={
-							toast.actions?.map((action, i) => (
-								<Button
-									key={i}
-									color="inherit"
-									size="small"
-									onClick={() => {
-										closeToast(toast.id);
-										void action.onClick();
-									}}
-								>
-									{action.children}
-								</Button>
-							)) ?? undefined
-						}
-					>
-						{toast.title}
-					</Alert>
-				</Snackbar>
+					message={toast.title}
+					variant={toast.variant ?? (toast.actions?.length ? "info" : "success")}
+					timeout={toast.timeout ?? (toast.actions?.length ? 8000 : 5000)}
+					actions={toast.actions?.map((a) => ({ label: a.children, onClick: () => void a.onClick() }))}
+					onClose={() => closeToast(toast.id)}
+				/>
 			))}
-		</Stack>
+		</ToastStack>
 	);
 }

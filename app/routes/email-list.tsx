@@ -50,6 +50,10 @@ import { queryKeys } from "~/queries/keys";
 import { useUIStore } from "~/hooks/useUIStore";
 import type { Email } from "~/types";
 import { ActionButton, EmptyState, MenuEntry, PositionedMenu, SelectionBar, ViewHeader, ViewTitle } from "~/shell/View";
+import Collapse from "@mui/material/Collapse";
+import Fab from "@mui/material/Fab";
+import Zoom from "@mui/material/Zoom";
+import { TransitionGroup } from "react-transition-group";
 
 const FOLDER_EMPTY_STATES: Record<
 	string,
@@ -313,6 +317,7 @@ export default function EmailListRoute() {
 	// The cursor is the row j/k move to; actions without a selection use the
 	// open message, else the cursor row.
 	const [cursor, setCursor] = useState(-1);
+	const [scrolled, setScrolled] = useState(false);
 	useEffect(() => {
 		if (!selectedEmailId) return;
 		const i = emails.findIndex((e) => e.id === selectedEmailId);
@@ -775,6 +780,7 @@ export default function EmailListRoute() {
 			{/* Email rows */}
 			<Box
 				sx={{ flex: 1, overflowY: "auto" }}
+				onScroll={(e) => setScrolled((e.currentTarget as HTMLElement).scrollTop > 24)}
 				onContextMenu={(e) => {
 					e.preventDefault();
 					setMenu({ x: e.clientX, y: e.clientY, email: null });
@@ -783,15 +789,15 @@ export default function EmailListRoute() {
 				{isRefreshing && emails.length === 0 ? (
 					<EmailListSkeleton />
 				) : emails.length > 0 ? (
-					<Box>
+					<TransitionGroup component={null}>
 						{emails.map((email, index) => {
 							const isSelected = selectedEmailId === email.id;
 							const checked = selected.has(email.id);
 							const snippet = getSnippetText(email.snippet);
 							const unread = hasUnread(email);
 							return (
+								<Collapse key={email.id} timeout={200}>
 								<Box
-									key={email.id}
 									className="mail-row"
 									role="button"
 									tabIndex={0}
@@ -936,13 +942,36 @@ export default function EmailListRoute() {
 										</Tooltip>
 									</Box>
 								</Box>
+								</Collapse>
 							);
 						})}
-					</Box>
+					</TransitionGroup>
 				) : (
 					<FolderEmptyState folder={folder} onCompose={() => startCompose()} />
 				)}
 			</Box>
+			<Zoom in={!isComposing}>
+				<Fab
+					variant={scrolled ? "circular" : "extended"}
+					aria-label="Compose"
+					onClick={() => startCompose()}
+					sx={{
+						display: { xs: "inline-flex", md: "none" },
+						position: "fixed",
+						right: 16,
+						bottom: 24,
+						zIndex: (t) => t.zIndex.speedDial,
+						bgcolor: "primary.light",
+						color: "primary.dark",
+						borderRadius: 4,
+						transition: "width .2s, padding .2s",
+						"&:hover": { bgcolor: "primary.light" },
+					}}
+				>
+					<EditOutlinedIcon sx={{ mr: scrolled ? 0 : 1 }} />
+					{!scrolled && "Compose"}
+				</Fab>
+			</Zoom>
 
 			{/* Pagination */}
 			{totalCount > pageSize && (

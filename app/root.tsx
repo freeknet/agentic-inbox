@@ -11,7 +11,7 @@ import Stack from "@mui/material/Stack";
 import { ThemeProvider } from "@mui/material/styles";
 import Typography from "@mui/material/Typography";
 import CloudOffIcon from "@mui/icons-material/CloudOffOutlined";
-import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryClient, QueryClientProvider, useIsFetching, useIsMutating } from "@tanstack/react-query";
 import { useState } from "react";
 import {
 	isRouteErrorResponse,
@@ -27,6 +27,7 @@ import { Toaster } from "~/lib/toast";
 import PreferencesApplier from "~/components/PreferencesApplier";
 import { theme } from "~/theme";
 import { PwaHead, PwaSupport } from "~/shell/pwa";
+import { TopProgress } from "~/shell/Toast";
 import "./index.css";
 
 function makeQueryClient() {
@@ -117,6 +118,7 @@ export default function App() {
 		<QueryClientProvider client={queryClient}>
 			<Outlet />
 			<PwaSupport name="Mail" shareLanding="/compose" />
+			<LoadingBar />
 		</QueryClientProvider>
 	);
 }
@@ -163,4 +165,10 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 			</Button>
 		</Stack>
 	);
+}
+
+/** First loads and saves (not background refreshes) show a thin bar at the top. */
+function LoadingBar() {
+	const loading = useIsFetching({ predicate: (q) => q.state.data === undefined }) + useIsMutating();
+	return <TopProgress active={loading > 0} />;
 }
