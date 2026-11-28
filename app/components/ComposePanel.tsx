@@ -61,7 +61,7 @@ export default function ComposePanel() {
 	);
 
 	return (
-		<Box sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.paper" }}>
+		<Box sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.paper", containerType: "inline-size", containerName: "compose" }}>
 			<Box
 				sx={{
 					display: "flex",
@@ -156,26 +156,28 @@ export default function ComposePanel() {
 						flexShrink: 0,
 					}}
 				>
-					<Box sx={{ display: "flex", flexWrap: { xs: "nowrap", sm: "wrap" }, alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+					<Box sx={{ display: "flex", flexWrap: "nowrap", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
 						<Button type="button" size="small" onClick={discardCompose} disabled={isSending} aria-label="Discard" sx={{ minWidth: 0 }}>
-							<Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+							<Box component="span" sx={{ display: "none", ["@container compose (min-width: 560px)"]: { display: "inline" } }}>
 								Discard
 							</Box>
-							<DeleteOutlinedIcon fontSize="small" sx={{ display: { xs: "block", sm: "none" } }} />
+							<DeleteOutlinedIcon fontSize="small" sx={{ display: "block", ["@container compose (min-width: 560px)"]: { display: "none" } }} />
 						</Button>
 						{/* Phones: one row, icons only for attach, Drive and save. */}
 						<Box
 							sx={{
 								display: "flex",
-								flexWrap: { xs: "nowrap", sm: "wrap" },
+								flexWrap: "nowrap",
 								alignItems: "center",
 								justifyContent: "flex-end",
 								gap: 1,
 								"& .MuiButton-outlined, & .MuiButton-text": {
-									fontSize: { xs: 0, sm: "0.8125rem" },
-									minWidth: { xs: 0 },
-									px: { xs: 1, sm: 1.25 },
-									"& .MuiButton-startIcon": { mr: { xs: 0, sm: 1 }, ml: { xs: 0, sm: -0.5 } },
+									// Narrow compose (phones, or beside the agent panel): icons only.
+									fontSize: 0,
+									minWidth: 0,
+									px: 1,
+									"& .MuiButton-startIcon": { mr: 0, ml: 0 },
+									["@container compose (min-width: 560px)"]: { fontSize: "0.8125rem", px: 1.25, "& .MuiButton-startIcon": { mr: 1, ml: -0.5 } },
 								},
 							}}
 						>

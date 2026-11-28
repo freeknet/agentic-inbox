@@ -22,6 +22,9 @@ import type { useComposeAttachments } from "~/hooks/useComposeAttachments";
 import { MAX_MESSAGE_ATTACHMENT_BYTES } from "~/hooks/useComposeAttachments";
 import { formatBytes } from "~/lib/utils";
 import api, { type DriveItem } from "~/services/api";
+import LinearProgress from "@mui/material/LinearProgress";
+import IconButton from "@mui/material/IconButton";
+import CloseIcon from "@mui/icons-material/Close";
 
 type Attachments = ReturnType<typeof useComposeAttachments>;
 
@@ -52,44 +55,67 @@ export function AttachButton({ attachments, disabled }: { attachments: Attachmen
 	);
 }
 
+/**
+ * One attached file in compose, as Gmail shows it: a row with the type
+ * icon, name and size, a progress bar while it uploads and a red line if it
+ * failed, and a remove button.
+ */
 function AttachmentChip({
 	name,
 	detail,
 	state,
 	icon,
+	progress,
 	onRemove,
 }: {
 	name: string;
 	detail: string;
 	state?: "uploading" | "error";
 	icon?: ReactNode;
+	/** 0–100 when known (Drive uploads); otherwise the bar just runs. */
+	progress?: number;
 	onRemove: () => void;
 }) {
+	const error = state === "error";
 	return (
-		<Chip
-			size="small"
-			onDelete={onRemove}
-			color={state === "error" ? "error" : "default"}
-			variant={state === "error" ? "filled" : "outlined"}
-			icon={
-				state === "uploading" ? (
-					<CircularProgress size={12} sx={{ ml: 1 }} />
-				) : state === "error" ? undefined : (
-					(icon as React.ReactElement)
-				)
-			}
-			label={
-				<Box component="span" sx={{ display: "inline-flex", gap: 0.75, alignItems: "baseline", minWidth: 0 }}>
-					<Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 140 }}>
-						{name}
-					</Box>
-					<Box component="span" sx={{ color: "text.secondary", fontSize: 11 }}>
-						{detail}
-					</Box>
-				</Box>
-			}
-			sx={{ maxWidth: "100%" }}
-		/>
+		<Box
+			component="li"
+			sx={{
+				position: "relative",
+				display: "flex",
+				alignItems: "center",
+				gap: 1,
+				width: { xs: "100%", sm: 300 },
+				maxWidth: "100%",
+				pl: 1.25,
+				pr: 0.5,
+				py: 0.5,
+				borderRadius: 2,
+				bgcolor: error ? "error.main" : "action.hover",
+				color: error ? "error.contrastText" : "text.primary",
+				overflow: "hidden",
+			}}
+		>
+			<Box sx={{ display: "flex", flexShrink: 0, color: error ? "inherit" : "primary.main" }}>{icon ?? <InsertDriveFileOutlinedIcon sx={{ fontSize: 18 }} />}</Box>
+			<Box sx={{ minWidth: 0, flex: 1 }}>
+				<Typography variant="body2" noWrap title={name} sx={{ fontWeight: 500, lineHeight: 1.3 }}>
+					{name}
+				</Typography>
+				<Typography variant="caption" noWrap sx={{ display: "block", color: error ? "inherit" : "text.secondary", opacity: error ? 0.9 : 1 }}>
+					{state === "uploading" && progress === undefined ? "Uploading…" : detail}
+				</Typography>
+			</Box>
+			<IconButton size="small" aria-label={`Remove ${name}`} onClick={onRemove} sx={{ color: "inherit", flexShrink: 0 }}>
+				<CloseIcon fontSize="small" />
+			</IconButton>
+			{state === "uploading" && (
+				<LinearProgress
+					variant={progress === undefined ? "indeterminate" : "determinate"}
+					value={progress}
+					sx={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 2 }}
+				/>
+			)}
+		</Box>
 	);
 }
 
@@ -101,7 +127,7 @@ export function AttachmentChips({ attachments }: { attachments: Attachments }) {
 			<Box
 				component="ul"
 				aria-label="Attachments"
-				sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, listStyle: "none", p: 0, m: 0 }}
+				sx={{ display: "flex", flexWrap: "wrap", gap: 1, listStyle: "none", p: 0, m: 0 }}
 			>
 				{forwarded.map((a) => (
 					<AttachmentChip
@@ -132,7 +158,8 @@ export function AttachmentChips({ attachments }: { attachments: Attachments }) {
 									: `Drive · ${formatBytes(l.size)}`
 						}
 						state={l.status === "done" ? undefined : l.status}
-						icon={<CloudOutlinedIcon sx={{ fontSize: 14, color: "primary.main" }} />}
+						progress={l.status === "uploading" && l.size ? Math.round((l.sent / l.size) * 100) : undefined}
+						icon={<CloudOutlinedIcon sx={{ fontSize: 18 }} />}
 						onRemove={() => attachments.removeDriveLink(l.key)}
 					/>
 				))}

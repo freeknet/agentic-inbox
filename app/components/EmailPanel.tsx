@@ -287,7 +287,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		splitEmailList(replyTarget.recipient).length + splitEmailList(replyTarget.cc).length + (replyTarget.sender === currentMailbox?.email ? 0 : 1) > 2;
 
 	return (
-		<Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+		<Box sx={{ display: "flex", flexDirection: "column", height: "100%", containerType: "inline-size", containerName: "panel" }}>
 			<EmailPanelToolbar
 				email={email}
 				mailboxId={mailboxId}
