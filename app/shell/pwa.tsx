@@ -22,6 +22,10 @@ export function PwaHead({ title }: { title: string }) {
 			{/* Access protects the manifest too, so it must be fetched with the session cookie. */}
 			<link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
 			<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+			{/* Google Sans, the typeface Gmail and Drive use (the service worker keeps it for offline). */}
+			<link rel="preconnect" href="https://fonts.googleapis.com" />
+			<link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+			<link rel="stylesheet" crossOrigin="anonymous" href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" />
 			<meta name="theme-color" content={THEME_COLOR.light} media="(prefers-color-scheme: light)" />
 			<meta name="theme-color" content={THEME_COLOR.dark} media="(prefers-color-scheme: dark)" />
 			<meta name="mobile-web-app-capable" content="yes" />

@@ -193,7 +193,7 @@ export default function ThreadMessage({
 			>
 				<SenderAvatar email={email} isDraft={isDraft} isSelf={isSelf} />
 				<Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", columnGap: 2, [WIDE]: { flexDirection: "row" } }}>
-					<Typography variant="body2" noWrap sx={{ fontWeight: unread ? 700 : 500, flexShrink: 0, color: isDraft ? "error.main" : undefined, [WIDE]: { maxWidth: "40%" } }}>
+					<Typography variant="body2" noWrap sx={{ fontWeight: 700, flexShrink: 0, color: isDraft ? "error.main" : undefined, [WIDE]: { maxWidth: "40%" } }}>
 						{name}
 					</Typography>
 					<Typography variant="body2" color="text.secondary" noWrap sx={{ flex: 1, minWidth: 0 }}>

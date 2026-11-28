@@ -181,7 +181,7 @@ export default function SearchResultsRoute() {
 											borderColor: "divider",
 											px: { xs: 2, md: isPanelOpen ? 2 : 2.5 },
 											py: { xs: 1.25, md: isPanelOpen ? 1.25 : 1.5 },
-											bgcolor: isSelected ? "action.selected" : "transparent",
+											bgcolor: isSelected ? "action.selected" : !email.read ? "var(--row-unread-bg)" : "var(--row-read-bg)",
 											"&:hover": { bgcolor: isSelected ? "action.selected" : "action.hover" },
 										}}
 									>
@@ -197,7 +197,7 @@ export default function SearchResultsRoute() {
 												<Typography
 													variant="body2"
 													noWrap
-													sx={{ fontWeight: !email.read ? 700 : 400, color: !email.read ? "text.primary" : "text.secondary" }}
+													sx={{ fontWeight: !email.read ? 700 : 400, color: "text.primary" }}
 												>
 													{highlightTerms(email.sender.split("@")[0], urlQuery)}
 												</Typography>
@@ -219,7 +219,7 @@ export default function SearchResultsRoute() {
 											<Typography
 												variant="body2"
 												noWrap
-												sx={{ mt: 0.25, fontWeight: !email.read ? 500 : 400, color: !email.read ? "text.primary" : "text.secondary" }}
+												sx={{ mt: 0.25, fontWeight: !email.read ? 700 : 400, color: "text.primary" }}
 											>
 												{highlightTerms(email.subject, urlQuery)}
 											</Typography>

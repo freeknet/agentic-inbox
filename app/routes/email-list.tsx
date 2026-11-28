@@ -239,6 +239,12 @@ export default function EmailListRoute() {
 		return folder ? folder.charAt(0).toUpperCase() + folder.slice(1) : "Inbox";
 	}, [folders, folder]);
 
+	// The tab title, as in Gmail: "Inbox (3) – address – Mail".
+	const folderUnread = folders.find((f) => f.id === folder)?.unreadCount ?? 0;
+	useEffect(() => {
+		document.title = `${folderName}${folderUnread ? ` (${folderUnread})` : ""} – ${mailboxId ?? ""} – Mail`;
+	}, [folderName, folderUnread, mailboxId]);
+
 	const isPanelOpen = selectedEmailId !== null || isComposing;
 	const selectedCount = selected.size;
 	const allSelected = emails.length > 0 && emails.every((e) => selected.has(e.id));
@@ -861,7 +867,7 @@ export default function EmailListRoute() {
 			{/* Email rows */}
 			<Box
 				ref={listRef}
-				sx={{ flex: 1, overflowY: "auto" }}
+				sx={{ flex: 1, overflowY: "auto", containerType: "inline-size", containerName: "list" }}
 				onScroll={(e) => {
 					const top = (e.currentTarget as HTMLElement).scrollTop;
 					setScrolled(top > 24);
@@ -928,11 +934,13 @@ export default function EmailListRoute() {
 										borderColor: "divider",
 										px: isPanelOpen ? { xs: 1.5, md: 1.5 } : { xs: 1.5, md: 2.5 },
 										py: rowPy,
-										bgcolor: checked ? "action.selected" : isSelected ? "action.focus" : unread ? "color-mix(in srgb, var(--mui-palette-primary-main) 6%, transparent)" : "transparent",
+										bgcolor: checked ? "action.selected" : isSelected ? "action.focus" : unread ? "var(--row-unread-bg)" : "var(--row-read-bg)",
 										// The keyboard cursor (j/k): a bar on the left, as in Gmail.
 										boxShadow: index === cursor && shortcutsOn ? "inset 3px 0 0 var(--mui-palette-primary-main)" : "none",
-										"&:hover": { bgcolor: checked ? "action.selected" : "action.hover" },
 										"&:hover .row-actions": { display: "flex" },
+										// Wide list: the hover actions take the date's place, as in Gmail.
+										"@container list (min-width: 760px)": { "&:hover .row-meta": { display: "none" } },
+										"&:hover": { bgcolor: checked ? "action.selected" : "action.hover", boxShadow: index === cursor && shortcutsOn ? "inset 3px 0 0 var(--mui-palette-primary-main)" : "inset 1px 0 0 var(--mui-palette-divider), inset -1px 0 0 var(--mui-palette-divider), 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15)", zIndex: 1, position: "relative" },
 									}}
 								>
 									<Checkbox
@@ -974,11 +982,6 @@ export default function EmailListRoute() {
 										{checked ? <CheckIcon sx={{ transform: "rotateY(180deg)" }} /> : formatParticipants(email).charAt(0).toUpperCase()}
 									</Avatar>
 
-									{/* Unread dot (phones show unread as bold text) */}
-									<Box sx={{ width: 8, flexShrink: 0, display: { xs: "none", sm: "flex" }, justifyContent: "center" }}>
-										{unread && <Box sx={{ height: 8, width: 8, borderRadius: "50%", bgcolor: "primary.main" }} />}
-									</Box>
-
 									{/* Star */}
 									<IconButton
 										size="small"
@@ -998,25 +1001,34 @@ export default function EmailListRoute() {
 										</Avatar>
 									)}
 
-									{/* Content */}
-									<Box sx={{ minWidth: 0, flex: 1 }}>
-										<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-											<Typography
-												variant="body2"
-												noWrap
-												sx={{ fontWeight: unread ? 700 : 400, color: unread ? "text.primary" : "text.secondary" }}
-											>
+									{/* Content. Narrow list: sender and date, then subject — snippet. Wide list: one line, as in Gmail. */}
+									<Box
+										sx={{
+											minWidth: 0,
+											flex: 1,
+											display: "grid",
+											gridTemplateColumns: "minmax(0, 1fr) auto",
+											gridTemplateAreas: '"who meta" "what what" "snip snip"',
+											columnGap: 1,
+											alignItems: "center",
+											"@container list (min-width: 760px)": {
+												gridTemplateColumns: "minmax(0, 168px) minmax(0, 1fr) auto",
+												gridTemplateAreas: '"who what meta"',
+												columnGap: 2.5,
+											},
+										}}
+									>
+										<Box sx={{ gridArea: "who", display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
+											<Typography variant="body2" noWrap sx={{ fontWeight: unread ? 700 : 400, color: "text.primary", minWidth: 0 }}>
 												{formatParticipants(email)}
 											</Typography>
 											{(email.thread_count ?? 1) > 1 && (
-												<Chip
-													size="small"
-													label={email.thread_count}
-													sx={{ height: 18, fontSize: 11, fontWeight: 500 }}
-												/>
+												<Typography component="span" variant="caption" sx={{ color: "text.secondary", fontWeight: unread ? 700 : 400, flexShrink: 0 }}>
+													{email.thread_count}
+												</Typography>
 											)}
 											{email.has_draft && (
-												<Typography variant="caption" sx={{ color: "error.main", fontWeight: 500, flexShrink: 0 }}>
+												<Typography variant="caption" sx={{ color: "error.main", fontWeight: 600, flexShrink: 0 }}>
 													Draft
 												</Typography>
 											)}
@@ -1026,31 +1038,30 @@ export default function EmailListRoute() {
 													<ReplyIcon sx={{ fontSize: 14, color: "warning.main", flexShrink: 0 }} />
 												</Tooltip>
 											)}
-											{email.has_attachments && (
-												<Tooltip title="Has attachments">
-													<AttachFileIcon aria-label="Has attachments" sx={{ fontSize: 16, color: "text.secondary", flexShrink: 0, ml: "auto", transform: "rotate(45deg)" }} />
-												</Tooltip>
-											)}
-											<Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, ml: email.has_attachments ? 0.5 : "auto" }}>
-												{formatListDate(email.date)}
-											</Typography>
 										</Box>
-										<Typography variant="body2" noWrap sx={{ mt: 0.25 }}>
-											<Box
-												component="span"
-												sx={{ fontWeight: unread ? 500 : 400, color: unread ? "text.primary" : "text.secondary" }}
-											>
-												{email.subject}
+										<Typography variant="body2" noWrap sx={{ gridArea: "what", mt: 0.25, "@container list (min-width: 760px)": { mt: 0 } }}>
+											<Box component="span" sx={{ fontWeight: unread ? 700 : 400, color: "text.primary" }}>
+												{email.subject || "(no subject)"}
 											</Box>
 											{showSnippets && snippet && (
 												<Box component="span" sx={{ color: "text.secondary", fontWeight: 400, display: { xs: "none", sm: "inline" } }}>
 													{" "}
-													&mdash; {snippet}
+													&ndash; {snippet}
 												</Box>
 											)}
 										</Typography>
+										<Box className="row-meta" sx={{ gridArea: "meta", display: "flex", alignItems: "center", gap: 0.5, justifySelf: "end" }}>
+											{email.has_attachments && (
+												<Tooltip title="Has attachments">
+													<AttachFileIcon aria-label="Has attachments" sx={{ fontSize: 16, color: "text.secondary", transform: "rotate(45deg)" }} />
+												</Tooltip>
+											)}
+											<Typography variant="caption" sx={{ fontWeight: unread ? 700 : 400, color: unread ? "text.primary" : "text.secondary", whiteSpace: "nowrap", fontSize: 12 }}>
+												{formatListDate(email.date)}
+											</Typography>
+										</Box>
 										{showSnippets && snippet && (
-											<Typography variant="body2" color="text.secondary" noWrap sx={{ display: { xs: "block", sm: "none" } }}>
+											<Typography variant="body2" color="text.secondary" noWrap sx={{ gridArea: "snip", display: { xs: "block", sm: "none" } }}>
 												{snippet}
 											</Typography>
 										)}

@@ -4,6 +4,8 @@
 // - Pages: network first (Cloudflare Access redirects pass straight through),
 //   with an offline page when there is no connection.
 // - Built assets (/assets/*, content-hashed) and icons: cache first.
+// - Google Fonts (stylesheet and font files): cache first, so text keeps
+//   its typeface offline.
 // - API calls and everything else: untouched, never cached.
 // - Share target: files and text shared to the installed app are POSTed to
 //   /share-target; they are held in a cache and the app picks them up from
@@ -15,6 +17,8 @@
 const VERSION = 1;
 const ASSET_CACHE = `assets-v${VERSION}`;
 const SHARE_CACHE = "share-target";
+const FONT_CACHE = "fonts-v1";
+const FONT_HOSTS = new Set(["fonts.googleapis.com", "fonts.gstatic.com"]);
 const MAX_ASSETS = 300;
 
 const params = new URL(self.location.href).searchParams;
@@ -40,7 +44,7 @@ self.addEventListener("message", (event) => {
 self.addEventListener("activate", (event) => {
 	event.waitUntil(
 		(async () => {
-			const keep = new Set([ASSET_CACHE, SHARE_CACHE]);
+			const keep = new Set([ASSET_CACHE, SHARE_CACHE, FONT_CACHE]);
 			for (const key of await caches.keys()) if (!keep.has(key)) await caches.delete(key);
 			if (self.registration.navigationPreload) await self.registration.navigationPreload.enable();
 			await self.clients.claim();
@@ -51,6 +55,10 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
 	const { request } = event;
 	const url = new URL(request.url);
+	if (request.method === "GET" && FONT_HOSTS.has(url.hostname)) {
+		event.respondWith(cacheFirst(request, FONT_CACHE));
+		return;
+	}
 	if (url.origin !== self.location.origin) return;
 
 	if (request.method === "POST" && url.pathname === "/share-target") {
@@ -78,13 +86,13 @@ async function page(event) {
 	}
 }
 
-async function cacheFirst(request) {
-	const cache = await caches.open(ASSET_CACHE);
+async function cacheFirst(request, name = ASSET_CACHE) {
+	const cache = await caches.open(name);
 	const hit = await cache.match(request);
 	if (hit) return hit;
 	const response = await fetch(request);
 	// Only keep real files: an Access sign-in redirect or an error must not stick.
-	if (response.ok && response.type === "basic") {
+	if (response.ok && (response.type === "basic" || response.type === "cors")) {
 		await cache.put(request, response.clone());
 		trim(cache);
 	}

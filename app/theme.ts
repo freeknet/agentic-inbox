@@ -102,6 +102,9 @@ export const theme = createTheme({
 		MuiCssBaseline: {
 			styleOverrides: {
 				body: { margin: 0 },
+				// Message rows, as in Gmail: unread on the brighter surface, read on a quieter one.
+				":root": { "--row-unread-bg": "#ffffff", "--row-read-bg": "#f2f6fc" },
+				":root.dark": { "--row-unread-bg": "#232425", "--row-read-bg": "#131314" },
 				"a:focus-visible, [tabindex]:focus-visible": { outline: "2px solid var(--mui-palette-primary-main)", outlineOffset: 2 },
 				"::selection": { background: "color-mix(in srgb, var(--mui-palette-primary-main) 30%, transparent)" },
 			},

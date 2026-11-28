@@ -187,7 +187,7 @@ export function SidebarItem({ icon, label, selected, to, onClick, count, color, 
 						icon
 					)}
 				</Box>
-				<Typography noWrap sx={{ fontSize: 11, fontWeight: selected ? 700 : 500, maxWidth: 72, color: "text.primary" }}>
+				<Typography noWrap sx={{ fontSize: 11, fontWeight: selected || shown ? 700 : 500, maxWidth: 72, color: "text.primary" }}>
 					{label}
 				</Typography>
 			</ListItemButton>
@@ -213,7 +213,7 @@ export function SidebarItem({ icon, label, selected, to, onClick, count, color, 
 			}}
 		>
 			<ListItemIcon sx={{ minWidth: 40, color: color ?? "inherit" }}>{icon}</ListItemIcon>
-			<ListItemText primary={label} slotProps={{ primary: { noWrap: true, sx: { fontSize: 14, fontWeight: selected ? 700 : 400 } } }} />
+			<ListItemText primary={label} slotProps={{ primary: { noWrap: true, sx: { fontSize: 14, fontWeight: selected || shown ? 700 : 400 } } }} />
 			{shown && (
 				<Box component="span" sx={{ ml: 1, px: 0.75, minWidth: 20, height: 20, borderRadius: 2.5, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: color ? "#fff" : "text.primary", bgcolor: color ?? "transparent" }}>
 					{shown}
