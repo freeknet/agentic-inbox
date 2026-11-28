@@ -2,6 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
+import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ChatBubbleOutlinedIcon from "@mui/icons-material/ChatBubbleOutlined";
 import CloseIcon from "@mui/icons-material/Close";
@@ -69,9 +70,12 @@ export default function EmailPanelToolbar({
 }: EmailPanelToolbarProps) {
 	// Tooltips name the keyboard shortcut too ("?" lists them all).
 	const hint = (title: string, key?: string) => (key ? `${title} (${key})` : title);
-	const iconButton = (title: string, icon: React.ReactNode, onClick: () => void, key?: string) => (
+	// On phones the toolbar keeps back, archive, delete, unread and move, as in
+	// Gmail's app; reply, star and source are on each message instead.
+	const desktopOnly = { display: { xs: "none", md: "inline-flex" } } as const;
+	const iconButton = (title: string, icon: React.ReactNode, onClick: () => void, key?: string, onlyDesktop = false) => (
 		<Tooltip title={hint(title, key)}>
-			<IconButton size="small" onClick={onClick} aria-label={title}>
+			<IconButton size="small" onClick={onClick} aria-label={title} sx={onlyDesktop ? desktopOnly : undefined}>
 				{icon}
 			</IconButton>
 		</Tooltip>
@@ -116,13 +120,15 @@ export default function EmailPanelToolbar({
 				</>
 			) : (
 				<>
-					{iconButton("Reply", <ReplyIcon />, onReply, "r")}
-					{iconButton("Reply all", <ReplyAllIcon />, onReplyAll, "a")}
-					{iconButton("Forward", <ForwardIcon />, onForward, "f")}
+					{iconButton("Reply", <ReplyIcon />, onReply, "r", true)}
+					{iconButton("Reply all", <ReplyAllIcon />, onReplyAll, "a", true)}
+					{iconButton("Forward", <ForwardIcon />, onForward, "f", true)}
 				</>
 			)}
 
-			<Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 1 }} />
+			<Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 1, display: { xs: "none", md: "block" } }} />
+			{/* Phones: actions sit on the right, after the back arrow. */}
+			<Box sx={{ flex: 1, display: { md: "none" } }} />
 
 			{iconButton(
 				email.starred ? "Unstar" : "Star",
@@ -130,6 +136,8 @@ export default function EmailPanelToolbar({
 					{email.starred ? <StarIcon /> : <StarBorderIcon />}
 				</Box>,
 				onToggleStar,
+				undefined,
+				true,
 			)}
 
 			{iconButton(
@@ -139,9 +147,10 @@ export default function EmailPanelToolbar({
 			)}
 
 			<MoveToFolderMenu folders={moveToFolders} onMove={onMove} />
+			{email.folder_id !== "archive" && !isDraftFolder && iconButton("Archive", <ArchiveOutlinedIcon />, () => onMove("archive"), "e")}
 
-			<Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 0.25 }}>
-				{iconButton("View source", <CodeIcon />, onViewSource)}
+			<Box sx={{ ml: { md: "auto" }, display: "flex", alignItems: "center", gap: 0.25 }}>
+				{iconButton("View source", <CodeIcon />, onViewSource, undefined, true)}
 				{iconButton("Delete", <DeleteOutlinedIcon />, onDelete, "#")}
 				<Tooltip title="Close (u)">
 					<IconButton

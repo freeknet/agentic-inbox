@@ -147,7 +147,7 @@ function LayoutSection() {
 						<ToggleButton value="off">No split</ToggleButton>
 					</ToggleButtonGroup>
 					<Typography variant="caption" color="text.secondary" sx={captionSx}>
-						Drag the gap between the list and the message to resize; double-click it to reset. With no split, a message opens in place of the list.
+						Drag the gap between the list and the message to resize; double-click it to reset. With no split, a message opens in place of the list. On phones a message always opens full screen.
 					</Typography>
 				</Box>
 				<Toggle checked={collapsed} onChange={setCollapsed} label="Collapse the sidebar to icons (the menu button in the header does this too)" />
@@ -325,6 +325,8 @@ export default function SettingsRoute() {
 							onChange={(e) => setDisplayName(e.target.value)}
 							fullWidth
 							size="small"
+							// The value arrives after the first render; keep the label up so it never overlaps.
+							slotProps={{ inputLabel: { shrink: true } }}
 						/>
 						<TextField label="Email" type="email" value={mailbox.email} disabled fullWidth size="small" />
 					</Box>
@@ -342,6 +344,8 @@ export default function SettingsRoute() {
 								onChange={(_, v: Accent | null) => v && prefs.set("accent", v)}
 								size="small"
 								aria-label="Accent colour"
+								// Wraps on phones instead of running off the screen.
+								sx={{ flexWrap: "wrap", "& .MuiToggleButtonGroup-grouped": { borderRadius: "999px !important", border: 1, borderColor: "divider", m: 0.25 } }}
 							>
 								{(Object.keys(ACCENTS) as Accent[]).map((key) => (
 									<ToggleButton key={key} value={key} aria-label={ACCENTS[key].label} sx={{ gap: 0.75, px: 1.5 }}>

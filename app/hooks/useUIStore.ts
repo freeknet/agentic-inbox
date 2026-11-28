@@ -3,6 +3,8 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { clearCompose } from "~/lib/composeRestore";
 import type { Email } from "~/types";
 import type { ComposePrefill } from "~/lib/mailto";
 
@@ -13,6 +15,8 @@ export interface ComposeOptions {
 	originalEmail?: Email | null;
 	/** When editing a draft, this holds the draft email to pre-fill the composer */
 	draftEmail?: Email | null;
+	/** Fields of an unsent message brought back after a refresh (lib/composeRestore). */
+	restored?: { to: string; cc: string; bcc: string; subject: string; body: string };
 	/** A new message's fields from a mailto: link or a share (see routes/launch.tsx). */
 	prefill?: ComposePrefill;
 }
@@ -51,7 +55,9 @@ interface UIState {
 	closeComposeModal: () => void;
 }
 
-export const useUIStore = create<UIState>((set, get) => ({
+export const useUIStore = create<UIState>()(
+	persist(
+		(set, get) => ({
 	selectedEmailId: null,
 	isComposing: false,
 	_previousEmailId: null,
@@ -81,10 +87,13 @@ export const useUIStore = create<UIState>((set, get) => ({
 			};
 		}),
 
-	closePanel: () => set({ selectedEmailId: null, isComposing: false, _previousEmailId: null, composeOptions: { mode: "new" as const, originalEmail: null } }),
+	closePanel: () => {
+		if (get().isComposing) clearCompose();
+		set({ selectedEmailId: null, isComposing: false, _previousEmailId: null, composeOptions: { mode: "new" as const, originalEmail: null } });
+	},
 
 	closeCompose: () =>
-		set((state) => ({
+		set((state) => (clearCompose(), {
 			isComposing: false,
 			selectedEmailId: state._previousEmailId,
 			_previousEmailId: null,
@@ -108,4 +117,14 @@ export const useUIStore = create<UIState>((set, get) => ({
 			isComposeModalOpen: false,
 			composeOptions: { mode: "new", originalEmail: null },
 		}),
-}));
+		}),
+		{
+			// Only the agent panel's open/closed state is remembered; the open
+			// message is in the URL and an unsent message in sessionStorage.
+			name: "mail-ui",
+			partialize: (s) => ({ isAgentPanelOpen: s.isAgentPanelOpen }),
+			// Loaded after the first render (mailbox layout) so it matches the server's HTML.
+			skipHydration: true,
+		},
+	),
+);

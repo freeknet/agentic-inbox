@@ -1,4 +1,8 @@
 // Shared shell: keep identical in agentic-inbox and agentic-drive (app/shell/).
+import BrightnessAutoIcon from "@mui/icons-material/BrightnessAuto";
+import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
+import InstallDesktopOutlinedIcon from "@mui/icons-material/InstallDesktopOutlined";
+import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutlined";
 import SwitchAccountOutlinedIcon from "@mui/icons-material/SwitchAccountOutlined";
@@ -10,9 +14,13 @@ import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
 import Popover from "@mui/material/Popover";
 import Stack from "@mui/material/Stack";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
+import { useColorScheme } from "@mui/material/styles";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { type ReactNode, useEffect, useState } from "react";
+import { useInstallPrompt } from "./pwa";
 
 export interface Identity {
 	name: string | null;
@@ -76,6 +84,8 @@ export function AccountMenu({ fallback, children }: { fallback?: Identity; child
 	const label = id.name || id.email || "Account";
 	const color = colorFor(id.email || label);
 	const first = id.name?.split(/\s+/)[0];
+	const { mode, setMode } = useColorScheme();
+	const install = useInstallPrompt();
 
 	return (
 		<>
@@ -115,6 +125,31 @@ export function AccountMenu({ fallback, children }: { fallback?: Identity; child
 						<Typography variant="caption">Protected by Cloudflare Access</Typography>
 					</Stack>
 				</Stack>
+				{/* Theme (the header's toggle is hidden on phones) and install. */}
+				<Box sx={{ bgcolor: "background.paper", borderRadius: 4, mb: 1, px: 2, py: 1.5 }}>
+					<Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+						Theme
+					</Typography>
+					<ToggleButtonGroup exclusive fullWidth size="small" value={mode ?? "system"} onChange={(_, v) => v && setMode(v)} aria-label="Theme">
+						<ToggleButton value="system" aria-label="System theme">
+							<BrightnessAutoIcon fontSize="small" sx={{ mr: 0.75 }} />
+							Auto
+						</ToggleButton>
+						<ToggleButton value="light" aria-label="Light theme">
+							<LightModeOutlinedIcon fontSize="small" sx={{ mr: 0.75 }} />
+							Light
+						</ToggleButton>
+						<ToggleButton value="dark" aria-label="Dark theme">
+							<DarkModeOutlinedIcon fontSize="small" sx={{ mr: 0.75 }} />
+							Dark
+						</ToggleButton>
+					</ToggleButtonGroup>
+					{install && (
+						<Button fullWidth variant="outlined" startIcon={<InstallDesktopOutlinedIcon />} onClick={() => void install()} sx={{ mt: 1.5 }}>
+							Install the app
+						</Button>
+					)}
+				</Box>
 				{children && (
 					<Box sx={{ bgcolor: "background.paper", borderRadius: 4, mb: 1, overflow: "hidden" }}>
 						{children}

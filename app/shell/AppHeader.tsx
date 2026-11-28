@@ -75,8 +75,10 @@ export function AppHeader({ app, homeHref, appUrls, search, actions, settings, a
 			spacing={1}
 			sx={{
 				alignItems: "center",
-				py: 1,
-				height: HEADER_HEIGHT,
+				// Installed on a phone, keep clear of the notch / status bar.
+				pt: "calc(8px + env(safe-area-inset-top, 0px))",
+				pb: 1,
+				height: `calc(${HEADER_HEIGHT}px + env(safe-area-inset-top, 0px))`,
 				flexShrink: 0,
 				bgcolor: "background.default",
 				// Window Controls Overlay: the env() values exist only in that mode.
@@ -99,7 +101,8 @@ export function AppHeader({ app, homeHref, appUrls, search, actions, settings, a
 				to={homeHref}
 				direction="row"
 				spacing={1}
-				sx={{ alignItems: "center", textDecoration: "none", color: "text.primary", width: { md: SIDEBAR_WIDTH - (onMenuClick ? 64 : 16) }, flexShrink: 0 }}
+				// On phones the search box gets the room (as in Gmail's app); the logo returns from sm up.
+				sx={{ display: { xs: search ? "none" : "flex", sm: "flex" }, alignItems: "center", textDecoration: "none", color: "text.primary", width: { md: SIDEBAR_WIDTH - (onMenuClick ? 64 : 16) }, flexShrink: 0 }}
 			>
 				{brand.icon(40)}
 				<Typography variant="h6" sx={{ display: { xs: "none", sm: "block" }, color: "text.secondary" }}>
@@ -151,16 +154,19 @@ export function AppHeader({ app, homeHref, appUrls, search, actions, settings, a
 			<Box sx={{ flex: { md: 1 } }} />
 			<Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexShrink: 0 }}>
 				{/* App-specific buttons step aside on phones so the search box keeps its room. */}
-				{actions && <Stack direction="row" spacing={0.5} sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center" }}>{actions}</Stack>}
-				<InstallButton name={brand.name} />
-				<ThemeToggle />
-				{settings && (
-					<Tooltip title="Settings">
-						<IconButton aria-label="Settings" onClick={settings.onClick} color={settings.active ? "primary" : "default"}>
-							<SettingsOutlinedIcon />
-						</IconButton>
-					</Tooltip>
-				)}
+				{/* On phones only apps and the account stay; theme, install and settings live in the account menu and sidebar. */}
+				<Stack direction="row" spacing={0.5} sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center" }}>
+					{actions}
+					<InstallButton name={brand.name} />
+					<ThemeToggle />
+					{settings && (
+						<Tooltip title="Settings">
+							<IconButton aria-label="Settings" onClick={settings.onClick} color={settings.active ? "primary" : "default"}>
+								<SettingsOutlinedIcon />
+							</IconButton>
+						</Tooltip>
+					)}
+				</Stack>
 				<AppsMenu current={app} urls={appUrls} />
 				{account}
 			</Stack>

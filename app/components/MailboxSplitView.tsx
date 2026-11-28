@@ -58,8 +58,11 @@ export default function MailboxSplitView({ selectedEmailId, isComposing, childre
 			) : isComposing && selectedEmailId ? (
 				<Box sx={{ display: "flex", flexDirection: "column", height: "100%", overflowY: "auto" }}>
 					<ComposePanel />
-					<Divider />
-					<EmailPanel emailId={selectedEmailId} />
+					{/* Phones: compose alone, full screen; the message is back when it closes. */}
+					<Box sx={{ display: { xs: "none", md: "block" } }}>
+						<Divider />
+						<EmailPanel emailId={selectedEmailId} />
+					</Box>
 				</Box>
 			) : selectedEmailId ? (
 				<EmailPanel emailId={selectedEmailId} />

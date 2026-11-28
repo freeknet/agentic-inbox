@@ -13,6 +13,9 @@ import { usePushSync } from "~/lib/push";
 import { DEFAULT_PREFS, usePrefs } from "~/lib/prefs";
 import { ResizeHandle } from "~/shell/Resizer";
 import { useUIStore } from "~/hooks/useUIStore";
+import { loadCompose } from "~/lib/composeRestore";
+import api from "~/services/api";
+import { addToast } from "~/lib/toast";
 
 /**
  * The same shell as Drive (app/shell/): a full-width header, the sidebar
@@ -23,7 +26,7 @@ export default function MailboxRoute() {
 	// Prefetch mailbox data for child components
 	useMailbox(mailboxId);
 	const prevMailboxIdRef = useRef<string | undefined>(undefined);
-	const { closeSidebar, isAgentPanelOpen, closePanel, closeComposeModal } = useUIStore();
+	const { closeSidebar, isAgentPanelOpen, closePanel, closeComposeModal, selectedEmailId, isComposing } = useUIStore();
 
 	useEffect(() => {
 		if (prevMailboxIdRef.current && mailboxId && prevMailboxIdRef.current !== mailboxId) {
@@ -41,6 +44,29 @@ export default function MailboxRoute() {
 		if (inboxUnread !== undefined) setAppBadge(inboxUnread);
 	}, [inboxUnread]);
 	usePushSync(mailboxId);
+
+	// Remembered across refreshes: the agent panel, and an unsent message.
+	const startCompose = useUIStore((s) => s.startCompose);
+	const restoredFor = useRef<string | null>(null);
+	useEffect(() => {
+		void useUIStore.persist.rehydrate();
+	}, []);
+	useEffect(() => {
+		if (!mailboxId || restoredFor.current === mailboxId) return;
+		restoredFor.current = mailboxId;
+		const saved = loadCompose(mailboxId);
+		if (!saved || useUIStore.getState().isComposing) return;
+		const fields = { to: saved.to, cc: saved.cc, bcc: saved.bcc, subject: saved.subject, body: saved.body };
+		void (async () => {
+			const fetchOne = (id?: string | null) => (id ? api.getEmail(mailboxId, id).catch(() => null) : Promise.resolve(null));
+			const [originalEmail, draftEmail] = await Promise.all([fetchOne(saved.originalId), fetchOne(saved.draftId)]);
+			startCompose({ mode: saved.mode, originalEmail, draftEmail, restored: fields });
+			addToast({
+				title: saved.hadAttachments ? "Your unsent message is back. Attachments weren't kept; add them again." : "Your unsent message is back.",
+				variant: "info",
+			});
+		})();
+	}, [mailboxId, startCompose]);
 	const agentWidth = usePrefs((p) => p.agentWidth);
 	const setPref = usePrefs((p) => p.set);
 
@@ -50,7 +76,10 @@ export default function MailboxRoute() {
 
 	return (
 		<Box sx={{ display: "flex", flexDirection: "column", height: "100dvh", overflow: "hidden", bgcolor: "background.default" }}>
-			<Header />
+			{/* On phones an open message or compose is full screen, as in Gmail's app. */}
+			<Box sx={{ display: { xs: ownCards && (selectedEmailId || isComposing) ? "none" : "block", md: "block" } }}>
+				<Header />
+			</Box>
 			<Box sx={{ display: "flex", flex: 1, minHeight: 0 }}>
 				<Sidebar />
 				<Box component="main" sx={{ flex: 1, minWidth: 0, display: "flex", pr: { md: 2 }, pb: { md: 2 } }}>

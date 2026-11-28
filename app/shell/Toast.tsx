@@ -130,7 +130,7 @@ export function ToastStack({ children }: { children: ReactNode }) {
 			sx={{
 				position: "fixed",
 				left: 16,
-				bottom: { xs: 88, md: 24 },
+				bottom: { xs: "calc(88px + env(safe-area-inset-bottom, 0px))", md: 24 },
 				zIndex: (t) => t.zIndex.snackbar,
 				display: "flex",
 				flexDirection: "column",

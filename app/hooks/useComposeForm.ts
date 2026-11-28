@@ -22,6 +22,7 @@ import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
 import { driveLinksHtml, driveLinksText, useComposeAttachments } from "~/hooks/useComposeAttachments";
 import { useDrive } from "~/queries/drive";
+import { saveCompose } from "~/lib/composeRestore";
 
 function appendUniqueAddress(
 	addresses: string[],
@@ -115,6 +116,11 @@ function buildInitialComposeFields(
 	sigBlock: string,
 ): ComposeFormFields {
 	const { draftEmail: draft, originalEmail: original, mode } = composeOptions;
+
+	if (composeOptions.restored) {
+		const r = composeOptions.restored;
+		return { to: r.to, cc: r.cc, bcc: r.bcc, showCcBcc: Boolean(r.cc || r.bcc), subject: r.subject, body: r.body };
+	}
 
 	if (draft) {
 		return {
@@ -230,6 +236,30 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		const shared = composeOptions.prefill?.files;
 		if (shared?.length) queueMicrotask(() => addFilesRef.current(shared));
 	}, [composeOptions, currentMailbox?.email, sigBlock, resetAttachments]);
+
+	// Keep the message in this tab so a refresh brings it back (lib/composeRestore).
+	const { isComposing } = useUIStore();
+	useEffect(() => {
+		if (!isComposing || !mailboxId) return;
+		if (!to && !cc && !bcc && !subject && !stripHtml(body).trim()) return;
+		const t = setTimeout(
+			() =>
+				saveCompose({
+					mailboxId,
+					mode: composeOptions.mode,
+					originalId: composeOptions.originalEmail?.id ?? null,
+					draftId: composeOptions.draftEmail?.id ?? null,
+					to,
+					cc,
+					bcc,
+					subject,
+					body,
+					hadAttachments: attachments.files.length > 0 || attachments.driveLinks.length > 0,
+				}),
+			400,
+		);
+		return () => clearTimeout(t);
+	}, [isComposing, mailboxId, to, cc, bcc, subject, body, composeOptions, attachments.files.length, attachments.driveLinks.length]);
 
 	const handleSaveDraft = async () => {
 		if (!mailboxId || isSending) return; setIsSavingDraft(true); setError(null);

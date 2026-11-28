@@ -5,6 +5,7 @@
 import CloseIcon from "@mui/icons-material/Close";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import SendIcon from "@mui/icons-material/Send";
+import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -174,11 +175,29 @@ export default function ComposePanel() {
 						flexShrink: 0,
 					}}
 				>
-					<Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
-						<Button type="button" size="small" onClick={discardCompose} disabled={isSending}>
-							Discard
+					<Box sx={{ display: "flex", flexWrap: { xs: "nowrap", sm: "wrap" }, alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+						<Button type="button" size="small" onClick={discardCompose} disabled={isSending} aria-label="Discard" sx={{ minWidth: 0 }}>
+							<Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+								Discard
+							</Box>
+							<DeleteOutlinedIcon fontSize="small" sx={{ display: { xs: "block", sm: "none" } }} />
 						</Button>
-						<Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end", gap: 1 }}>
+						{/* Phones: one row, icons only for attach, Drive and save. */}
+						<Box
+							sx={{
+								display: "flex",
+								flexWrap: { xs: "nowrap", sm: "wrap" },
+								alignItems: "center",
+								justifyContent: "flex-end",
+								gap: 1,
+								"& .MuiButton-outlined, & .MuiButton-text": {
+									fontSize: { xs: 0, sm: "0.8125rem" },
+									minWidth: { xs: 0 },
+									px: { xs: 1, sm: 1.25 },
+									"& .MuiButton-startIcon": { mr: { xs: 0, sm: 1 }, ml: { xs: 0, sm: -0.5 } },
+								},
+							}}
+						>
 							<AttachButton attachments={attachments} disabled={isSending} />
 							<FromDriveButton attachments={attachments} disabled={isSending} />
 							<Button

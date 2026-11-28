@@ -54,6 +54,10 @@ import Collapse from "@mui/material/Collapse";
 import Fab from "@mui/material/Fab";
 import Zoom from "@mui/material/Zoom";
 import { TransitionGroup } from "react-transition-group";
+import Avatar from "@mui/material/Avatar";
+import CheckIcon from "@mui/icons-material/Check";
+import { SwipeRow } from "~/components/SwipeRow";
+import { avatarColor } from "~/components/email-panel/people";
 
 const FOLDER_EMPTY_STATES: Record<
 	string,
@@ -148,23 +152,45 @@ export default function EmailListRoute() {
 		folder: string;
 	}>();
 	const { selectedEmailId, isComposing, selectEmail, closePanel, startCompose } = useUIStore();
-	const [page, setPage] = useState(1);
 
-	// ?open=<id>: a notification click opens that message, then the URL is tidied.
+	// The open message lives in the URL (?open=<id>), so a refresh, a shared
+	// link or a notification click lands on it. Whichever side changed last
+	// wins: opening a message updates the URL, a new URL opens its message.
 	const [searchParams, setSearchParams] = useSearchParams();
+	// The page is in the URL too (?page=2), so a refresh stays on it.
+	const page = Math.max(1, Number(searchParams.get("page")) || 1);
+	const setPage = (p: number) =>
+		setSearchParams((prev) => {
+			const n = new URLSearchParams(prev);
+			if (p > 1) n.set("page", String(p));
+			else n.delete("page");
+			return n;
+		}, { replace: true });
 	const openId = searchParams.get("open");
+	const prevSync = useRef<{ sel: string | null; url: string | null } | undefined>(undefined);
 	useEffect(() => {
-		if (!openId) return;
-		selectEmail(openId);
-		setSearchParams(
-			(prev) => {
-				const next = new URLSearchParams(prev);
-				next.delete("open");
-				return next;
-			},
-			{ replace: true },
-		);
-	}, [openId, selectEmail, setSearchParams]);
+		const sel = selectedEmailId ?? null;
+		const url = openId ?? null;
+		const prev = prevSync.current;
+		prevSync.current = { sel, url };
+		if (url === sel) return;
+		const urlChanged = !prev || prev.url !== url;
+		const selChanged = !prev || prev.sel !== sel;
+		if (url && urlChanged) {
+			// A new address (refresh, link, notification, back/forward) opens its message.
+			selectEmail(url);
+		} else if (selChanged || !url) {
+			setSearchParams(
+				(p) => {
+					const n = new URLSearchParams(p);
+					if (sel) n.set("open", sel);
+					else n.delete("open");
+					return n;
+				},
+				{ replace: true },
+			);
+		}
+	}, [openId, selectedEmailId, selectEmail, setSearchParams]);
 	const [selected, setSelected] = useState<Set<string>>(new Set());
 	const [bulkBusy, setBulkBusy] = useState(false);
 
@@ -797,6 +823,10 @@ export default function EmailListRoute() {
 							const unread = hasUnread(email);
 							return (
 								<Collapse key={email.id} timeout={200}>
+								<SwipeRow
+									disabled={folder === Folders.ARCHIVE || folder === Folders.TRASH || folder === Folders.DRAFT}
+									onSwipe={() => void bulkMove(Folders.ARCHIVE, [email.id])}
+								>
 								<Box
 									className="mail-row"
 									role="button"
@@ -843,11 +873,35 @@ export default function EmailListRoute() {
 											toggleRow(index, e.target.checked, (e.nativeEvent as MouseEvent).shiftKey)
 										}
 										slotProps={{ input: { "aria-label": `Select ${email.subject}` } }}
-										sx={{ p: 0.5 }}
+										sx={{ p: 0.5, display: { xs: "none", sm: "inline-flex" } }}
 									/>
+									<Avatar
+										component="button"
+										aria-label={checked ? `Deselect ${email.subject}` : `Select ${email.subject}`}
+										aria-pressed={checked}
+										onClick={(e: React.MouseEvent) => {
+											e.stopPropagation();
+											toggleRow(index, !checked, false);
+										}}
+										sx={{
+											display: { xs: "flex", sm: "none" },
+											width: 40,
+											height: 40,
+											flexShrink: 0,
+											border: 0,
+											cursor: "pointer",
+											fontSize: 17,
+											color: "#fff",
+											bgcolor: checked ? "primary.main" : avatarColor(email.sender),
+											transition: "background-color .15s, transform .15s",
+											transform: checked ? "rotateY(180deg)" : "none",
+										}}
+									>
+										{checked ? <CheckIcon sx={{ transform: "rotateY(180deg)" }} /> : formatParticipants(email).charAt(0).toUpperCase()}
+									</Avatar>
 
-									{/* Unread dot */}
-									<Box sx={{ width: 8, flexShrink: 0, display: "flex", justifyContent: "center" }}>
+									{/* Unread dot (phones show unread as bold text) */}
+									<Box sx={{ width: 8, flexShrink: 0, display: { xs: "none", sm: "flex" }, justifyContent: "center" }}>
 										{unread && <Box sx={{ height: 8, width: 8, borderRadius: "50%", bgcolor: "primary.main" }} />}
 									</Box>
 
@@ -859,7 +913,7 @@ export default function EmailListRoute() {
 											e.stopPropagation();
 											toggleStar(e, email);
 										}}
-										sx={{ p: 0.25, color: email.starred ? "warning.main" : "text.disabled" }}
+										sx={{ p: 0.25, color: email.starred ? "warning.main" : "text.disabled", display: { xs: "none", sm: "inline-flex" } }}
 									>
 										{email.starred ? <StarIcon sx={{ fontSize: 16 }} /> : <StarBorderIcon sx={{ fontSize: 16 }} />}
 									</IconButton>
@@ -904,13 +958,29 @@ export default function EmailListRoute() {
 												{email.subject}
 											</Box>
 											{showSnippets && snippet && (
-												<Box component="span" sx={{ color: "text.secondary", fontWeight: 400 }}>
+												<Box component="span" sx={{ color: "text.secondary", fontWeight: 400, display: { xs: "none", sm: "inline" } }}>
 													{" "}
 													&mdash; {snippet}
 												</Box>
 											)}
 										</Typography>
+										{showSnippets && snippet && (
+											<Typography variant="body2" color="text.secondary" noWrap sx={{ display: { xs: "block", sm: "none" } }}>
+												{snippet}
+											</Typography>
+										)}
 									</Box>
+									<IconButton
+										size="small"
+										aria-label={email.starred ? "Unstar" : "Star"}
+										onClick={(e) => {
+											e.stopPropagation();
+											toggleStar(e, email);
+										}}
+										sx={{ display: { xs: "inline-flex", sm: "none" }, alignSelf: "flex-end", color: email.starred ? "warning.main" : "text.disabled" }}
+									>
+										{email.starred ? <StarIcon fontSize="small" /> : <StarBorderIcon fontSize="small" />}
+									</IconButton>
 
 									{/* Hover actions */}
 									<Box className="row-actions" sx={{ display: "none", alignItems: "center", flexShrink: 0 }}>
@@ -942,6 +1012,7 @@ export default function EmailListRoute() {
 										</Tooltip>
 									</Box>
 								</Box>
+								</SwipeRow>
 								</Collapse>
 							);
 						})}
@@ -959,7 +1030,7 @@ export default function EmailListRoute() {
 						display: { xs: "inline-flex", md: "none" },
 						position: "fixed",
 						right: 16,
-						bottom: 24,
+						bottom: "calc(24px + env(safe-area-inset-bottom, 0px))",
 						zIndex: (t) => t.zIndex.speedDial,
 						bgcolor: "primary.light",
 						color: "primary.dark",

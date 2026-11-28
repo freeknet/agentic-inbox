@@ -31,6 +31,7 @@ import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
 import { useToast } from "~/lib/toast";
 import { SidebarFooter, SidebarFrame, SidebarItem, SidebarPrimaryButton, SidebarSection } from "~/shell/Sidebar";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 
 const FOLDER_ICONS: Record<string, React.ReactNode> = {
 	[Folders.INBOX]: <InboxOutlinedIcon />,
@@ -140,6 +141,17 @@ export default function Sidebar() {
 				/>
 				<List aria-label="Your folders" disablePadding>
 					{customFolders.map((folder) => folderRow(folder.id, folder.name, <FolderOutlinedIcon />, folder.unreadCount))}
+				</List>
+				<List aria-label="More" disablePadding sx={{ mt: 1 }}>
+					<SidebarItem
+						icon={<SettingsOutlinedIcon />}
+						label="Settings"
+						selected={pathname.endsWith("/settings")}
+						onClick={() => {
+							closeSidebar();
+							navigate(`/mailbox/${mailboxId}/settings`);
+						}}
+					/>
 				</List>
 			</Box>
 
