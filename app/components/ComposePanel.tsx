@@ -18,6 +18,7 @@ import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor from "./RichTextEditor";
 import { AttachButton, AttachmentChips, FromDriveButton, useFileDrop } from "./ComposeAttachments";
 import ScheduleSendButton from "./ScheduleSendButton";
+import { RecipientField } from "~/components/RecipientField";
 
 export default function ComposePanel() {
 	const { mailboxId, folder } = useParams<{
@@ -103,15 +104,7 @@ export default function ComposePanel() {
 						{fieldRow(
 							"To",
 							<Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
-								<TextField
-									fullWidth
-									size="small"
-									type="text"
-									placeholder="recipient@example.com"
-									value={to}
-									onChange={(e) => setTo(e.target.value)}
-									required
-								/>
+								<RecipientField mailboxId={mailboxId} label="To" value={to} onChange={setTo} placeholder="recipient@example.com" />
 								{!showCcBcc && (
 									<Button size="small" onClick={() => setShowCcBcc(true)} sx={{ flexShrink: 0, fontSize: 12 }}>
 										CC / BCC
@@ -123,25 +116,13 @@ export default function ComposePanel() {
 						{showCcBcc &&
 							fieldRow(
 								"CC",
-								<TextField
-									fullWidth
-									size="small"
-									value={cc}
-									onChange={(e) => setCc(e.target.value)}
-									placeholder="Separate multiple addresses with commas"
-								/>,
+								<RecipientField mailboxId={mailboxId} label="Cc" value={cc} onChange={setCc} />,
 							)}
 
 						{showCcBcc &&
 							fieldRow(
 								"BCC",
-								<TextField
-									fullWidth
-									size="small"
-									value={bcc}
-									onChange={(e) => setBcc(e.target.value)}
-									placeholder="Separate multiple addresses with commas"
-								/>,
+								<RecipientField mailboxId={mailboxId} label="Bcc" value={bcc} onChange={setBcc} />,
 							)}
 
 						{fieldRow(

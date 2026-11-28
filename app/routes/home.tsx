@@ -32,6 +32,7 @@ import { queryKeys } from "~/queries/keys";
 import { useToast } from "~/lib/toast";
 import { useDrive } from "~/queries/drive";
 import { AppHeader } from "~/shell/AppHeader";
+import { AccountMenu } from "~/shell/AccountMenu";
 
 export function meta() {
 	return [{ title: "Agentic Inbox" }];
@@ -358,5 +359,5 @@ export default function HomeRoute() {
 /** The shared Mail header on the mailbox picker (no search or settings here). */
 function HomeHeader() {
 	const drive = useDrive();
-	return <AppHeader app="mail" homeHref="/" appUrls={{ drive: drive?.url }} />;
+	return <AppHeader app="mail" homeHref="/" appUrls={{ drive: drive?.url }} account={<AccountMenu />} />;
 }

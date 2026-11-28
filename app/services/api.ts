@@ -142,6 +142,8 @@ interface EmailListResponse {
 // ---------- API client ----------
 
 const api = {
+	getContacts: (mailboxId: string) =>
+		get<Array<{ address: string; count: number; last: string }>>(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/contacts`),
 	// Push notifications (installed app)
 	getPushConfig: () => get<{ publicKey: string | null }>("/api/v1/push"),
 	savePushSubscription: (mailboxId: string, subscription: PushSubscriptionJSON) =>

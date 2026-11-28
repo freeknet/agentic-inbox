@@ -340,6 +340,9 @@ app.post("/api/v1/mailboxes/:mailboxId/emails/:id/forward", handleForwardEmail);
 
 app.get("/api/v1/mailboxes/:mailboxId/folders", async (c: AppContext) => c.json(await c.var.mailboxStub.getFolders()));
 
+// Recipient suggestions for compose.
+app.get("/api/v1/mailboxes/:mailboxId/contacts", async (c: AppContext) => c.json(await c.var.mailboxStub.getContacts()));
+
 app.post("/api/v1/mailboxes/:mailboxId/folders", async (c: AppContext) => {
 	const { name } = (await c.req.json()) as { name: string };
 	const slug = slugify(name);

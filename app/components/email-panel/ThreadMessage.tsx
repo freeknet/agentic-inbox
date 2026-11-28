@@ -34,6 +34,7 @@ import { useInlineImages } from "~/hooks/useInlineImages";
 import { formatDetailDate, splitEmailList, stripHtml } from "~/lib/utils";
 import type { Email } from "~/types";
 import { avatarColor, messageDate, relativeTime, senderName, shortAddress } from "./people";
+import { SenderCard } from "./SenderCard";
 
 interface ThreadMessageProps {
 	email: Email;
@@ -192,7 +193,7 @@ export default function ThreadMessage({
 			>
 				<SenderAvatar email={email} isDraft={isDraft} isSelf={isSelf} />
 				<Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", columnGap: 2, [WIDE]: { flexDirection: "row" } }}>
-					<Typography variant="body2" noWrap sx={{ fontWeight: unread ? 700 : 500, flexShrink: 0, color: isDraft ? "error.main" : undefined, [WIDE]: { width: 180 } }}>
+					<Typography variant="body2" noWrap sx={{ fontWeight: unread ? 700 : 500, flexShrink: 0, color: isDraft ? "error.main" : undefined, [WIDE]: { maxWidth: "40%" } }}>
 						{name}
 					</Typography>
 					<Typography variant="body2" color="text.secondary" noWrap sx={{ flex: 1, minWidth: 0 }}>
@@ -215,9 +216,17 @@ export default function ThreadMessage({
 				<SenderAvatar email={email} isDraft={isDraft} isSelf={isSelf} />
 				<Box sx={{ flex: 1, minWidth: 0 }}>
 					<Box sx={{ display: "flex", alignItems: "baseline", gap: 0.75, minWidth: 0, flexWrap: "wrap" }}>
-						<Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
-							{name}
-						</Typography>
+						{isDraft ? (
+							<Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
+								{name}
+							</Typography>
+						) : (
+							<SenderCard address={email.sender} name={senderName(email)}>
+								<Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
+									{name}
+								</Typography>
+							</SenderCard>
+						)}
 						{!isDraft && name !== email.sender && (
 							<Typography variant="caption" color="text.secondary" noWrap sx={{ minWidth: 0, display: "none", [WIDE]: { display: "block" } }}>
 								&lt;{email.sender}&gt;

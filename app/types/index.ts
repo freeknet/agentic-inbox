@@ -51,6 +51,8 @@ export interface Email {
 	participants?: string;
 	needs_reply?: boolean;
 	has_draft?: boolean;
+	/** List rows: the conversation has a (non-inline) attachment. */
+	has_attachments?: boolean;
 }
 
 export interface Attachment {

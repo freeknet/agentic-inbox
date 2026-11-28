@@ -21,6 +21,14 @@ import { useUIStore } from "~/hooks/useUIStore";
 import type { Email } from "~/types";
 import { usePrefs } from "~/lib/prefs";
 import { EmptyState, ViewHeader, ViewTitle } from "~/shell/View";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
+import StarBorderIcon from "@mui/icons-material/StarBorder";
+import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
+import MarkEmailUnreadOutlinedIcon from "@mui/icons-material/MarkEmailUnreadOutlined";
+import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
+import CheckIcon from "@mui/icons-material/Check";
+import Avatar from "@mui/material/Avatar";
+import { avatarColor } from "~/components/email-panel/people";
 
 function highlightTerms(text: string, query: string): React.ReactNode {
 	if (!query || !text) return text;
@@ -113,6 +121,10 @@ export default function SearchResultsRoute() {
 						</Typography>
 					)}
 				</ViewHeader>
+				<SearchFilterChips
+					query={urlQuery}
+					onChange={(q) => navigate(`/mailbox/${mailboxId}/search?q=${encodeURIComponent(q)}`)}
+				/>
 				<Box sx={{ flex: 1, overflowY: "auto" }}>
 					{isLoading ? (
 						<Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
@@ -171,9 +183,13 @@ export default function SearchResultsRoute() {
 											"&:hover": { bgcolor: isSelected ? "action.selected" : "action.hover" },
 										}}
 									>
-										<Box sx={{ width: 10, flexShrink: 0, display: "flex", justifyContent: "center" }}>
+										<Box sx={{ width: 10, flexShrink: 0, display: { xs: "none", sm: "flex" }, justifyContent: "center" }}>
 											{!email.read && <Box sx={{ height: 8, width: 8, borderRadius: "50%", bgcolor: "primary.main" }} />}
 										</Box>
+										{/* Phones: the sender's avatar, as in the inbox. */}
+										<Avatar sx={{ display: { xs: "flex", sm: "none" }, width: 40, height: 40, flexShrink: 0, fontSize: 17, color: "#fff", bgcolor: avatarColor(email.sender) }}>
+											{email.sender.charAt(0).toUpperCase()}
+										</Avatar>
 										<Box sx={{ minWidth: 0, flex: 1 }}>
 											<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
 												<Typography
@@ -191,7 +207,10 @@ export default function SearchResultsRoute() {
 														sx={{ height: 18, fontSize: 11 }}
 													/>
 												)}
-												<Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, ml: "auto" }}>
+												{email.has_attachments && (
+													<AttachFileIcon aria-label="Has attachments" sx={{ fontSize: 16, color: "text.secondary", flexShrink: 0, ml: "auto", transform: "rotate(45deg)" }} />
+												)}
+												<Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, ml: email.has_attachments ? 0.5 : "auto" }}>
 													{formatListDate(email.date)}
 												</Typography>
 											</Box>
@@ -226,5 +245,40 @@ export default function SearchResultsRoute() {
 				)}
 			</>
 		</MailboxSplitView>
+	);
+}
+
+/** Gmail's quick filters under the search: each chip adds or removes an operator in the query. */
+function SearchFilterChips({ query, onChange }: { query: string; onChange: (q: string) => void }) {
+	const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+	const filters: { label: string; token: string; match: RegExp; icon: React.ReactElement }[] = [
+		{ label: "Has attachment", token: "has:attachment", match: /\bhas:attachment\b/i, icon: <AttachFileIcon /> },
+		{ label: "Unread", token: "is:unread", match: /\bis:unread\b/i, icon: <MarkEmailUnreadOutlinedIcon /> },
+		{ label: "Starred", token: "is:starred", match: /\bis:starred\b/i, icon: <StarBorderIcon /> },
+		{ label: "Sent", token: "in:sent", match: /\bin:sent\b/i, icon: <SendOutlinedIcon /> },
+		{ label: "Last 7 days", token: `after:${weekAgo}`, match: /\bafter:\S+/i, icon: <EventOutlinedIcon /> },
+	];
+	return (
+		<Box
+			role="toolbar"
+			aria-label="Search filters"
+			sx={{ display: "flex", gap: 1, px: { xs: 2, md: 2.5 }, pb: 1.5, overflowX: "auto", flexShrink: 0, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}
+		>
+			{filters.map((f) => {
+				const on = f.match.test(query);
+				return (
+					<Chip
+						key={f.label}
+						label={f.label}
+						icon={on ? <CheckIcon /> : f.icon}
+						color={on ? "primary" : "default"}
+						variant={on ? "filled" : "outlined"}
+						aria-pressed={on}
+						onClick={() => onChange((on ? query.replace(f.match, " ") : `${query} ${f.token}`).replace(/\s+/g, " ").trim())}
+						sx={{ flexShrink: 0 }}
+					/>
+				);
+			})}
+		</Box>
 	);
 }

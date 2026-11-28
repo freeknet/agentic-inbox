@@ -19,6 +19,7 @@ import { useUIStore } from "~/hooks/useUIStore";
 import RichTextEditor from "./RichTextEditor";
 import { AttachButton, AttachmentChips, FromDriveButton, useFileDrop } from "./ComposeAttachments";
 import ScheduleSendButton from "./ScheduleSendButton";
+import { RecipientField } from "~/components/RecipientField";
 
 export default function ComposeEmail() {
 	const { mailboxId, folder } = useParams<{
@@ -79,15 +80,7 @@ export default function ComposeEmail() {
 					{error && <Alert severity="error">{error}</Alert>}
 					<Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
 						<Box sx={{ flex: 1 }}>
-							<TextField
-								fullWidth
-								label="To"
-								size="small"
-								placeholder="recipient@example.com, another@example.com"
-								value={to}
-								onChange={(e) => setTo(e.target.value)}
-								required
-							/>
+							<RecipientField mailboxId={mailboxId} label="To" value={to} onChange={setTo} placeholder="To" />
 						</Box>
 						{!showCcBcc && (
 							<Button size="small" onClick={() => setShowCcBcc(true)} sx={{ mt: 0.5, fontSize: 12 }}>
@@ -96,24 +89,10 @@ export default function ComposeEmail() {
 						)}
 					</Box>
 					{showCcBcc && (
-						<TextField
-							fullWidth
-							label="CC"
-							size="small"
-							value={cc}
-							onChange={(e) => setCc(e.target.value)}
-							placeholder="Separate multiple addresses with commas"
-						/>
+						<RecipientField mailboxId={mailboxId} label="Cc" value={cc} onChange={setCc} placeholder="Cc" />
 					)}
 					{showCcBcc && (
-						<TextField
-							fullWidth
-							label="BCC"
-							size="small"
-							value={bcc}
-							onChange={(e) => setBcc(e.target.value)}
-							placeholder="Separate multiple addresses with commas"
-						/>
+						<RecipientField mailboxId={mailboxId} label="Bcc" value={bcc} onChange={setBcc} placeholder="Bcc" />
 					)}
 					<TextField
 						fullWidth

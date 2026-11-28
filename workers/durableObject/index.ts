@@ -303,7 +303,8 @@ export class MailboxDO extends DurableObject<Env> {
 					lp.read, lp.starred, lp.thread_id, lp.folder_id,
 					lp.in_reply_to, lp.email_references,
 					SUBSTR(COALESCE(lp.body_text, lp.body), 1, 300) as snippet,
-					ds.thread_count, ds.thread_unread_count, ds.participants
+					ds.thread_count, ds.thread_unread_count, ds.participants,
+					EXISTS (SELECT 1 FROM attachments a WHERE a.email_id = lp.id AND COALESCE(a.disposition, '') != 'inline') as has_attachments
 				FROM latest_per_group lp
 				JOIN draft_stats ds ON lp.draft_group_key = ds.draft_group_key
 				WHERE lp.rn = 1
@@ -320,6 +321,7 @@ export class MailboxDO extends DurableObject<Env> {
 				thread_count: row.thread_count || 1,
 				thread_unread_count: row.thread_unread_count || 0,
 				participants: row.participants || row.sender,
+				has_attachments: !!row.has_attachments,
 			}));
 		}
 
@@ -396,7 +398,12 @@ export class MailboxDO extends DurableObject<Env> {
 					AND lmc.folder_id != (SELECT id FROM folders WHERE name = 'draft' LIMIT 1)
 					AND cs.thread_read_count > 0
 					THEN 1 ELSE 0 END as needs_reply,
-				CASE WHEN cs.has_draft > 0 THEN 1 ELSE 0 END as has_draft
+				CASE WHEN cs.has_draft > 0 THEN 1 ELSE 0 END as has_draft,
+				EXISTS (
+					SELECT 1 FROM attachments a
+					JOIN all_emails_with_conversation c ON c.id = a.email_id
+					WHERE c.conversation_id = lif.conversation_id AND COALESCE(a.disposition, '') != 'inline'
+				) as has_attachments
 			FROM latest_in_folder lif
 			JOIN conversation_stats cs ON lif.conversation_id = cs.conversation_id
 			LEFT JOIN latest_message_per_conversation lmc
@@ -417,6 +424,7 @@ export class MailboxDO extends DurableObject<Env> {
 			participants: row.participants || row.sender,
 			needs_reply: !!row.needs_reply,
 			has_draft: !!row.has_draft,
+			has_attachments: !!row.has_attachments,
 		}));
 	}
 
@@ -743,7 +751,8 @@ export class MailboxDO extends DurableObject<Env> {
 				e.read, e.starred, e.in_reply_to, e.email_references,
 				e.thread_id, e.folder_id,
 				SUBSTR(COALESCE(e.body_text, e.body), 1, 300) as snippet,
-				f.name as folder_name
+				f.name as folder_name,
+				EXISTS (SELECT 1 FROM attachments a WHERE a.email_id = e.id AND COALESCE(a.disposition, '') != 'inline') as has_attachments
 			FROM emails e
 			LEFT JOIN folders f ON e.folder_id = f.id
 			${where}
@@ -755,6 +764,7 @@ export class MailboxDO extends DurableObject<Env> {
 			...row,
 			read: !!row.read,
 			starred: !!row.starred,
+			has_attachments: !!row.has_attachments,
 		}));
 	}
 
@@ -1067,6 +1077,44 @@ export class MailboxDO extends DurableObject<Env> {
 		)] as Array<{ model: string; calls: number; input_tokens: number; output_tokens: number; neurons: number }>;
 		const neurons = models.reduce((n, m) => n + m.neurons, 0);
 		return { day, neurons, limit: FREE_NEURONS_PER_DAY, models };
+	}
+
+	/**
+	 * People you correspond with, for recipient suggestions: who wrote to you
+	 * and who you wrote to, most frequent and recent first. Bounded reads
+	 * (latest 2,000 messages) to stay inside the Free plan's limits.
+	 */
+	async getContacts(limit = 300) {
+		const rows = [...this.ctx.storage.sql.exec(
+			`SELECT sender, recipient, cc, bcc, folder_id, date FROM emails
+			 WHERE folder_id NOT IN ('draft', 'spam', 'trash') ORDER BY date DESC LIMIT 2000`,
+		)] as Array<{ sender: string; recipient: string | null; cc: string | null; bcc: string | null; folder_id: string; date: string }>;
+		const own = new Set<string>();
+		const seen = new Map<string, { address: string; count: number; last: string; sent: number }>();
+		const add = (raw: string, date: string, sent: boolean) => {
+			const m = raw.match(/<([^>]+)>/);
+			const address = (m ? m[1] : raw).trim().toLowerCase();
+			if (!address.includes("@") || address.length > 254) return;
+			const c = seen.get(address) ?? { address, count: 0, last: date, sent: 0 };
+			c.count++;
+			if (sent) c.sent++;
+			if (date > c.last) c.last = date;
+			seen.set(address, c);
+		};
+		for (const r of rows) {
+			if (r.folder_id === "sent") {
+				own.add(r.sender.toLowerCase());
+				for (const list of [r.recipient, r.cc, r.bcc]) for (const a of (list ?? "").split(",")) if (a.trim()) add(a, r.date, true);
+			} else if (r.sender) {
+				add(r.sender, r.date, false);
+			}
+		}
+		for (const a of own) seen.delete(a);
+		// People you've written to count double; then recency breaks ties.
+		return [...seen.values()]
+			.sort((a, b) => b.sent * 2 + b.count - (a.sent * 2 + a.count) || b.last.localeCompare(a.last))
+			.slice(0, limit)
+			.map(({ address, count, last }) => ({ address, count, last }));
 	}
 
 	/** Saves (or refreshes) a browser's push subscription. */
