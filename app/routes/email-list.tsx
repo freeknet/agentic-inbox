@@ -60,6 +60,8 @@ import { SwipeRow } from "~/components/SwipeRow";
 import { avatarColor } from "~/components/email-panel/people";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import { NAV_BAR_HEIGHT } from "~/shell/NavBar";
+import { dateGroup, folderColor, folderIcon } from "~/lib/folders";
+import Stack from "@mui/material/Stack";
 
 const FOLDER_EMPTY_STATES: Record<
 	string,
@@ -199,6 +201,7 @@ export default function EmailListRoute() {
 	const [bulkBusy, setBulkBusy] = useState(false);
 
 	const pageSize = usePrefs((p) => p.pageSize);
+	const showAvatars = usePrefs((p) => p.showAvatars);
 	const refreshSeconds = usePrefs((p) => p.refreshSeconds);
 	const density = usePrefs((p) => p.density);
 	const showSnippets = usePrefs((p) => p.showSnippets);
@@ -825,7 +828,24 @@ export default function EmailListRoute() {
 									</ActionButton>
 								</SelectionBar>
 							) : (
-								<ViewTitle>{folderName}</ViewTitle>
+								<Stack direction="row" spacing={1.5} sx={{ alignItems: "center", minWidth: 0 }}>
+									<Box
+										aria-hidden
+										sx={{
+											display: { xs: "none", sm: "flex" },
+											width: 36,
+											height: 36,
+											borderRadius: 2.5,
+											alignItems: "center",
+											justifyContent: "center",
+											color: folderColor(folder ?? "inbox"),
+											bgcolor: `color-mix(in srgb, ${folderColor(folder ?? "inbox")} 16%, transparent)`,
+										}}
+									>
+										{folderIcon(folder ?? "inbox", { fontSize: "small" })}
+									</Box>
+									<ViewTitle>{folderName}</ViewTitle>
+								</Stack>
 							)}
 						</Box>
 					</Box>
@@ -856,12 +876,26 @@ export default function EmailListRoute() {
 					<EmailListSkeleton />
 				) : emails.length > 0 ? (
 					<TransitionGroup component={null}>
-						{emails.map((email, index) => {
+						{emails.flatMap((email, index) => {
+							// A heading where the date group changes (Today, Yesterday, …).
+							const group = dateGroup(email.date);
+							const heading =
+								index === 0 || dateGroup(emails[index - 1].date) !== group ? (
+									<Collapse key={`group-${group}`} timeout={200}>
+										<Typography
+											component="h3"
+											variant="caption"
+											sx={{ display: "block", px: { xs: 2, md: 2.5 }, pt: index === 0 ? 1 : 2, pb: 0.75, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "text.secondary", borderBottom: 1, borderColor: "divider" }}
+										>
+											{group}
+										</Typography>
+									</Collapse>
+								) : null;
 							const isSelected = selectedEmailId === email.id;
 							const checked = selected.has(email.id);
 							const snippet = getSnippetText(email.snippet);
 							const unread = hasUnread(email);
-							return (
+							const row = (
 								<Collapse key={email.id} timeout={200}>
 								<SwipeRow
 									disabled={folder === Folders.ARCHIVE || folder === Folders.TRASH || folder === Folders.DRAFT}
@@ -894,7 +928,7 @@ export default function EmailListRoute() {
 										borderColor: "divider",
 										px: isPanelOpen ? { xs: 1.5, md: 1.5 } : { xs: 1.5, md: 2.5 },
 										py: rowPy,
-										bgcolor: checked ? "action.selected" : isSelected ? "action.focus" : "transparent",
+										bgcolor: checked ? "action.selected" : isSelected ? "action.focus" : unread ? "color-mix(in srgb, var(--mui-palette-primary-main) 6%, transparent)" : "transparent",
 										// The keyboard cursor (j/k): a bar on the left, as in Gmail.
 										boxShadow: index === cursor && shortcutsOn ? "inset 3px 0 0 var(--mui-palette-primary-main)" : "none",
 										"&:hover": { bgcolor: checked ? "action.selected" : "action.hover" },
@@ -957,6 +991,12 @@ export default function EmailListRoute() {
 									>
 										{email.starred ? <StarIcon sx={{ fontSize: 16 }} /> : <StarBorderIcon sx={{ fontSize: 16 }} />}
 									</IconButton>
+									{/* Larger screens: the sender's picture, if that preference is on. */}
+									{showAvatars && (
+										<Avatar aria-hidden sx={{ display: { xs: "none", sm: "flex" }, width: 32, height: 32, fontSize: 14, flexShrink: 0, color: "#fff", bgcolor: avatarColor(email.sender) }}>
+											{formatParticipants(email).charAt(0).toUpperCase()}
+										</Avatar>
+									)}
 
 									{/* Content */}
 									<Box sx={{ minWidth: 0, flex: 1 }}>
@@ -1060,6 +1100,7 @@ export default function EmailListRoute() {
 								</SwipeRow>
 								</Collapse>
 							);
+							return heading ? [heading, row] : [row];
 						})}
 					</TransitionGroup>
 				) : (

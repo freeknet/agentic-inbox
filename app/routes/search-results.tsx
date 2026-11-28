@@ -65,6 +65,7 @@ function highlightTerms(text: string, query: string): React.ReactNode {
 
 export default function SearchResultsRoute() {
 	const { mailboxId } = useParams<{ mailboxId: string }>();
+	const showAvatars = usePrefs((p) => p.showAvatars);
 	const [searchParams] = useSearchParams();
 	const navigate = useNavigate();
 	const { selectedEmailId, isComposing, selectEmail, closePanel } = useUIStore();
@@ -187,7 +188,7 @@ export default function SearchResultsRoute() {
 											{!email.read && <Box sx={{ height: 8, width: 8, borderRadius: "50%", bgcolor: "primary.main" }} />}
 										</Box>
 										{/* Phones: the sender's avatar, as in the inbox. */}
-										<Avatar sx={{ display: { xs: "flex", sm: "none" }, width: 40, height: 40, flexShrink: 0, fontSize: 17, color: "#fff", bgcolor: avatarColor(email.sender) }}>
+										<Avatar sx={{ display: { xs: "flex", sm: showAvatars ? "flex" : "none" }, width: { xs: 40, sm: 32 }, height: { xs: 40, sm: 32 }, flexShrink: 0, fontSize: { xs: 17, sm: 14 }, color: "#fff", bgcolor: avatarColor(email.sender) }}>
 											{email.sender.charAt(0).toUpperCase()}
 										</Avatar>
 										<Box sx={{ minWidth: 0, flex: 1 }}>

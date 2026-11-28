@@ -14,10 +14,11 @@ import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useColorScheme } from "@mui/material/styles";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Link as RouterLink } from "react-router";
 import { APP_BRANDS, AppsMenu, type AppId } from "./AppsMenu";
 import { InstallButton } from "./pwa";
+import { type SearchTip, SearchSuggestions } from "./SearchSuggestions";
 
 export const HEADER_HEIGHT = 64;
 export const SIDEBAR_WIDTH = 256;
@@ -49,6 +50,13 @@ export interface AppHeaderProps {
 		onChange: (value: string) => void;
 		onSubmit: () => void;
 		onClear: () => void;
+		/** Recent searches shown when the box has focus (useRecentSearches). */
+		recent?: string[];
+		onRemoveRecent?: (q: string) => void;
+		/** Search a recent query or filter right away. */
+		onPick?: (q: string) => void;
+		/** Quick filters offered as chips (they add an operator to the query). */
+		tips?: SearchTip[];
 	};
 	/** App-specific icon buttons, shown before theme, settings and apps. */
 	actions?: ReactNode;
@@ -68,6 +76,7 @@ export interface AppHeaderProps {
  */
 export function AppHeader({ app, homeHref, appUrls, search, actions, settings, account, onMenuClick }: AppHeaderProps) {
 	const brand = APP_BRANDS[app];
+	const [focused, setFocused] = useState(false);
 	return (
 		<Stack
 			component="header"
@@ -113,7 +122,11 @@ export function AppHeader({ app, homeHref, appUrls, search, actions, settings, a
 			<Box
 				component="form"
 				role="search"
-				sx={{ flex: 1, maxWidth: 720, minWidth: 0 }}
+				onFocus={() => setFocused(true)}
+				onBlur={(e) => {
+					if (!e.currentTarget.contains(e.relatedTarget as Node)) setFocused(false);
+				}}
+				sx={{ flex: 1, maxWidth: 720, minWidth: 0, position: "relative" }}
 				onSubmit={(e) => {
 					e.preventDefault();
 					search.onSubmit();
@@ -126,7 +139,10 @@ export function AppHeader({ app, homeHref, appUrls, search, actions, settings, a
 					value={search.value}
 					onChange={(e) => search.onChange(e.target.value)}
 					onKeyDown={(e) => {
-						if (e.key === "Escape" && search.value) search.onClear();
+						if (e.key === "Escape") {
+							if (search.value) search.onClear();
+							else (e.target as HTMLElement).blur();
+						}
 					}}
 					slotProps={{
 						htmlInput: { "aria-label": search.placeholder },
@@ -147,6 +163,20 @@ export function AppHeader({ app, homeHref, appUrls, search, actions, settings, a
 						},
 					}}
 				/>
+				{focused && (search.recent?.length || search.tips?.length) ? (
+					<SearchSuggestions
+						value={search.value}
+						recent={search.recent ?? []}
+						tips={search.tips}
+						onPick={(q) => {
+							setFocused(false);
+							(document.activeElement as HTMLElement | null)?.blur();
+							search.onPick?.(q);
+						}}
+						onInsert={(token) => search.onChange(`${search.value.trim()} ${token}`.trim() + " ")}
+						onRemove={(q) => search.onRemoveRecent?.(q)}
+					/>
+				) : null}
 			</Box>
 			) : (
 				<Box sx={{ flex: 1 }} />

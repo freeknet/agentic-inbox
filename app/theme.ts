@@ -93,7 +93,19 @@ export const theme = createTheme({
 			styleOverrides: { root: { backgroundImage: "none" } },
 		},
 		MuiBottomNavigationAction: { styleOverrides: { root: { minWidth: 0, paddingInline: 4 } } },
-		MuiCssBaseline: { styleOverrides: { body: { margin: 0 } } },
+		// A clear ring on whatever has keyboard focus (mouse clicks don't show it).
+		MuiButtonBase: {
+			styleOverrides: {
+				root: { "&.Mui-focusVisible": { outline: "2px solid var(--mui-palette-primary-main)", outlineOffset: 2 } },
+			},
+		},
+		MuiCssBaseline: {
+			styleOverrides: {
+				body: { margin: 0 },
+				"a:focus-visible, [tabindex]:focus-visible": { outline: "2px solid var(--mui-palette-primary-main)", outlineOffset: 2 },
+				"::selection": { background: "color-mix(in srgb, var(--mui-palette-primary-main) 30%, transparent)" },
+			},
+		},
 	},
 });
 

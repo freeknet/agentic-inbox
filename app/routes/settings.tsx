@@ -71,7 +71,7 @@ function Section({
 	children: ReactNode;
 }) {
 	return (
-		<Box component="section" sx={sectionSx}>
+		<Box component="section" id={sectionId(title)} sx={{ ...sectionSx, scrollMarginTop: 56 }}>
 			<Box sx={{ mb: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
 				<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
 					<Box sx={{ display: "flex", width: 32, height: 32, borderRadius: 2, alignItems: "center", justifyContent: "center", bgcolor: "action.hover" }}>{icon}</Box>
@@ -204,6 +204,30 @@ function UsageBar({ value, max, label }: { value: number; max: number; label: st
 }
 
 const captionSx = { display: "block", mt: 0.5 };
+/** Anchor id for a settings section title. */
+const sectionId = (title: string) => `settings-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
+/** The jump chips: section titles with their colour. */
+const SETTINGS_SECTIONS: [string, string][] = [
+	["Account", "#5f6368"],
+	["Appearance", "#f538a0"],
+	["Layout", "#24c1e0"],
+	["Behaviour", "#4285f4"],
+	["Notifications", "#ea4335"],
+	["Signature", "#fa7b17"],
+	["Vacation auto-reply", "#fbbc04"],
+	["Forwarding", "#a142f4"],
+	["Usage", "#34a853"],
+];
+/** Smooth-scroll to a section; jump straight there if the smooth scroll didn't run (background tab, reduced motion). */
+function jumpTo(id: string) {
+	const el = document.getElementById(id);
+	if (!el) return;
+	el.scrollIntoView({ behavior: "smooth", block: "start" });
+	const before = el.getBoundingClientRect().top;
+	setTimeout(() => {
+		if (Math.abs(el.getBoundingClientRect().top - before) < 2 && before > 120) el.scrollIntoView({ block: "start" });
+	}, 450);
+}
 /** Sections are separated by a rule, as in Drive's settings. */
 const sectionSx = { py: 3, borderTop: 1, borderColor: "divider", "&:first-of-type": { borderTop: 0, pt: 1 } } as const;
 
@@ -313,8 +337,26 @@ export default function SettingsRoute() {
 				</Button>
 			</ViewHeader>
 			<Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", px: { xs: 2, md: 3.5 }, pb: 4 }}>
+			{/* Jump to a section; the bar stays in view while scrolling. */}
+			<Box
+				role="navigation"
+				aria-label="Settings sections"
+				sx={{ position: "sticky", top: 0, zIndex: 1, bgcolor: "background.paper", display: "flex", gap: 0.75, py: 1.25, mb: 1, overflowX: "auto", maxWidth: 720, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" }, borderBottom: 1, borderColor: "divider" }}
+			>
+				{SETTINGS_SECTIONS.map(([label, color]) => (
+					<Chip
+						key={label}
+						label={label}
+						size="small"
+						variant="outlined"
+						icon={<Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: color, ml: "8px !important" }} />}
+						onClick={() => jumpTo(sectionId(label))}
+						sx={{ flexShrink: 0 }}
+					/>
+				))}
+			</Box>
 			<Box sx={{ display: "flex", flexDirection: "column", maxWidth: 720 }}>
-				<Box component="section" sx={sectionSx}>
+				<Box component="section" id={sectionId("Account")} sx={{ ...sectionSx, scrollMarginTop: 56 }}>
 					<Typography variant="subtitle2" sx={{ mb: 2 }}>
 						Account
 					</Typography>
@@ -397,6 +439,7 @@ export default function SettingsRoute() {
 							onChange={(v) => prefs.set("showSnippets", v)}
 							label="Show a preview line of each message"
 						/>
+						<Toggle checked={prefs.showAvatars} onChange={(v) => prefs.set("showAvatars", v)} label="Show sender pictures in the list" />
 					</Box>
 				</Section>
 

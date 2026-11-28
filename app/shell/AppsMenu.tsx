@@ -2,6 +2,7 @@
 import AddToDriveIcon from "@mui/icons-material/AddToDrive";
 import AppsIcon from "@mui/icons-material/Apps";
 import MailIcon from "@mui/icons-material/Mail";
+import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import Paper from "@mui/material/Paper";
 import Popover from "@mui/material/Popover";
@@ -12,9 +13,9 @@ import { useState } from "react";
 
 export type AppId = "mail" | "drive";
 
-export const APP_BRANDS: Record<AppId, { name: string; icon: (size: number) => React.ReactNode }> = {
-	mail: { name: "Mail", icon: (size) => <MailIcon sx={{ fontSize: size, color: "#ea4335" }} /> },
-	drive: { name: "Drive", icon: (size) => <AddToDriveIcon sx={{ fontSize: size, color: "#1a73e8" }} /> },
+export const APP_BRANDS: Record<AppId, { name: string; color: string; icon: (size: number) => React.ReactNode }> = {
+	mail: { name: "Mail", color: "#ea4335", icon: (size) => <MailIcon sx={{ fontSize: size, color: "#ea4335" }} /> },
+	drive: { name: "Drive", color: "#1a73e8", icon: (size) => <AddToDriveIcon sx={{ fontSize: size, color: "#1a73e8" }} /> },
 };
 
 /**
@@ -55,11 +56,15 @@ export function AppsMenu({ current, urls }: { current: AppId; urls: Partial<Reco
 								borderRadius: 2,
 								textDecoration: "none",
 								color: "text.primary",
-								bgcolor: id === current ? "action.selected" : undefined,
-								"&:hover": { bgcolor: id === current ? "action.selected" : "action.hover" },
+								transition: "background-color .15s, transform .15s",
+								bgcolor: id === current ? `color-mix(in srgb, ${APP_BRANDS[id].color} 14%, transparent)` : undefined,
+								"&:hover": { bgcolor: `color-mix(in srgb, ${APP_BRANDS[id].color} 18%, transparent)`, transform: "translateY(-1px)" },
 							}}
 						>
-							{APP_BRANDS[id].icon(36)}
+							{/* Each app's icon on a soft tile of its own colour. */}
+							<Box sx={{ width: 52, height: 52, borderRadius: 3, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: `color-mix(in srgb, ${APP_BRANDS[id].color} 12%, var(--mui-palette-background-paper))` }}>
+								{APP_BRANDS[id].icon(32)}
+							</Box>
 							<Typography variant="body2">{APP_BRANDS[id].name}</Typography>
 						</Stack>
 					))}

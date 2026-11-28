@@ -13,6 +13,12 @@ import { toggleSidebar as toggleShellSidebar } from "~/shell/layout";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import Button from "@mui/material/Button";
 import { AccountMenu } from "~/shell/AccountMenu";
+import { useRecentSearches } from "~/shell/SearchSuggestions";
+import MarkEmailUnreadOutlinedIcon from "@mui/icons-material/MarkEmailUnreadOutlined";
+import StarBorderIcon from "@mui/icons-material/StarBorder";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
+import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutlined";
 
 /** Mail's top bar: the shared shell header with Mail's refresh and agent buttons. */
 export default function Header() {
@@ -24,6 +30,7 @@ export default function Header() {
 	const { toggleSidebar, toggleAgentPanel, isAgentPanelOpen } = useUIStore();
 	const queryClient = useQueryClient();
 	const drive = useDrive();
+	const recent = useRecentSearches("mail-recent-searches");
 
 	const isRefreshing =
 		useIsFetching({
@@ -61,8 +68,25 @@ export default function Header() {
 				value: searchQuery,
 				onChange: setSearchQuery,
 				onSubmit: () => {
-					if (mailboxId && searchQuery.trim()) navigate(`/mailbox/${mailboxId}/search?q=${encodeURIComponent(searchQuery.trim())}`);
+					if (!mailboxId || !searchQuery.trim()) return;
+					recent.add(searchQuery);
+					navigate(`/mailbox/${mailboxId}/search?q=${encodeURIComponent(searchQuery.trim())}`);
 				},
+				recent: recent.items,
+				onRemoveRecent: recent.remove,
+				onPick: (q) => {
+					if (!mailboxId) return;
+					setSearchQuery(q);
+					recent.add(q);
+					navigate(`/mailbox/${mailboxId}/search?q=${encodeURIComponent(q)}`);
+				},
+				tips: [
+					{ label: "Unread", insert: "is:unread", icon: <MarkEmailUnreadOutlinedIcon />, color: "#4285f4" },
+					{ label: "Starred", insert: "is:starred", icon: <StarBorderIcon />, color: "#fbbc04" },
+					{ label: "Has attachment", insert: "has:attachment", icon: <AttachFileIcon />, color: "#fa7b17" },
+					{ label: "Sent", insert: "in:sent", icon: <SendOutlinedIcon />, color: "#34a853" },
+					{ label: "From…", insert: "from:", icon: <PersonOutlineIcon />, color: "#a142f4" },
+				],
 				onClear: () => {
 					setSearchQuery("");
 					if (location.pathname.includes("/search") && mailboxId) navigate(inbox);

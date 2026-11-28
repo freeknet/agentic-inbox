@@ -31,6 +31,8 @@ interface Prefs {
 	density: Density;
 	fontSize: FontSize;
 	showSnippets: boolean;
+	/** Sender avatars in the list on larger screens (phones always show them). */
+	showAvatars: boolean;
 	// Layout
 	readingPane: ReadingPane;
 	/** Message list width (px) with the pane on the right. */
@@ -55,6 +57,7 @@ export const DEFAULT_PREFS = {
 	density: "comfortable" as Density,
 	fontSize: "medium" as FontSize,
 	showSnippets: true,
+	showAvatars: true,
 	readingPane: "right" as ReadingPane,
 	listWidth: 400,
 	listHeight: 320,
